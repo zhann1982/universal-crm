@@ -46,7 +46,7 @@ Editable fields:
 - company
 - responsible member
 - expected close date
-- notes
+- notes / description
 
 Requirements:
 
@@ -57,15 +57,19 @@ Requirements:
 - Company must belong to current organization
 - Company must not be deleted
 - selected responsible member must belong to current organization
-- selected responsible member should be active
+- selected responsible member should normally be active
 - Zod validation
 - updatedAt must be updated
 
 If pipeline changes, stage selection must also change to a valid stage in the new
 pipeline.
 
-Do not allow a stage from another pipeline to be submitted through manipulated
+Do not allow a Stage from another Pipeline to be submitted through manipulated
 form data.
+
+The current simple `notes` field remains a single description / summary field.
+
+It is not the long-term multi-user Notes system.
 
 ---
 
@@ -86,12 +90,12 @@ won
 lost
 → closedAt = existing closedAt or current time
 
-If Deal editing changes the stage, apply the same rules used by manual stage
+If Deal editing changes the Stage, apply the same rules used by manual Stage
 movement.
 
 Avoid duplicating this logic in many independent places.
 
-A small reusable server helper may be appropriate once Deal editing is added.
+A small reusable server helper may be appropriate once Deal editing is stable.
 
 Do not create a separate Deal status field.
 
@@ -114,9 +118,12 @@ Requirements:
 - deletedAt remains null
 - normal hard deletion is not exposed
 - active/archive views or equivalent discoverability
-- archived Deals should not appear in the normal Kanban
+- archived Deals must not appear in the normal Kanban
 
-Decide whether archived Deal detail remains readable.
+Archived Deal detail may remain readable if the user has deals.read.
+
+Archived Deals must not be editable or movable between Stages unless they are
+first restored.
 
 Prefer archive / restore over physical deletion.
 
@@ -124,13 +131,14 @@ Prefer archive / restore over physical deletion.
 
 # Step 4 — Drag-and-drop Kanban
 
-After manual stage movement and edit behavior are stable, add drag-and-drop.
+After manual Stage movement and Deal editing behavior are stable, add
+drag-and-drop.
 
 Target UX:
 
 Deal card
 → drag
-→ drop into another stage
+→ drop into another Stage
 → Server Action
 → validate Deal
 → validate target Stage
@@ -149,9 +157,9 @@ Client-side drag-and-drop state is not an authorization boundary.
 
 The server must validate every move.
 
-Do not allow drag/drop to mutate pipelineId implicitly.
+Do not allow drag-and-drop to mutate pipelineId implicitly.
 
-Cross-pipeline movement should happen through explicit Deal editing or a later
+Cross-Pipeline movement should happen through explicit Deal editing or a later
 dedicated action.
 
 ---
@@ -160,13 +168,7 @@ dedicated action.
 
 Current board shows counts and monetary totals.
 
-Before adding more analytics, decide how to handle multiple currencies.
-
-Current simple total:
-
-Number(deal.amount)
-
-is acceptable only as a temporary display when data is effectively one currency.
+Before adding more analytics, handle multiple currencies correctly.
 
 Do not present:
 
@@ -174,16 +176,18 @@ KZT + USD + EUR
 
 as one meaningful financial total.
 
-Possible next approach:
-
-group stage totals by currency.
+Prefer grouping totals by currency.
 
 Example:
 
 KZT 1 500 000
 USD 4 000
+EUR 1 250
 
-Do not implement exchange-rate conversion without a concrete product requirement.
+Do not implement exchange-rate conversion without a concrete product
+requirement.
+
+Persistent monetary values must remain PostgreSQL numeric.
 
 ---
 
@@ -195,30 +199,41 @@ Current seed creates:
 
 Основная воронка
 
-with standard stages.
+with standard Stages.
 
 Add administration UI for:
 
 - create Pipeline
 - rename Pipeline
 - archive Pipeline
+- restore Pipeline if needed
 - choose default Pipeline
 - create Stage
 - rename Stage
 - reorder Stage
-- probability
-- type: open / won / lost
-- optional color
+- change Stage probability
+- change Stage type
+- optional Stage color
 
 Permission:
 
 pipelines.manage
 
-Important constraints:
+Stage types:
+
+- open
+- won
+- lost
 
 A Pipeline or Stage currently referenced by Deals must not be casually deleted.
 
-Prefer archive / controlled migration over destructive deletion.
+Prefer:
+
+- archive
+- controlled migration
+- reassignment
+
+over destructive deletion.
 
 ---
 
@@ -234,6 +249,9 @@ Consider:
 - whether each Pipeline requires a won Stage
 - whether each Pipeline requires a lost Stage
 - behavior when archiving a Pipeline containing active Deals
+- behavior when archiving a Stage containing Deals
+- behavior when changing Stage type from open to won/lost
+- behavior when changing Stage type from won/lost to open
 
 Current database does not enforce all of these.
 
@@ -250,17 +268,31 @@ Current Deal directly supports:
 
 Current Deal does not directly reference a Client/contact.
 
-After basic Deal lifecycle is complete, decide whether Deals need:
+After the basic Deal lifecycle is complete, decide whether Deals need:
 
 - one primary Client
 - many Client contacts
-- reuse of client_companies
 - dedicated deal_clients join table
+- reuse of Company-related Client contacts
 
-Do not add a single clientId without deciding the desired CRM relationship model.
+Do not add a single clientId without deciding the intended CRM relationship
+model.
 
-For a universal CRM, a many-to-many Deal ↔ Client relationship may eventually be
-more flexible.
+For a universal CRM, a many-to-many Deal ↔ Client relationship may eventually
+be more flexible.
+
+Possible future model:
+
+deal_clients
+
+- organizationId
+- dealId
+- clientId
+- relationshipType
+- isPrimary
+- createdAt
+
+Do not implement this until the real workflow requires it.
 
 ---
 
@@ -270,6 +302,8 @@ After Deals and Pipeline interaction are stable, begin Tasks.
 
 Likely Task fields:
 
+- id
+- organizationId
 - title
 - description
 - dueAt
@@ -278,9 +312,23 @@ Likely Task fields:
 - ownerMemberId
 - createdByMemberId
 - completedAt
-- organizationId
 - createdAt
 - updatedAt
+- deletedAt
+
+Possible statuses:
+
+- open
+- in_progress
+- completed
+- cancelled
+
+Possible priorities:
+
+- low
+- normal
+- high
+- urgent
 
 Tasks should eventually be linkable to business entities such as:
 
@@ -291,38 +339,394 @@ Tasks should eventually be linkable to business entities such as:
 Do not over-generalize the first implementation before the real workflow is
 tested.
 
+Task authorization must remain tenant-scoped and server-side.
+
 ---
 
-# Step 10 — Comments and activity timeline
+# Step 10 — Collaborative Notes / Comments
 
-After Tasks:
+Current Client, Company and Deal entities contain a simple `notes` text field.
 
-Comments
+Keep this field for now as a single persistent description / summary field.
 
-Activity timeline
+Do not use it as the long-term collaborative Notes system.
 
-Likely tracked Deal events:
+Add a separate multi-user Notes / Comments system.
 
+Target UX:
+
+Entity detail
+→ Notes section
+→ chronological list of Notes
+→ author
+→ creation date/time
+→ last edit date/time
+→ optional last editor
+→ create Note
+→ edit allowed Note
+→ soft-delete allowed Note
+
+Examples of supported parent entities:
+
+- Client
+- Company
+- Deal
+- later Task
+
+A typical UI should look conceptually like:
+
+Ivan Petrov
+25.09.2026 14:32
+
+Client asked to call again after 18:00.
+
+---
+
+Anna Sadykova
+25.09.2026 16:10
+Edited: 25.09.2026 16:22
+
+Commercial proposal sent.
+
+Each Note should eventually contain at least:
+
+- id
+- organizationId
+- authorMemberId
+- lastEditedByMemberId if applicable
+- body
+- createdAt
+- updatedAt
+- deletedAt
+
+authorMemberId must remain immutable.
+
+If another authorized user edits a Note:
+
+- preserve the original author
+- update updatedAt
+- record lastEditedByMemberId
+
+Do not physically delete Notes by default.
+
+Prefer soft deletion so future history and audit data are preserved.
+
+---
+
+## Notes authorization
+
+Viewing a Note must require access to the parent CRM entity.
+
+Knowing a Note UUID must never be sufficient to read it.
+
+Examples:
+
+Deal Note:
+
+organization membership
+→ deals.read
+→ Deal belongs to current organization
+→ Note belongs to that Deal
+→ Note may be read
+
+Company Note:
+
+organization membership
+→ companies.read
+→ Company belongs to current organization
+→ Note belongs to that Company
+→ Note may be read
+
+Client Note:
+
+organization membership
+→ clients.read
+→ Client belongs to current organization
+→ Note belongs to that Client
+→ Note may be read
+
+For the first version, prefer:
+
+- authenticated member can create Notes when they can access the parent entity
+- author can edit their own Note
+- author can soft-delete their own Note
+- authorized administrators may manage other users' Notes
+
+Exact permissions must be defined before implementation.
+
+Possible future permission family:
+
+- comments.create
+- comments.update
+- comments.delete
+- comments.manage
+
+or:
+
+- notes.create
+- notes.update
+- notes.delete
+- notes.manage
+
+Choose one naming convention and use it consistently.
+
+Do not rely on client-side author checks.
+
+All authorship, tenant and permission checks must be enforced server-side.
+
+---
+
+## Notes data model decision
+
+Do not choose a polymorphic relationship casually.
+
+A generic model such as:
+
+entityType
+entityId
+
+is flexible but prevents a normal PostgreSQL foreign key from entityId to the
+actual Client, Company, Deal or Task table.
+
+Before implementation, explicitly compare the following approaches.
+
+### Option A — Entity-specific tables
+
+Examples:
+
+client_notes
+
+company_notes
+
+deal_notes
+
+task_notes
+
+Advantages:
+
+- strong foreign keys
+- simple tenant validation
+- clear queries
+- strong referential integrity
+
+Disadvantages:
+
+- repeated table structure
+- repeated application code
+
+### Option B — Shared Notes table with explicit nullable parent columns
+
+Example:
+
+notes
+
+- id
+- organizationId
+- clientId nullable
+- companyId nullable
+- dealId nullable
+- taskId nullable
+- authorMemberId
+- lastEditedByMemberId
+- body
+- createdAt
+- updatedAt
+- deletedAt
+
+Require exactly one parent reference.
+
+Advantages:
+
+- one Note model
+- normal PostgreSQL foreign keys remain possible
+- easier shared UI and permissions
+
+Disadvantages:
+
+- more nullable parent columns
+- requires a constraint ensuring exactly one parent
+
+This may be a strong candidate for the first universal CRM Notes model.
+
+### Option C — Generic entityType + entityId
+
+Advantages:
+
+- highly generic
+- easy to attach Notes to new entity types
+
+Disadvantages:
+
+- weak database referential integrity
+- harder database constraints
+- easier to create dangling references
+- heavier application validation
+
+Do not choose Option C merely because it looks more generic.
+
+Prefer referential integrity and clear tenant enforcement over premature generic
+abstraction.
+
+Make the final decision immediately before implementing Notes.
+
+---
+
+## Notes editing history
+
+Initial implementation only needs:
+
+- original author
+- createdAt
+- updatedAt
+- optional lastEditedByMemberId
+
+Later, if complete text history is required, add immutable Note revisions.
+
+Possible table:
+
+note_versions
+
+Fields:
+
+- id
+- organizationId
+- noteId
+- body
+- editedByMemberId
+- createdAt
+
+Possible flow:
+
+Note created
+→ version 1
+
+Note edited
+→ current Note body changes
+→ version 2 recorded
+
+Do not build complete revision history before there is a real product
+requirement.
+
+However, the main Notes design should not make adding revision history difficult
+later.
+
+---
+
+# Step 11 — Activity Timeline
+
+After collaborative Notes are stable, implement a general Activity Timeline.
+
+The Activity Timeline is separate from Notes.
+
+Notes represent human-written collaboration.
+
+Activities represent structured events that happened in the CRM.
+
+Likely tracked events:
+
+- Client created
+- Client updated
+- Client archived
+- Client restored
+- Company created
+- Company updated
+- Company archived
+- Company restored
+- Client linked to Company
+- Client unlinked from Company
 - Deal created
-- Stage changed
-- Pipeline changed
-- amount changed
-- responsible member changed
-- archived
-- restored
+- Deal updated
+- Deal Stage changed
+- Deal Pipeline changed
+- Deal amount changed
+- Company on Deal changed
+- responsible Member changed
+- Deal archived
+- Deal restored
+- Note created
+- Note edited
+- Note deleted
+- Task created
+- Task completed
 
-Activity history will later be important for:
+Activity records should include at least:
+
+- id
+- organizationId
+- actorMemberId
+- eventType
+- createdAt
+- structured metadata
+- parent entity relationship
+
+Examples:
+
+deal.stage_changed
+
+deal.owner_changed
+
+deal.amount_changed
+
+note.created
+
+company.archived
+
+task.completed
+
+Structured metadata may contain:
+
+- previous value
+- new value
+- relevant IDs
+- short display snapshot
+
+Do not store secrets or unnecessary sensitive data in activity metadata.
+
+---
+
+## Activity Timeline UX
+
+A Deal detail page may eventually show:
+
+25.09.2026 10:15
+Ivan created the Deal
+
+25.09.2026 11:42
+Ivan moved Stage:
+New → Qualification
+
+25.09.2026 14:30
+Anna added a Note
+
+25.09.2026 16:00
+Anna changed responsible Member:
+Ivan → Anna
+
+This gives users a reliable history of the business process.
+
+---
+
+## Activity Timeline purpose
+
+Activity history will support:
 
 - CRM auditability
+- team collaboration
+- troubleshooting
 - analytics
 - automations
-- AI summaries
+- future notifications
+- future AI summaries
 
-Design history data before introducing AI summaries.
+Do not create Activity Timeline primarily for AI.
+
+The primary purpose is reliable CRM history.
+
+AI may consume this data later through controlled application functions.
 
 ---
 
-# Step 11 — Team hardening
+# Step 12 — Team hardening
 
 Team is working, but some design debt remains.
 
@@ -335,13 +739,15 @@ Improve later:
 - member detail page
 - custom role management UI
 - permission editor UI
+- better display of inactive members
+- ownership reassignment workflows before deactivation where required
 
 Do not block current Deal development on these improvements unless security work
 touches the same code.
 
 ---
 
-# Step 12 — Active organization
+# Step 13 — Active organization
 
 Current active organization remains:
 
@@ -353,7 +759,7 @@ authenticated user
 → memberships
 → selected organization
 → validated active membership
-→ member
+→ Member
 → roles
 → permissions
 
@@ -367,9 +773,12 @@ Possible storage for selected organization may be:
 
 The exact design is not decided yet.
 
+Organization switching must never allow access to an organization without a
+valid active membership.
+
 ---
 
-# Step 13 — Production authentication gaps
+# Step 14 — Production authentication gaps
 
 Before public production release, address:
 
@@ -377,12 +786,14 @@ Before public production release, address:
 - forgot password
 - password reset
 - production email delivery
-- rate limiting
+- login rate limiting
 - brute-force protection
 - account recovery
 - HTTPS
 - production cookie settings
+- BETTER_AUTH_URL configuration
 - secret management
+- security logging
 
 These are important but should not block the current local CRM core milestone.
 
@@ -390,9 +801,9 @@ These are important but should not block the current local CRM core milestone.
 
 # Later roadmap
 
-After Phase 0.2:
+## Phase 0.3
 
-Phase 0.3:
+After Phase 0.2:
 
 - custom fields
 - advanced filters
@@ -400,25 +811,132 @@ Phase 0.3:
 - configurable entity fields
 - configurable CRM structure
 
-Phase 0.4:
+Custom fields are especially important for the universal CRM goal.
 
-- automation engine
+Possible future custom field types:
+
+- text
+- textarea
+- number
+- decimal
+- currency
+- date
+- datetime
+- checkbox
+- select
+- multi-select
+- email
+- phone
+- URL
+- user/member
+- entity reference
+
+Do not implement custom fields until the standard CRM entity lifecycle is
+stable.
+
+---
+
+## Phase 0.4
+
+Automation engine:
+
 - triggers
 - conditions
 - actions
 
-Later:
+Possible triggers:
+
+- Deal created
+- Stage changed
+- Task overdue
+- Note added
+- Client created
+- Company archived
+
+Possible conditions:
+
+- Stage equals X
+- amount greater than X
+- owner equals X
+- custom field value
+- status
+
+Possible actions:
+
+- create Task
+- update field
+- assign Member
+- move Deal
+- create notification
+- call future integration
+
+Do not introduce a queue until actual automation workload requires one.
+
+---
+
+## Later infrastructure
+
+Possible future systems:
 
 - audit log
+- notifications
 - external integrations
+- import/export
+- webhooks
+- API access
 
-Phase 0.5:
+Add infrastructure only when justified by real requirements.
 
-- AI assistant
+---
+
+## Phase 0.5 — AI
+
+AI comes after the CRM core is stable.
+
+Potential AI capabilities:
+
 - natural-language search
-- summaries
+- Deal summaries
+- Client summaries
+- Company summaries
+- Note summaries
+- Activity Timeline summaries
+- suggested Tasks
 - analytics
-- controlled AI actions
+- controlled CRM actions
+
+AI must never have unrestricted database access.
+
+Future AI operations must go through controlled application tools.
+
+Examples:
+
+searchClients()
+
+readClient()
+
+searchCompanies()
+
+readCompany()
+
+readDeal()
+
+readDealNotes()
+
+readDealActivity()
+
+createTask()
+
+updateDeal()
+
+Every AI operation must still pass:
+
+- Better Auth authentication
+- active organization membership
+- RBAC
+- tenant scoping
+- input validation
+- normal CRM business rules
 
 ---
 
@@ -429,6 +947,10 @@ Phase 0.5:
 Better Auth owns authentication.
 
 Do not build a second password/session system.
+
+Do not manually parse authentication independently throughout the application.
+
+Use centralized helpers.
 
 ---
 
@@ -448,13 +970,15 @@ requirePermission()
 
 Server-side authorization is mandatory.
 
+UI permission checks are only UX.
+
 ---
 
 ## Multi-tenancy
 
-Every tenant-owned operation must use the authenticated member's organization.
+Every tenant-owned operation must use the authenticated Member's organization.
 
-Never use browser organizationId as proof of authorization.
+Never use browser-supplied organizationId as proof of authorization.
 
 ---
 
@@ -465,12 +989,24 @@ All submitted relationship IDs must be revalidated.
 Examples:
 
 clientId
+
 companyId
+
+dealId
+
 pipelineId
+
 stageId
+
 ownerMemberId
 
+future taskId
+
+future noteId
+
 UUID validity alone is not authorization.
+
+Every relationship must be validated against the current organization.
 
 ---
 
@@ -478,13 +1014,29 @@ UUID validity alone is not authorization.
 
 Use Zod for external input.
 
+Validate:
+
+- forms
+- route parameters
+- search parameters
+- relationship IDs
+- Server Action data
+- future API payloads
+
 ---
 
 ## Database
 
-Use Drizzle migrations.
+Use Drizzle ORM.
+
+Generate migrations for schema changes.
 
 Never casually edit an already-applied migration.
+
+Prefer explicit relational constraints where practical.
+
+Do not replace strong relational modeling with generic abstractions without a
+clear benefit.
 
 ---
 
@@ -493,9 +1045,16 @@ Never casually edit an already-applied migration.
 The current Neon HTTP driver does not use normal interactive transaction
 callbacks.
 
-Use supported patterns such as db.batch where appropriate.
+Use supported patterns such as:
+
+db.batch([...])
+
+where appropriate.
 
 Do not overstate concurrency guarantees.
+
+Application-level pre-check followed by a write is not automatically a fully
+serialized invariant.
 
 ---
 
@@ -503,11 +1062,43 @@ Do not overstate concurrency guarantees.
 
 Prefer Server Components.
 
-Use Client Components only for actual interaction such as:
+Use Client Components only when actual browser interaction requires them.
+
+Examples:
 
 - dynamic dependent selects
 - drag-and-drop
 - confirmation interaction
+- optimistic UI where justified
+
+Do not convert entire modules to Client Components unnecessarily.
+
+---
+
+## Business record lifecycle
+
+Prefer:
+
+archive
+→ restore
+
+over physical deletion for important CRM entities.
+
+This applies especially to:
+
+- Clients
+- Companies
+- Deals
+- Tasks
+- Notes
+
+Historical CRM data will later support:
+
+- Activity Timeline
+- auditability
+- analytics
+- automations
+- AI summaries
 
 ---
 
@@ -522,11 +1113,13 @@ Do not introduce without a real requirement:
 - paid infrastructure
 - AI API dependencies
 
+Continue with the modular monolith while it remains sufficient.
+
 ---
 
 # Immediate next task
 
-Implement:
+Implement and stabilize:
 
 /crm/deals/[id]/edit
 
@@ -541,13 +1134,24 @@ Deal detail
 → validate responsible Member
 → update Deal
 → apply closedAt rules
+→ update updatedAt
 → return to Deal detail
 
-After that:
+After Deal editing:
 
-Deal archive / restore
-→ drag-and-drop Kanban
-→ Pipeline management
-→ Tasks
-→ Comments
-→ Activity timeline
+1. Deal archive / restore
+2. Drag-and-drop Kanban
+3. improve multi-currency Kanban totals
+4. Pipeline / Stage management
+5. Tasks
+6. Collaborative Notes / Comments
+7. Activity Timeline
+
+The Notes system must support multiple users and show:
+
+- original author
+- created time
+- edited time
+- optional last editor
+
+Do not replace this requirement with a single text field.

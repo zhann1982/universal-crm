@@ -171,3 +171,9 @@ export type CreateDealState = {
     string
   >;
 };
+
+export const updateDealSchema =
+  createDealSchema;
+
+export type UpdateDealState =
+  CreateDealState;

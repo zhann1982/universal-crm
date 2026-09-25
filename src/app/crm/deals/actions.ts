@@ -26,6 +26,8 @@ import {
 import {
   createDealSchema,
   dealIdSchema,
+  updateDealSchema,
+  type UpdateDealState,
   type CreateDealState,
 } from "@/lib/validation/deal";
 
@@ -644,5 +646,497 @@ export async function moveDealToStage(
 
   redirect(
     `/crm/deals/${deal.id}`,
+  );
+}
+
+export async function updateDeal(
+  dealId: string,
+  _previousState:
+    UpdateDealState,
+  formData: FormData,
+): Promise<UpdateDealState> {
+  const {
+    organization,
+    member,
+    permissions,
+  } = await requirePermission(
+    "deals.update",
+  );
+
+  if (
+    !permissions.has(
+      "pipelines.read",
+    )
+  ) {
+    redirect(
+      "/crm/forbidden",
+    );
+  }
+
+  const idResult =
+    dealIdSchema.safeParse(
+      dealId,
+    );
+
+  if (!idResult.success) {
+    redirect(
+      "/crm/deals",
+    );
+  }
+
+  const values =
+    getFormValues(
+      formData,
+    );
+
+  const result =
+    updateDealSchema.safeParse(
+      values,
+    );
+
+  if (!result.success) {
+    return {
+      values,
+
+      errors:
+        result.error.flatten()
+          .fieldErrors,
+
+      message:
+        "Проверьте данные формы.",
+    };
+  }
+
+  const data =
+    result.data;
+
+  const [existingDeal] =
+    await db
+      .select({
+        id:
+          deals.id,
+
+        pipelineId:
+          deals.pipelineId,
+
+        stageId:
+          deals.stageId,
+
+        companyId:
+          deals.companyId,
+
+        ownerMemberId:
+          deals.ownerMemberId,
+
+        closedAt:
+          deals.closedAt,
+      })
+      .from(deals)
+      .where(
+        and(
+          eq(
+            deals.id,
+            idResult.data,
+          ),
+
+          eq(
+            deals.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            deals.isArchived,
+            false,
+          ),
+
+          isNull(
+            deals.deletedAt,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!existingDeal) {
+    redirect(
+      "/crm/forbidden",
+    );
+  }
+
+  /*
+   * Pipeline
+   */
+
+  const [pipeline] =
+    await db
+      .select({
+        id:
+          pipelines.id,
+      })
+      .from(pipelines)
+      .where(
+        and(
+          eq(
+            pipelines.id,
+            data.pipelineId,
+          ),
+
+          eq(
+            pipelines.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            pipelines.isArchived,
+            false,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!pipeline) {
+    return {
+      values,
+
+      errors: {
+        pipelineId: [
+          "Выбранная воронка недоступна.",
+        ],
+      },
+
+      message:
+        "Проверьте данные формы.",
+    };
+  }
+
+  /*
+   * Stage обязательно должен
+   * принадлежать выбранной Pipeline.
+   */
+
+  const [stage] =
+    await db
+      .select({
+        id:
+          pipelineStages.id,
+
+        type:
+          pipelineStages.type,
+      })
+      .from(
+        pipelineStages,
+      )
+      .where(
+        and(
+          eq(
+            pipelineStages.id,
+            data.stageId,
+          ),
+
+          eq(
+            pipelineStages.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            pipelineStages.pipelineId,
+            pipeline.id,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!stage) {
+    return {
+      values,
+
+      errors: {
+        stageId: [
+          "Этап не относится к выбранной воронке.",
+        ],
+      },
+
+      message:
+        "Проверьте данные формы.",
+    };
+  }
+
+  /*
+   * Company
+   */
+
+  if (data.companyId) {
+    const companyChanged =
+      data.companyId !==
+      existingDeal.companyId;
+
+    if (
+      companyChanged &&
+      !permissions.has(
+        "companies.read",
+      )
+    ) {
+      return {
+        values,
+
+        errors: {
+          companyId: [
+            "Нет доступа для изменения компании.",
+          ],
+        },
+
+        message:
+          "Проверьте данные формы.",
+      };
+    }
+
+    const conditions = [
+      eq(
+        companies.id,
+        data.companyId,
+      ),
+
+      eq(
+        companies.organizationId,
+        organization.id,
+      ),
+
+      isNull(
+        companies.deletedAt,
+      ),
+    ];
+
+    if (companyChanged) {
+      conditions.push(
+        eq(
+          companies.isArchived,
+          false,
+        ),
+      );
+    }
+
+    const [company] =
+      await db
+        .select({
+          id:
+            companies.id,
+        })
+        .from(companies)
+        .where(
+          and(
+            ...conditions,
+          ),
+        )
+        .limit(1);
+
+    if (!company) {
+      return {
+        values,
+
+        errors: {
+          companyId: [
+            "Выбранная компания недоступна.",
+          ],
+        },
+
+        message:
+          "Проверьте данные формы.",
+      };
+    }
+  }
+
+  /*
+   * Responsible member
+   */
+
+  if (
+    data.ownerMemberId
+  ) {
+    const ownerChanged =
+      data.ownerMemberId !==
+      existingDeal.ownerMemberId;
+
+    if (
+      ownerChanged &&
+      !permissions.has(
+        "members.read",
+      ) &&
+      data.ownerMemberId !==
+        member.id
+    ) {
+      return {
+        values,
+
+        errors: {
+          ownerMemberId: [
+            "Нельзя назначить этого сотрудника.",
+          ],
+        },
+
+        message:
+          "Проверьте данные формы.",
+      };
+    }
+
+    const conditions = [
+      eq(
+        organizationMembers.id,
+        data.ownerMemberId,
+      ),
+
+      eq(
+        organizationMembers.organizationId,
+        organization.id,
+      ),
+    ];
+
+    if (ownerChanged) {
+      conditions.push(
+        eq(
+          organizationMembers.status,
+          "active",
+        ),
+      );
+    }
+
+    const [owner] =
+      await db
+        .select({
+          id:
+            organizationMembers.id,
+        })
+        .from(
+          organizationMembers,
+        )
+        .where(
+          and(
+            ...conditions,
+          ),
+        )
+        .limit(1);
+
+    if (!owner) {
+      return {
+        values,
+
+        errors: {
+          ownerMemberId: [
+            "Ответственный сотрудник недоступен.",
+          ],
+        },
+
+        message:
+          "Проверьте данные формы.",
+      };
+    }
+  }
+
+  let expectedCloseAt:
+    | Date
+    | null = null;
+
+  if (
+    data.expectedCloseAt
+  ) {
+    expectedCloseAt =
+      new Date(
+        `${data.expectedCloseAt}T12:00:00.000Z`,
+      );
+  }
+
+  const targetIsClosed =
+    stage.type === "won" ||
+    stage.type === "lost";
+
+  const closedAt =
+    targetIsClosed
+      ? existingDeal.closedAt ??
+        new Date()
+      : null;
+
+  try {
+    await db
+      .update(deals)
+      .set({
+        pipelineId:
+          pipeline.id,
+
+        stageId:
+          stage.id,
+
+        title:
+          data.title,
+
+        amount:
+          data.amount,
+
+        currency:
+          data.currency,
+
+        companyId:
+          data.companyId,
+
+        ownerMemberId:
+          data.ownerMemberId,
+
+        expectedCloseAt,
+
+        closedAt,
+
+        notes:
+          data.notes,
+
+        updatedAt:
+          new Date(),
+      })
+      .where(
+        and(
+          eq(
+            deals.id,
+            existingDeal.id,
+          ),
+
+          eq(
+            deals.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            deals.isArchived,
+            false,
+          ),
+
+          isNull(
+            deals.deletedAt,
+          ),
+        ),
+      );
+  } catch (error) {
+    console.error(
+      "Failed to update deal:",
+      error,
+    );
+
+    return {
+      values,
+
+      message:
+        "Не удалось сохранить изменения.",
+    };
+  }
+
+  revalidatePath(
+    "/crm",
+  );
+
+  revalidatePath(
+    "/crm/deals",
+  );
+
+  revalidatePath(
+    `/crm/deals/${existingDeal.id}`,
+  );
+
+  redirect(
+    `/crm/deals/${existingDeal.id}`,
   );
 }

@@ -152,6 +152,18 @@ export default async function DealPage({
               }
             </p>
           </div>
+
+          {permissions.has(
+            "deals.update",
+          ) &&
+            !deal.isArchived && (
+              <Link
+                href={`/crm/deals/${deal.id}/edit`}
+                className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
+              >
+                Редактировать
+              </Link>
+            )}
         </div>
       </div>
 
