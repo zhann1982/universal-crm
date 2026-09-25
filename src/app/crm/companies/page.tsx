@@ -23,6 +23,12 @@ import {
   companyListQuerySchema,
   type CompanyListQuery,
 } from "@/lib/validation/company";
+import {
+  RestoreCompanyButton,
+} from "./[id]/restore-company-button";
+import {
+  ArchiveCompanyButton,
+} from "./[id]/archive-company-button";
 
 type SearchParams = {
   [key: string]:
@@ -443,6 +449,10 @@ export default async function CompaniesPage({
                 <th className="px-5 py-4 text-sm font-medium">
                   Создана
                 </th>
+
+                <th className="px-5 py-4 text-sm font-medium">
+                  Действия
+                </th>
               </tr>
             </thead>
 
@@ -451,9 +461,7 @@ export default async function CompaniesPage({
               0 ? (
                 <tr>
                   <td
-                    colSpan={
-                      6
-                    }
+                    colSpan={7}
                     className="px-5 py-20 text-center"
                   >
                     <div className="font-medium">
@@ -486,9 +494,12 @@ export default async function CompaniesPage({
                     >
                       <td className="px-5 py-4">
                         <div className="font-medium">
-                          {
-                            company.name
-                          }
+                          <Link
+                            href={`/crm/companies/${company.id}`}
+                            className="transition hover:text-blue-600 hover:underline"
+                          >
+                            {company.name}
+                          </Link>
                         </div>
 
                         {company.legalName && (
@@ -546,6 +557,30 @@ export default async function CompaniesPage({
                       <td className="px-5 py-4 text-sm text-slate-500">
                         {company.createdAt.toLocaleDateString(
                           "ru-RU",
+                        )}
+                      </td>
+                      <td className="px-5 py-4">
+                        {currentPermissions.has(
+                          "companies.archive",
+                        ) ? (
+                          company.isArchived ? (
+                            <RestoreCompanyButton
+                              companyId={
+                                company.id
+                              }
+                              returnTo="list"
+                            />
+                          ) : (
+                            <ArchiveCompanyButton
+                              companyId={
+                                company.id
+                              }
+                            />
+                          )
+                        ) : (
+                          <span className="text-sm text-slate-400">
+                            —
+                          </span>
                         )}
                       </td>
                     </tr>
