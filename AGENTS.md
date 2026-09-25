@@ -4,7 +4,9 @@
 
 Universal CRM is a configurable multi-tenant CRM platform.
 
-The long-term goal is to let organization administrators configure:
+The product must remain industry-neutral.
+
+Long-term configurable areas include:
 
 - business processes
 - pipelines
@@ -12,64 +14,61 @@ The long-term goal is to let organization administrators configure:
 - custom fields
 - roles
 - permissions
+- saved views
 - workflows
 - automations
 
-AI features come only after the CRM core is stable.
+AI comes after the CRM core, authorization model and business operations are
+stable.
 
-The application must remain industry-neutral.
-
-Possible future use cases include:
-
-- sales
-- banking
-- collections
-- construction
-- service businesses
-- automotive
-- e-commerce
-
-Industry-specific behavior should primarily be implemented through configuration,
-not separate application forks.
+Do not let AI requirements drive the core architecture prematurely.
 
 ---
 
-## Current phase
+## Source of truth
 
-Current development phase:
+Before significant work, read in this order:
 
-CRM Core / early v0.2
+1. AGENTS.md
+2. docs/ai/CONTEXT.md
+3. docs/ai/STATUS.md
+4. docs/ai/NEXT.md
+5. docs/ai/DECISIONS.md
 
-Phase 0.1 foundations are substantially implemented:
+Responsibilities:
 
-- organizations
-- Better Auth authentication
-- organization membership
-- RBAC
-- Team
-- Clients
-- Companies
-- Client ↔ Company relationships
+AGENTS.md
+→ durable implementation rules
 
-Phase 0.2 is now in progress:
+CONTEXT.md
+→ product goal, domain model and terminology
 
-- Pipelines
-- Pipeline stages
-- Deals
-- Kanban
-- Deal creation
-- Deal detail
-- Deal stage transitions
+STATUS.md
+→ current implemented state, verified state, known limitations and audit findings
 
-Still planned for v0.2:
+NEXT.md
+→ only the next 3–5 development priorities
 
-- deal editing
-- deal archive / restore
-- drag-and-drop Kanban
-- pipeline management UI
-- tasks
-- comments
-- activity timeline
+DECISIONS.md
+→ accepted or proposed architecture/product decisions and their rationale
+
+Do not duplicate large status lists across these files.
+
+If documentation disagrees with code:
+
+1. inspect the current implementation
+2. verify the relevant behavior
+3. update STATUS/NEXT
+4. do not reimplement an already existing feature
+
+Keep separate meanings for:
+
+- code exists
+- manually tested
+- automatically tested
+- production-ready
+
+Do not describe one as another.
 
 ---
 
@@ -87,554 +86,228 @@ Still planned for v0.2:
 - Better Auth 1.7.x
 - npm
 
----
+Architecture:
 
-## Architecture
-
-The application is a modular monolith built with Next.js App Router.
-
-Prefer:
-
+- Next.js App Router
+- modular monolith
 - Server Components by default
-- Server Actions for CRM mutations
-- PostgreSQL as the primary datastore
+- Server Actions for application mutations
+- PostgreSQL primary datastore
 - server-side authorization
-- organization-scoped business queries
-- explicit Zod validation
-- simple modules over premature abstractions
+- multi-tenancy
 
-Do not introduce additional infrastructure without a concrete requirement.
+Do not add infrastructure without a concrete requirement.
 
-Avoid while the CRM core is developing:
+Avoid premature introduction of:
 
 - Redis
 - queues
 - microservices
 - separate backend services
+- vector databases
+- dedicated AI backend
 - paid infrastructure
-- AI APIs
 
-Development infrastructure should remain at or close to $0.
+Development infrastructure should remain close to $0 where practical.
 
 ---
 
 ## Multi-tenancy
 
-Multi-tenancy is a fundamental requirement.
+Multi-tenancy is a core invariant.
 
-Every tenant-owned business record must belong to an organization.
+Every tenant-owned record must belong to an organization.
 
-Primary tenant boundary:
+Primary tenant key:
 
 organizationId
 
-Never expose records from one organization to another.
+Never accept a browser-provided organizationId as authorization proof.
 
-Tenant-owned reads and writes must be scoped server-side.
+Server operations must obtain tenant context from authenticated server state.
 
-Never trust organizationId supplied by the browser as authorization proof.
+Target security flow:
 
-Current organization resolution is still temporary:
+session
+→ active organization
+→ active organization membership
+→ permissions
+→ business operation
 
-src/lib/current-organization.ts
+The current development version still uses a fixed development organization.
 
-Current development organization slug:
+This is a known temporary limitation.
 
-development
-
-A real active-organization selector is not implemented yet.
-
-Future organization selection must always validate membership server-side.
+Future organization selection must validate membership server-side.
 
 ---
 
-## Database
+## Tenant context rule
 
-Database:
+Do not introduce new business queries that independently guess or resolve the
+organization if the caller already has an authenticated access context.
 
-PostgreSQL on Neon.
+Direction for new/refactored business operations:
 
-ORM:
+authenticated context
+→ explicit tenant/member/permissions context
+→ business module operation
 
-Drizzle ORM.
+Business data helpers must not become public authorization boundaries by
+accident.
 
-CRM schema:
-
-src/db/schema.ts
-
-Authentication schema:
-
-src/db/auth-schema.ts
-
-Database connection:
-
-src/db/index.ts
-
-Migrations:
-
-drizzle/
-
-Never casually modify an already-applied migration.
-
-Create new schema changes through Drizzle migrations.
-
-Current total database table count:
-
-16
-
-CRM tables:
-
-- organizations
-- organization_members
-- roles
-- permissions
-- role_permissions
-- member_roles
-- clients
-- companies
-- client_companies
-- pipelines
-- pipeline_stages
-- deals
-
-Better Auth tables:
-
-- user
-- session
-- account
-- verification
+Prefer marking server business modules as server-only.
 
 ---
 
 ## Authentication
 
-Authentication is implemented with Better Auth.
+Better Auth owns:
 
-Current authentication method:
+- user identity
+- password authentication
+- sessions
 
-email + password
+CRM owns:
 
-Main files:
+- organization membership
+- roles
+- permissions
+- tenant authorization
 
-src/lib/auth/auth.ts
+Do not build a parallel authentication/session implementation.
 
-src/lib/auth/auth-client.ts
+Stable identity:
 
-src/lib/auth/current-member.ts
+Better Auth user.id
 
-src/app/api/auth/[...all]/route.ts
-
-Main auth routes include:
-
-- /register
-- /login
-- /auth-test
-- /no-access
-
-Better Auth provides the authenticated user identity.
-
-The stable Better Auth user ID is stored in:
+CRM membership identity:
 
 organization_members.userId
 
 Do not use email as the long-term authorization identity.
 
-Email may be used for:
+Email may be used only for controlled lookup/invitation workflows.
 
-- lookup
-- display
-- adding an already-registered user to an organization
+Identity lookup by email must use exact canonicalized comparison.
 
-Do not spread direct session parsing throughout the application.
-
-Prefer centralized auth helpers.
+Do not use SQL LIKE / ILIKE semantics for identity matching.
 
 ---
 
-## Authentication and authorization separation
-
-Authentication answers:
-
-Who is the user?
-
-Authorization answers:
-
-What may the user do?
-
-These responsibilities must remain separate.
-
-Authentication:
-
-Better Auth
-
-Authorization:
-
-organization membership + roles + permissions
-
-Current security chain:
-
-Better Auth session
-→ authenticated user
-→ organization_members
-→ active membership
-→ member_roles
-→ roles
-→ role_permissions
-→ permissions
-→ CRM resource access
-
-Registration alone must never grant organization access.
-
----
-
-## Authorization / RBAC
+## Authorization
 
 Authorization must be enforced server-side.
 
-Client-side visibility checks are UX only.
+Client-side visibility is UX only.
 
-Main helpers:
-
-src/lib/auth/current-member.ts
-
-src/lib/auth/permissions.ts
-
-Important functions:
+Primary helpers currently include:
 
 - getCurrentMember()
 - getCurrentAccessContext()
 - hasPermission()
 - requirePermission()
 
-Permission denial:
+A valid UUID is never proof that the caller may access the referenced record.
 
-/crm/forbidden
+For every relationship ID validate:
 
-Authenticated user without active membership:
+- current organization
+- required permission
+- record lifecycle state
+- relationship-specific invariants
 
-/no-access
+Examples:
 
----
-
-## Current permissions
-
-Client permissions:
-
-- clients.read
-- clients.create
-- clients.update
-- clients.archive
-- clients.delete
-
-Company permissions:
-
-- companies.read
-- companies.create
-- companies.update
-- companies.archive
-- companies.delete
-
-Deal permissions:
-
-- deals.read
-- deals.create
-- deals.update
-- deals.archive
-- deals.delete
-
-Pipeline permissions:
-
-- pipelines.read
-- pipelines.manage
-
-Team permissions:
-
-- members.read
-- members.manage
-
-Role permissions:
-
-- roles.read
-- roles.manage
-
-Settings:
-
-- settings.manage
-
----
-
-## Current roles
-
-System roles:
-
-- Owner
-- Admin
-- Manager
-- Viewer
-
-Owner:
-
-all current permissions
-
-Admin:
-
-all current permissions
-
-Manager:
-
-- clients.read
-- clients.create
-- clients.update
-- clients.archive
-- companies.read
-- companies.create
-- companies.update
-- companies.archive
-- deals.read
-- deals.create
-- deals.update
-- deals.archive
-- pipelines.read
-
-Viewer:
-
-- clients.read
-- companies.read
-- deals.read
-- pipelines.read
-
-Members may have multiple roles.
-
----
-
-## Team
-
-The Team module currently supports:
-
-- organization member listing
-- adding an already-registered Better Auth user by email
-- assigning an initial role
-- multiple roles per member
-- role updates
-- member activation
-- member deactivation
-- active/inactive status display
-- server-side permission checks
-- organization-scoped role validation
-- organization-scoped member validation
-- self-role protection
-- self-deactivation protection
-- last active Owner protection
-
-Role and status management require:
-
-members.manage
-
-Member listing requires:
-
-members.read
-
-Do not physically delete memberships by default.
-
-Prefer deactivation.
-
-The last-owner invariant is currently enforced at application level.
-
-The pre-check and later write are not protected by a serialized database
-transaction, so do not describe this as a strict concurrency-proof invariant.
-
-Multiple writes currently use Neon/Drizzle batch operations where appropriate.
-
----
-
-## Clients
-
-The Clients module supports:
-
-- create
-- read
-- update
-- archive
-- restore
-- search
-- status filtering
-- active/archive views
-- server-side pagination
-- RBAC
-- tenant scoping
-- company relationship display and management
-
-Current client statuses:
-
-- active
-- lead
-- inactive
-
-Normal client workflow does not physically delete records.
-
-Prefer archive / restore.
-
----
-
-## Companies
-
-Companies are a separate business entity.
-
-Do not model Company as a Client.
-
-The Companies module supports:
-
-- create
-- read
-- update
-- archive
-- restore
-- search
-- status filtering
-- active/archive views
-- server-side pagination
-- responsible member
-- tenant-scoped duplicate tax ID validation
-- RBAC
-- tenant scoping
-- linked client display
-
-Current company statuses:
-
-- active
-- prospect
-- inactive
-
-Tax identifier is intentionally generic in the schema:
-
-taxId
-
-UI may display:
-
-БИН / налоговый ID
-
-Normal company workflow prefers archive / restore.
-
----
-
-## Client ↔ Company relationship
-
-Clients and Companies have a many-to-many relationship through:
-
-client_companies
-
-A Client may belong to multiple Companies.
-
-A Company may have multiple Clients / contacts.
-
-The join table contains:
-
-- organizationId
 - clientId
 - companyId
-- createdAt
+- dealId
+- pipelineId
+- stageId
+- memberId
+- roleId
+- future taskId
+- future noteId
 
-Do not replace this relationship with a single clients.companyId field.
+Do not fetch or serialize related data merely because the parent record is
+visible.
 
-All relationship mutations must validate both Client and Company against the
-current organization.
-
-Deleting a relationship removes only the relationship, not the Client or Company.
+Check permission semantics for the related data first.
 
 ---
 
-## Pipelines
+## Permission design
 
-Pipelines are organization-owned.
+Do not assume that one broad permission automatically authorizes every related
+directory or field.
 
-Tables:
+Examples that require explicit policy:
 
-pipelines
+- responsible-member picker
+- member email visibility
+- Dashboard aggregate counts
+- company information shown on a Deal
+- role assignment
+- future exports
 
-pipeline_stages
+If Managers need a limited responsible-member directory, prefer a dedicated
+permission or restricted DTO over exposing the complete Team dataset.
 
-A pipeline contains ordered stages.
+Keep permission policy consistent across:
 
-Current stage types:
+- create forms
+- edit forms
+- detail pages
+- Dashboard
+- Server Actions
+- API routes
+- future AI tools
 
-- open
-- won
-- lost
+---
 
-Stages have:
+## Business operations
 
-- name
-- type
-- position
-- probability
-- optional color
+Do not duplicate important business rules across pages and Server Actions.
 
-The seed currently creates:
+Prefer small domain modules inside the same Next.js application.
 
-Основная воронка
+Target direction:
 
-with stages:
+src/modules/deals/
+src/modules/companies/
+src/modules/team/
+src/modules/clients/
 
-- Новая
-- Квалификация
-- Предложение
-- Переговоры
-- Выиграна
-- Проиграна
+A module may contain:
+
+- operations
+- queries
+- validation
+- domain rules
+
+Server Actions should primarily:
+
+1. parse request/form data
+2. obtain authenticated access context
+3. call a business operation
+4. translate result into UI response / redirect
+
+Do not build a generic repository layer for every entity.
+
+Extract shared code only for rules that are actually shared.
+
+Priority shared rules include:
+
+- tenant context
+- responsible-member assignment
+- archive lifecycle
+- Deal stage transition
+- optimistic concurrency
+- relationship validation
 
 ---
 
 ## Deals
-
-Deals are organization-owned.
-
-Main Deal relationships:
-
-- organization
-- pipeline
-- stage
-- responsible member
-- optional company
-
-Deal fields currently include:
-
-- title
-- amount
-- currency
-- expectedCloseAt
-- closedAt
-- notes
-- archive state
-- timestamps
-
-The Deals module currently supports:
-
-- Kanban board
-- pipeline selection
-- pipeline stage columns
-- stage counts
-- stage totals
-- company display
-- responsible member display
-- deal creation
-- deal detail page
-- manual stage transition
-- RBAC
-- tenant scoping
-
-Deal editing is not implemented yet.
-
-Deal archive / restore is not implemented yet.
-
-Kanban drag-and-drop is not implemented yet.
-
----
-
-## Deal stage rules
-
-Do not add a duplicate deal status field for:
-
-open / won / lost
 
 Deal state is derived from:
 
@@ -642,57 +315,213 @@ pipeline_stages.type
 
 Valid stage types:
 
-open
-won
-lost
+- open
+- won
+- lost
 
-When a deal moves to:
+Do not add an independent Deal status for won/lost state.
 
-won or lost
-
-closedAt must be set if it is not already set.
-
-When a deal moves back to:
+Rules:
 
 open
+→ closedAt = null
 
-closedAt must become null.
+won/lost
+→ closedAt is set
 
-A Deal stores both:
+Deal stage transitions must use one shared server-side business operation.
 
-pipelineId
-stageId
+The same operation should eventually serve:
 
-Application code must validate that the selected stage:
+- manual stage selector
+- Kanban drag-and-drop
+- future automation
+- future API
+- future AI action
 
-- belongs to the current organization
-- belongs to the selected pipeline
+Do not allow separate implementations to evolve different transition rules.
 
-The database does not currently enforce all cross-tenant and pipeline/stage
-consistency through composite foreign keys.
+A Deal stores:
 
-Server-side validation is mandatory.
+- organizationId
+- pipelineId
+- stageId
+
+Stage must belong to the same:
+
+- organization
+- pipeline
+
+This must be checked both in application logic and, where practical, by database
+constraints.
+
+---
+
+## Concurrency
+
+Do not assume read → validate → write is safe against concurrent requests.
+
+Critical workflows must eventually use optimistic locking, transactional logic or
+database-enforced invariants.
+
+Important concurrency-sensitive areas:
+
+- Deal edit
+- Deal stage transition
+- Deal pipeline change
+- archive / restore
+- last Owner protection
+- future Pipeline changes
+
+For mutable business entities, prefer a version field or equivalent optimistic
+locking strategy.
+
+A mutation that updates zero rows because state changed concurrently must not
+silently report success.
+
+---
+
+## Database integrity
+
+Application validation remains mandatory, but important invariants should also be
+enforced by PostgreSQL where practical.
+
+Priority future constraints include:
+
+- Stage belongs to the same organization and Pipeline
+- Deal Stage matches Deal organization + Pipeline
+- Client/Company relationships remain in one organization
+- Member/Role relationships remain in one organization
+- Stage probability is between 0 and 100
+- Stage type is one of open/won/lost
+- Deal amount/currency consistency
+- at most one active default Pipeline per organization if product policy requires it
+
+Composite foreign keys may require corresponding composite unique constraints.
+
+Do not implement unsupported cross-table rules as CHECK constraints with
+subqueries.
+
+Validate existing data before adding stricter constraints.
+
+---
+
+## Neon / transactions
+
+Current database access uses Neon serverless HTTP.
+
+Do not assume ordinary interactive:
+
+db.transaction(async (tx) => ...)
+
+is available in the current path.
+
+db.batch([...]) can group supported writes but does not make earlier pre-checks
+part of the same serialized transaction.
+
+For invariants requiring locking or serialized checks, explicitly design one of:
+
+- suitable atomic SQL operation
+- PostgreSQL function/procedure
+- transactional driver for that operation
+- database constraint
+- optimistic locking
+
+Do not describe application pre-checks as concurrency-proof.
+
+---
+
+## Lifecycle
+
+Important CRM records normally use:
+
+archive
+→ restore
+
+instead of physical deletion.
+
+Current examples:
+
+- Clients
+- Companies
+- Deals
+
+Future likely examples:
+
+- Tasks
+- Notes
+
+If archive means immutable, enforce that in Server Actions too.
+
+Do not rely only on UI hiding mutation buttons.
+
+---
+
+## Dates
+
+Do not validate calendar dates using Date.parse alone.
+
+JavaScript may normalize impossible dates.
+
+Required validation must reject examples such as:
+
+- 2026-02-29
+- 2026-02-31
+- 2026-04-31
+
+For date-only business concepts, prefer a PostgreSQL date model.
+
+Do not invent UTC noon as a permanent timezone solution.
+
+If a timestamp is required, define organization timezone semantics explicitly.
 
 ---
 
 ## Money
 
-Deal amounts are stored as PostgreSQL:
+Persistent Deal amounts use PostgreSQL:
 
 numeric(14,2)
 
-Drizzle returns numeric values as strings.
+Do not use floating point for persisted financial values.
 
-Do not casually convert money storage to floating point.
+Currency is stored separately.
 
-Formatting to JavaScript Number is acceptable for current display summaries,
-but persistent monetary values must remain numeric/decimal in PostgreSQL.
+Money summaries must remain grouped by currency unless an explicit exchange-rate
+conversion feature exists.
 
-Currency uses a three-letter code such as:
+Do not combine KZT + USD + EUR into one total.
 
-- KZT
-- USD
-- EUR
+Define negative-amount policy explicitly before production.
+
+---
+
+## Team / Owner
+
+Current Owner-specific rules are not yet concurrency-proof.
+
+Do not use mutable role display names as the long-term system identity.
+
+Target:
+
+stable role systemKey
++ explicit ownership-transfer policy
++ stronger last-Owner invariant
+
+Do not assume members.manage should permanently imply the right to grant every
+future privilege.
+
+---
+
+## Health and diagnostics
+
+Public health endpoints must not expose tenant/business counters.
+
+Public readiness should return only minimal service state.
+
+Prefer a lightweight database readiness check such as SELECT 1 if required.
+
+Administrative diagnostics must be separately protected.
 
 ---
 
@@ -703,18 +532,15 @@ Validate external input with Zod.
 Examples:
 
 - forms
-- identifiers
 - route parameters
 - search parameters
 - relationship IDs
-- role selections
-- pipeline IDs
-- stage IDs
-- future API payloads
+- Server Action payloads
+- future API inputs
 
-Never trust hidden form fields as proof that a record belongs to the tenant.
+Schema validation is not authorization.
 
-Always revalidate relationships server-side.
+Authorization and tenant checks must follow separately.
 
 ---
 
@@ -731,54 +557,126 @@ Never commit:
 - API keys
 - private credentials
 
-If a secret is accidentally committed, rotate it.
+If a secret is committed, rotate it.
 
-Do not assume deleting it from a later commit makes it safe.
+Deleting it from a later commit is not sufficient.
 
----
-
-## Neon / Drizzle constraint
-
-The current application uses the Neon serverless HTTP driver.
-
-Do not assume ordinary interactive:
-
-db.transaction(async (tx) => ...)
-
-is available in the current execution path.
-
-Use supported Drizzle / Neon patterns.
-
-For grouped writes, db.batch([...]) is currently used where appropriate.
-
-Do not claim application-level pre-checks are concurrency-proof when the check
-and write are separate operations.
+Do not log complete forms or secrets in production error logs.
 
 ---
 
-## Development identity
+## Testing direction
 
-Historical development records may still exist:
+New important business rules should have regression tests.
 
-- local-dev-owner
-- local-dev-manager
-- local-dev-viewer
+Priority test categories:
 
-They are legacy development fixtures.
+- exact email identity lookup
+- cross-tenant access denial
+- inactive membership denial
+- organization inactive denial
+- role permissions
+- last Owner
+- Deal pipeline/stage consistency
+- concurrent stage/pipeline changes
+- editing while another request archives the record
+- impossible dates
+- money/currency validation
+- archive mutation rules
 
-They are not the current authentication mechanism.
+Prefer PostgreSQL integration tests for database invariants.
 
-Never reintroduce literal development IDs into request authentication.
+Add E2E tests for a small set of critical workflows.
 
-Real users are Better Auth users linked through:
+---
 
-organization_members.userId
+## CI direction
+
+Target CI pipeline:
+
+npm ci
+→ next typegen
+→ TypeScript
+→ lint
+→ tests
+→ build
+
+Do not claim production build success unless the build ran with the required test
+configuration/environment.
+
+---
+
+## Accessibility / scale
+
+HTML drag-and-drop is not sufficient as the only interaction.
+
+Keep or add:
+
+- manual Stage selector
+- keyboard-friendly alternative
+- mobile-friendly alternative
+
+Do not load unbounded datasets indefinitely.
+
+Large collections will require:
+
+- pagination
+- search
+- incremental loading
+- SQL aggregates
+- representative performance testing
+
+Optimize indexes after observing real query plans with EXPLAIN ANALYZE.
+
+---
+
+## Collaborative Notes and Activity
+
+Current entity `notes` fields are descriptions, not collaborative Notes.
+
+Future collaborative Notes must be separate records with:
+
+- author
+- created time
+- updated time
+- optional last editor
+- soft-delete policy
+
+Activity Timeline is separate from Notes.
+
+Business state changes should eventually record structured events.
+
+Where consistency matters, entity mutation and event creation should be atomic.
+
+---
+
+## AI
+
+AI must use the same business operations as human UI actions.
+
+AI must never receive unrestricted database access.
+
+Start with read-oriented AI only after core stabilization.
+
+Future AI must respect:
+
+- Better Auth
+- active organization
+- membership
+- permissions
+- tenant scope
+- normal validation
+- business invariants
+
+Treat Note/comment text as untrusted input.
+
+Minimize data sent to external AI services.
 
 ---
 
 ## Development commands
 
-Start development server:
+Development:
 
 npm run dev
 
@@ -790,123 +688,35 @@ Apply migrations:
 
 npm run db:migrate
 
-Seed database:
+Seed:
 
 npm run db:seed
 
-Link an existing Better Auth user to the development organization as Owner:
+Link development Owner:
 
 npm run db:link-owner -- email@example.com
 
-Build:
+Type generation:
 
-npm run build
+npx next typegen
+
+TypeScript check:
+
+npx tsc --noEmit --incremental false
 
 Lint:
 
 npm run lint
 
----
+Build:
 
-## Coding approach
-
-Prefer:
-
-- simple architecture
-- Server Components by default
-- server-side database access
-- Server Actions
-- TypeScript strictness
-- small reusable components
-- explicit validation
-- explicit permission checks
-- explicit tenant checks
-- clear database constraints
-
-Avoid premature abstraction.
-
-Do not add a dependency when the existing stack can reasonably solve the
-problem.
-
----
-
-## AI context protocol
-
-Before significant work, read in this order:
-
-1. AGENTS.md
-2. docs/ai/CONTEXT.md
-3. docs/ai/STATUS.md
-4. docs/ai/NEXT.md
-5. docs/ai/DECISIONS.md
-
-After significant development work:
-
-- update docs/ai/STATUS.md
-- update docs/ai/NEXT.md
-- update docs/ai/DECISIONS.md only when an architectural or product decision changes
-
-Keep these files concise and factual.
-
-Do not turn them into conversation transcripts.
-
----
-
-## Product roadmap
-
-Phase 0.1:
-
-- organizations
-- authentication
-- members
-- roles and permissions
-- clients
-- companies
-- client/company relationships
-
-Status:
-
-substantially implemented
-
-Phase 0.2:
-
-- deals
-- pipelines
-- stages
-- tasks
-- comments
-- activity timeline
-
-Status:
-
-in progress
-
-Phase 0.3:
-
-- custom fields
-- advanced filters
-- saved views
-- configurable CRM structure
-
-Phase 0.4:
-
-- automation engine
-- triggers
-- conditions
-- actions
-
-Phase 0.5:
-
-- AI assistant
-- natural-language search
-- summaries
-- analytics
-- controlled AI actions
+npm run build
 
 ---
 
 ## Important principle
 
-Build and stabilize the CRM core first.
+Stabilize identity, tenant boundaries, permissions, concurrency and database
+invariants before adding more platform complexity.
 
-Do not allow AI features to drive the architecture prematurely.
+Do not rewrite the working modular-monolith foundation.

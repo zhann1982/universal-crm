@@ -1,33 +1,51 @@
 # Universal CRM — Current Status
 
-Last updated: 2026-09-25
+Last updated: 2026-09-26
 
-## Current phase
+Verified repository snapshot:
 
-CRM Core / early v0.2
+main
+a9333a80d3172e8ce25cc13dc4369c6ab7159f23
 
-Phase 0.1 foundations are substantially implemented.
+Audit date:
 
-Phase 0.2 is now active.
+2026-09-26
 
-Current functional chain:
+## Status meaning
 
-Better Auth
-→ Organization membership
-→ RBAC
-→ Clients
-→ Companies
-→ Client / Company relationships
-→ Pipelines
-→ Pipeline stages
-→ Deals
-→ Kanban
+This file is the single source of truth for current implementation status.
+
+Use these terms carefully:
+
+Implemented
+→ code exists in the repository
+
+Manually working
+→ behavior has been manually exercised during development
+
+Automatically verified
+→ covered by a repeatable automated check/test
+
+Production-ready
+→ do not assume unless explicitly stated
+
+The current application is not yet production-ready.
 
 ---
 
-## Technology
+# Current phase
 
-Current stack:
+CRM Core / early v0.2
+
+The architecture is still a modular monolith.
+
+No rewrite or microservice extraction is currently required.
+
+The current priority is stabilization before adding more major product modules.
+
+---
+
+# Stack
 
 - Next.js 16.3.6
 - React 19
@@ -41,295 +59,82 @@ Current stack:
 - Better Auth 1.7.x
 - npm
 
-Architecture:
+---
 
-- Next.js App Router
-- modular monolith
-- Server Components by default
-- Server Actions for mutations
-- PostgreSQL primary datastore
-- server-side authentication
-- server-side RBAC
-- tenant-scoped business operations
+# Automated/static verification from 2026-09-26 audit
 
-No separate backend is currently used.
+Successful:
 
-No Redis, queues, microservices or AI APIs are currently required.
+- npm ci --ignore-scripts --no-audit --no-fund
+- ESLint
+- next typegen
+- TypeScript tsc --noEmit after typegen
+
+Production build:
+
+Compilation and TypeScript passed.
+
+The audited environment stopped during route data collection because
+DATABASE_URL was not configured.
+
+Therefore a complete production build was not verified by that audit.
+
+No GitHub Actions workflows currently exist.
+
+No dependency vulnerability audit was performed.
 
 ---
 
-# Authentication
+# Implemented capabilities
 
-Real authentication is implemented with Better Auth.
-
-Method:
-
-email + password
+## Authentication
 
 Implemented:
 
+- Better Auth
 - registration
 - login
 - logout
 - session cookies
-- server-side session lookup
-- authenticated user identity
-- organization membership mapping
-- no-access handling
-- protected CRM access
+- server-side session resolution
 
-Main files:
+Authentication method:
 
-src/lib/auth/auth.ts
+email + password
 
-src/lib/auth/auth-client.ts
+Known production gap:
 
-src/lib/auth/current-member.ts
-
-src/app/api/auth/[...all]/route.ts
-
-Better Auth tables:
-
-- user
-- session
-- account
-- verification
-
-Authenticated Better Auth user ID maps to:
-
-organization_members.userId
-
-Email is not the authorization identity.
+mandatory email ownership verification is not currently part of the membership
+workflow.
 
 ---
 
-# Authorization / RBAC
-
-Server-side RBAC is implemented.
-
-Main helpers:
-
-src/lib/auth/current-member.ts
-
-src/lib/auth/permissions.ts
-
-Functions:
-
-- getCurrentMember()
-- getCurrentAccessContext()
-- hasPermission()
-- requirePermission()
-
-Permission failure:
-
-/crm/forbidden
-
-Authenticated user without active membership:
-
-/no-access
-
-UI permission checks are not the security boundary.
-
-Server Actions and server-side reads enforce permissions independently.
-
----
-
-# Current permissions
-
-Clients:
-
-- clients.read
-- clients.create
-- clients.update
-- clients.archive
-- clients.delete
-
-Companies:
-
-- companies.read
-- companies.create
-- companies.update
-- companies.archive
-- companies.delete
-
-Deals:
-
-- deals.read
-- deals.create
-- deals.update
-- deals.archive
-- deals.delete
-
-Pipelines:
-
-- pipelines.read
-- pipelines.manage
-
-Team:
-
-- members.read
-- members.manage
-
-Roles:
-
-- roles.read
-- roles.manage
-
-Settings:
-
-- settings.manage
-
----
-
-# Current roles
-
-Owner:
-
-all permissions
-
-Admin:
-
-all permissions
-
-Manager:
-
-- clients.read
-- clients.create
-- clients.update
-- clients.archive
-- companies.read
-- companies.create
-- companies.update
-- companies.archive
-- deals.read
-- deals.create
-- deals.update
-- deals.archive
-- pipelines.read
-
-Viewer:
-
-- clients.read
-- companies.read
-- deals.read
-- pipelines.read
-
-Members may have multiple roles.
-
----
-
-# Database
-
-Neon PostgreSQL is connected and working.
-
-Drizzle uses:
-
-src/db/schema.ts
-
-and:
-
-src/db/auth-schema.ts
-
-Current table count:
-
-16
-
-CRM tables:
-
-- organizations
-- organization_members
-- roles
-- permissions
-- role_permissions
-- member_roles
-- clients
-- companies
-- client_companies
-- pipelines
-- pipeline_stages
-- deals
-
-Auth tables:
-
-- user
-- session
-- account
-- verification
-
-Current migrations include the CRM core, Better Auth, Companies,
-Client ↔ Company relationships and Deals/Pipelines foundations.
-
----
-
-# Multi-tenancy
-
-Primary tenant boundary:
-
-organizationId
-
-Current development organization:
-
-development
-
-Current organization selection is still server-side and fixed through:
-
-src/lib/current-organization.ts
-
-The browser is never trusted to establish organization access.
-
-A real multi-organization selector is not implemented yet.
-
----
-
-# Team
-
-Route:
-
-/crm/team
+## Membership / RBAC
 
 Implemented:
 
-- organization member list
-- add already-registered Better Auth user by email
-- stable Better Auth user ID stored as member identity
-- initial role assignment
-- multiple roles per member
-- role replacement
-- member activation
-- member deactivation
-- current-user self-role protection
-- current-user self-deactivation protection
-- last active Owner protection
-- tenant-scoped member validation
-- tenant-scoped role validation
-- RBAC enforcement
+- Organization membership
+- active/inactive Member state
+- multiple Roles per Member
+- Permissions
+- permission checks
+- Team listing
+- adding an already-registered User to an Organization
+- role assignment/update
+- Member activation/deactivation
+- self-role protection
+- self-deactivation protection
+- application-level last-Owner check
 
-Role/status management requires:
+Known limitation:
 
-members.manage
+last-Owner protection is not concurrency-safe.
 
-Listing requires:
-
-members.read
-
-Role replacement uses:
-
-db.batch([...])
-
-The current Neon HTTP path does not use ordinary interactive transactions.
-
-The last-owner rule is enforced at application level.
-
-Because the pre-check and write are separate operations, the invariant is not
-fully serialized against concurrent administrative writes.
+Owner is currently identified by Role name.
 
 ---
 
-# Clients
-
-Route:
-
-/crm/clients
+## Clients
 
 Implemented:
 
@@ -340,475 +145,569 @@ Implemented:
 - archive
 - restore
 - search
-- status filter
-- active/archive views
-- URL-driven filters
-- server-side pagination
+- filters
+- pagination
 - tenant scoping
 - RBAC
-- Client ↔ Company management
-
-Current statuses:
-
-- active
-- lead
-- inactive
-
-Pagination:
-
-25 records per page
-
-Normal physical deletion is not used.
-
----
-
-# Companies
-
-Route:
-
-/crm/companies
-
-Implemented:
-
-- create
-- list
-- detail
-- edit
-- archive
-- restore
-- quick archive from list
-- quick restore from archive list
-- search
-- status filter
-- active/archive views
-- server-side pagination
-- responsible member
-- tax ID
-- tenant scoping
-- RBAC
-- linked Clients display
-
-Current statuses:
-
-- active
-- prospect
-- inactive
-
-Tax ID is unique per organization when non-null.
-
-Normal physical deletion is not used.
-
----
-
-# Client ↔ Company
-
-Join table:
-
-client_companies
-
-Relationship:
-
-many-to-many
-
-Implemented:
-
-Client detail:
-- show linked Companies
-- add Company relationship
-- remove relationship
-
-Company detail:
-- show linked Clients
-- navigate to linked Client
-
-All relationship operations are tenant-scoped.
-
-A relationship deletion does not delete either business entity.
-
----
-
-# Pipelines
-
-Tables:
-
-pipelines
-
-pipeline_stages
-
-Seed currently creates:
-
-Основная воронка
-
-Stages:
-
-1. Новая
-2. Квалификация
-3. Предложение
-4. Переговоры
-5. Выиграна
-6. Проиграна
-
-Stage types:
-
-- open
-- won
-- lost
-
-Stages also contain:
-
-- position
-- probability
-- optional color
-
-A pipeline management UI is not implemented yet.
-
----
-
-# Deals
-
-Route:
-
-/crm/deals
-
-Implemented:
-
-- permission-aware navigation
-- pipeline selection
-- Kanban stage columns
-- Deal counts
-- stage Deal counts
-- stage monetary summaries
-- company display
-- responsible member display
-- expected close date display
-- Deal creation
-- server-side Deal validation
-- Deal detail page
-- manual Deal stage transitions
-- tenant scoping
-- RBAC
-
-Creation route:
-
-/crm/deals/new
-
-Detail route:
-
-/crm/deals/[id]
-
-Creation validates server-side:
-
-- organization
-- pipeline
-- stage belongs to pipeline
-- company belongs to organization
-- owner belongs to organization
-- owner is active
-
----
-
-## Deal state model
-
-Deal state is derived from:
-
-pipeline_stages.type
-
-No independent:
-
-deal.status
-
-field is used for won/lost state.
-
-Stage types:
-
-open
-won
-lost
-
-When moving to:
-
-won
-or
-lost
-
-closedAt is set.
-
-When returning to:
-
-open
-
-closedAt is cleared.
-
----
-
-## Deal money
-
-Amount:
-
-numeric(14,2)
-
-Currency:
-
-three-letter string such as KZT / USD / EUR.
-
-Drizzle returns numeric values as strings.
-
-Persistent monetary values remain PostgreSQL numeric.
-
----
-
-# CRM navigation
-
-Current working sections:
-
-- Dashboard
-- Clients
-- Companies
-- Deals
-- Team
-
-Still placeholder / unfinished:
-
-- Tasks
-- Settings
-
-Visibility is permission-aware.
-
----
-
-# Security properties implemented
-
-- Better Auth sessions
-- stable authenticated user IDs
-- active membership requirement
-- tenant-scoped reads
-- tenant-scoped mutations
-- server-side Zod validation
-- server-side permission enforcement
-- permission-aware UI
-- tenant-scoped relationship validation
-- Client ↔ Company validation
-- Deal → Pipeline validation
-- Deal → Stage validation
-- Deal → Company validation
-- Deal → Member validation
-- secrets excluded from Git
-- browser organizationId is not trusted
-
----
-
-# Known limitations
-
-## Active organization
-
-The active organization is still fixed to:
-
-development
-
-A membership-validated organization selector is still required for true
-multi-organization UX.
-
----
-
-## Team concurrency
-
-The last-active-Owner rule is implemented as an application-level pre-check.
-
-It is not yet protected by a serialized transaction or database invariant.
-
-Concurrent administrator writes remain a future hardening concern.
-
----
-
-## Role identity
-
-Some Owner-specific protection still identifies the Owner role by:
-
-roles.name = "Owner"
-
-A stable role key/system identifier would be more robust.
 
 ---
 
 ## Companies
 
-Company edit currently expects the selected responsible member to be active.
+Implemented:
 
-If a Company's current owner later becomes inactive, editing unrelated fields may
-require changing or clearing that owner.
+- create
+- list
+- detail
+- edit
+- archive
+- restore
+- search
+- filters
+- pagination
+- responsible Member
+- linked Clients
+- tenant scoping
+- RBAC
 
-This can be improved later.
+Known inconsistency:
+
+editing a Company with an unchanged inactive responsible Member can be rejected by
+the Server Action even though the UI can display that Member.
 
 ---
 
-## Cross-tenant database constraints
+## Client ↔ Company
 
-Application code validates tenant ownership.
+Implemented:
 
-PostgreSQL does not yet enforce every cross-tenant relationship with composite
-foreign keys.
+- many-to-many relationship
+- link
+- unlink
+- reverse display
 
-Server-side organization validation remains mandatory.
+Known issue:
+
+the unlink Server Action does not currently enforce the same archived-Client
+immutability policy as the UI.
+
+---
+
+## Pipelines / Stages
+
+Implemented in database:
+
+- Pipelines
+- ordered Stages
+- Stage type
+- Stage probability
+- Stage color
+- Pipeline selection in Deals UI
+
+Seed creates a default Pipeline and standard Stages.
+
+Not implemented:
+
+- Pipeline management UI
+- Stage management UI
+
+Database invariants are not yet strong enough to guarantee all
+organization/Pipeline/Stage relationships.
 
 ---
 
 ## Deals
 
-Not yet implemented:
+Implemented:
 
-- full Deal editing
-- Deal archive / restore UI
-- Deal hard-delete policy
-- Kanban drag-and-drop
-- change pipeline from Deal edit
-- pipeline management UI
-- stage management UI
-- Deal ↔ Client direct relationship
-- activity history for stage changes
-
----
-
-## Authentication production gaps
-
-Current auth is suitable for development, but public production launch still
-requires review of:
-
-- email verification
-- forgot password
-- password reset
-- production email delivery
-- rate limiting / brute-force protection
-- account recovery
-- production URL/cookie configuration
-- HTTPS
-- production secret management
-
----
-
-# Not implemented yet
-
-Phase 0.2 remaining:
-
-- Tasks
-- Comments
-- Activity timeline
-
-Phase 0.3:
-
-- custom fields
-- advanced filters
-- saved views
-- configurable business fields
-
-Phase 0.4:
-
-- automation engine
-- triggers
-- conditions
-- actions
-
-Later:
-
-- audit log
-- external integrations
-- AI assistant
-
----
-
-# Current checkpoint
-
-Authentication:
-
-Register
-→ Login
-→ Session
-→ Better Auth user
-→ Organization member
-→ RBAC
-→ CRM
-
-Client:
-
-Create
-→ Read
-→ Update
-→ Archive
-→ Restore
-→ Search
-→ Filter
-→ Company relationships
-
-Company:
-
-Create
-→ Read
-→ Update
-→ Archive
-→ Restore
-→ Search
-→ Filter
-→ Client relationships
-
-Deal:
-
-Pipeline
-→ Stage
-→ Create Deal
-→ Kanban
-→ Deal detail
-→ Move between stages
-→ close/reopen state derived from stage type
-
-The project is now beyond a CRUD-only CRM foundation and has the first working
-business process model.
-
----
-
-# Immediate next development
-
-Primary next step:
-
-Deal editing
-
-Target fields:
-
-- title
-- pipeline
-- stage
-- amount
-- currency
-- company
-- responsible member
+- create
+- detail
+- edit
+- Pipeline change
+- Stage change
+- Company assignment
+- responsible Member assignment
 - expected close date
-- notes
+- description/notes
+- archive
+- restore
+- archive view
+- Kanban
+- HTML drag-and-drop
+- manual Stage selector
+- server-side drag/drop validation
+- closedAt handling
+- currency-separated totals
+- RBAC
+- tenant scoping
 
-After Deal editing:
+Not implemented:
 
-1. Deal archive / restore
-2. Drag-and-drop Kanban
-3. Pipeline / stage management UI
-4. Tasks
-5. Comments
-6. Activity timeline
+- optimistic locking
+- shared single transition operation
+- direct Deal ↔ Client contacts
+- activity history
+- next-action Task
+- pagination/incremental Kanban loading
 
 ---
 
-# Important
+## Money
 
-Before significant implementation work, read:
+Implemented:
 
-1. AGENTS.md
-2. docs/ai/CONTEXT.md
-3. docs/ai/STATUS.md
-4. docs/ai/NEXT.md
-5. docs/ai/DECISIONS.md
+- PostgreSQL numeric(14,2)
+- currency field
+- Kanban totals grouped by currency
+- individual Deal currency formatting
 
-Continue using organizationId as the tenant boundary.
+Known policy gaps:
 
-Do not weaken server-side authorization.
+- negative amount policy is not explicitly defined
+- database-level amount/currency consistency is not fully enforced
 
-Do not trust browser relationship IDs without server-side validation.
+---
 
-Do not introduce unnecessary infrastructure.
+## Dashboard
 
-Do not add AI before the CRM core is stable.
+Implemented:
+
+basic CRM Dashboard.
+
+Known permission issue:
+
+Dashboard aggregate counts are not yet governed by sufficiently explicit
+per-module permission semantics.
+
+---
+
+## Collaborative Notes
+
+Not implemented.
+
+Current `notes` fields are single text descriptions only.
+
+Future Notes require separate records.
+
+---
+
+## Tasks
+
+Not implemented.
+
+---
+
+## Activity Timeline / Audit History
+
+Not implemented.
+
+---
+
+## Custom Fields
+
+Not implemented.
+
+---
+
+## Saved Views
+
+Not implemented.
+
+---
+
+## Automation
+
+Not implemented.
+
+---
+
+## AI
+
+Not implemented.
+
+This is intentional.
+
+---
+
+# Audit findings
+
+Priority definitions:
+
+P1
+→ fix before public launch or serious collaborative use
+
+P2
+→ fix in the next stabilization cycle
+
+---
+
+## F01 — P1 — Email identity lookup uses ILIKE
+
+Current affected workflows include:
+
+- Team add-member lookup
+- development Owner linking helper
+
+Risk:
+
+PostgreSQL LIKE/ILIKE treats `_` as a wildcard.
+
+An email containing `_` can match another email.
+
+Potential result:
+
+wrong Better Auth User can be associated with a CRM membership.
+
+Required fix:
+
+- canonicalize email
+- use exact equality
+- guarantee unique result
+- add regression test with `_`
+
+---
+
+## F02 — P1 — Organization membership can be granted to an unverified email account
+
+Registration is open.
+
+The Team add-member flow can locate an account by email and immediately create
+membership.
+
+It does not currently require confirmed email ownership or invitation acceptance.
+
+Risk:
+
+someone may pre-register another person's business email and later receive CRM
+access when an administrator adds that address.
+
+Required direction:
+
+- verified email ownership
+and/or
+- invitation token + acceptance flow
+
+Production Owner bootstrap must also respect verified identity.
+
+---
+
+## F03 — P1 — Public database health endpoint exposes global counters
+
+Current health endpoint returns aggregate counts without authentication or tenant
+scope.
+
+Risk:
+
+cross-tenant aggregate information disclosure and unnecessary database load.
+
+Required fix:
+
+public readiness should return only minimal status.
+
+If DB readiness is required, prefer a lightweight connectivity query.
+
+Administrative diagnostics must be separately protected.
+
+---
+
+## F04 — P1 — Manual Deal Stage transition has a concurrency race
+
+Current manual Stage movement and Kanban movement do not use exactly the same
+update rule.
+
+Possible race:
+
+request A validates Pipeline P1 + Stage S1
+→ request B edits Deal to Pipeline P2 + Stage S2
+→ request A updates only stageId
+→ resulting Deal can become P2 + S1
+
+Required fix:
+
+- one shared transition operation
+- conditional update against expected/current Pipeline or version
+- verify affected row
+- stronger database invariant
+- concurrency regression test
+
+---
+
+## F05 — P2 — Related-data permission policy is inconsistent
+
+Examples:
+
+- Manager lacks members.read
+- some Company forms still expose active Member names/emails
+- Deal assignment uses a different rule
+- Dashboard exposes broad counters
+- Deals board serializes owner email/company name without a fully explicit related-data permission policy
+
+This is not a confirmed cross-tenant leak.
+
+It is an inconsistent permission model.
+
+Required fix:
+
+define explicit policy for:
+
+- responsible-member directory
+- member email visibility
+- Dashboard aggregates
+- related Company visibility
+
+Check permissions before query/serialization, not only before showing a link.
+
+---
+
+## F06 — P2 — Last Owner protection is race-prone
+
+Current protection:
+
+read current Owners
+→ validate
+→ later write
+
+Two concurrent administrators may both pass the pre-check.
+
+db.batch does not include the earlier read in the same serialized operation.
+
+Required fix:
+
+design a database/transactional ownership update operation.
+
+---
+
+## F07 — P2 — Organization isActive is not part of access context
+
+organizations.isActive exists.
+
+Current access flow checks active membership but does not consistently reject an
+inactive Organization.
+
+Required fix:
+
+define isActive semantics and enforce it in the central tenant context.
+
+---
+
+## F08 — P2 — Inactive Company owner blocks unrelated Company edits
+
+UI can preserve the current inactive owner.
+
+Server validation requires active owner even when unchanged.
+
+Required fix:
+
+use the same pattern already used in Deal editing:
+
+- existing relationship may remain
+- a newly assigned responsible Member must be active
+
+---
+
+## F09 — P2 — Impossible dates pass Deal validation
+
+Confirmed examples:
+
+- 2026-02-29
+- 2026-02-31
+- 2026-04-31
+
+Date.parse normalizes invalid dates.
+
+Current artificial noon-UTC conversion also does not represent a stable
+date-only business model across every timezone.
+
+Required fix:
+
+- strict calendar validation
+- decide whether expectedCloseAt is a date or timestamp
+- if date-only, prefer PostgreSQL date
+- if timestamp, define organization timezone semantics
+
+---
+
+## F10 — P2 — Concurrent edits can overwrite newer state
+
+Current Deal edit submits the full record without optimistic locking.
+
+Possible effects:
+
+- lost updates
+- Stage overwrite
+- responsible Member overwrite
+- notes/description overwrite
+- stale closedAt calculation
+
+Another issue:
+
+if a Deal is archived between read and update, zero affected rows may still lead
+to an apparent successful redirect.
+
+Required fix:
+
+- add version / optimistic locking
+- update using expected version
+- atomically increase version
+- treat zero updated rows as conflict
+- define archive/restore idempotency behavior
+
+---
+
+## F11 — P2 — Archived Client relation can still be mutated server-side
+
+UI hides unlinking for archived Client.
+
+Server Action does not enforce the same archive condition.
+
+Required fix:
+
+if archived records are immutable, add the lifecycle condition to the server
+mutation itself.
+
+---
+
+## F12 — P2 — Unbounded loading
+
+Current structural limits include:
+
+- all Deals for selected Pipeline loaded into Kanban
+- full Deal archive without pagination
+- complete reference lists in several forms
+- potentially all active Companies loaded for relationship selectors
+
+This is not currently a measured performance failure.
+
+It is a scaling limit.
+
+Required direction:
+
+- pagination
+- per-column incremental loading
+- searchable reference pickers
+- SQL counts/aggregates
+- representative performance test
+- EXPLAIN ANALYZE before index tuning
+
+---
+
+# Architectural debt
+
+## Business logic distribution
+
+Important rules currently exist in multiple:
+
+- pages
+- Server Actions
+- helpers
+
+Deal actions are especially large.
+
+Target:
+
+small domain modules inside the same modular monolith.
+
+---
+
+## Tenant context
+
+Current entity helpers may resolve the fixed development Organization internally.
+
+Pages currently often check access first, but this contract is easy to misuse in
+future API/AI code.
+
+Target:
+
+authenticated tenant context as explicit input to business operations.
+
+---
+
+## Database invariants
+
+Current application validation is stronger than current database relationship
+constraints.
+
+Priority future database protection:
+
+- Organization ↔ Pipeline ↔ Stage
+- Deal Pipeline ↔ Stage
+- Organization ↔ Company/Client/Member relations
+- Member ↔ Role
+- Stage type
+- Stage probability
+- amount/currency consistency
+- single default Pipeline if chosen as a product invariant
+
+---
+
+## Role model
+
+Owner uses mutable name identity.
+
+organization_members.userId does not currently have a fully designed lifecycle
+FK relationship to Better Auth user.
+
+Development seed still creates legacy fake Members.
+
+These need deliberate cleanup rather than blind deletion.
+
+---
+
+# Operational gaps
+
+Not yet implemented or confirmed:
+
+- CI workflow
+- automated regression suite
+- PostgreSQL integration tests
+- E2E tests
+- production email flow
+- production password recovery
+- verified backup restore procedure
+- structured operational error events
+- production observability
+- complete project README/bootstrap guide
+- .env.example
+- separate test environment
+
+tsx should eventually be an explicit devDependency because scripts use it.
+
+---
+
+# Minor improvements
+
+Future cleanup:
+
+- deterministic secondary Client sorting by id when createdAt ties
+- shared money formatter
+- lang="ru"
+- real metadata
+- responsive navigation
+- mobile/keyboard alternative to DnD
+
+Manual Stage movement already provides a non-DnD alternative.
+
+---
+
+# Current recommended direction
+
+Do not immediately add another large product feature.
+
+First stabilize:
+
+1. identity lookup and account ownership
+2. public health exposure
+3. Deal transition concurrency
+4. permission semantics
+5. validation and optimistic concurrency
+
+Then strengthen tenant context, business operations, database constraints and
+tests.
+
+After that continue product development with:
+
+Tasks
+→ Collaborative Notes
+→ Activity Timeline
+→ Pipeline management
+→ Deal contacts

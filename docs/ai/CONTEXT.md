@@ -1,431 +1,453 @@
 # Universal CRM — Project Context
 
-Last updated: 2026-09-25
+Last updated: 2026-09-26
 
 ## Goal
 
-Build a configurable multi-tenant CRM platform.
+Universal CRM is an industry-neutral configurable multi-tenant CRM platform.
 
-An organization administrator should eventually be able to configure:
+The product should eventually allow organizations to configure:
 
-- CRM fields
+- business processes
 - pipelines
 - stages
+- custom fields
 - roles
 - permissions
+- saved views
 - workflows
 - automations
 
-AI will later assist users with CRM data and operations.
-
-AI is not part of the current CRM core milestone.
-
----
-
-## Product direction
-
-The CRM should not be tied to one industry.
-
-Possible use cases include:
+Potential industries include:
 
 - sales
 - banking
 - collections
-- service businesses
+- service
 - construction
 - automotive
 - e-commerce
 
-Industry-specific requirements should primarily be implemented through
-configuration rather than separate application forks.
+Industry-specific behavior should primarily come from configuration instead of
+separate application forks.
 
 ---
 
-## Cost strategy
+## Product boundary
 
-Development infrastructure should remain as close to $0 as possible.
+The application is currently a modular monolith.
 
-Current approach:
+Frontend and server-side business code live in the same Next.js application.
 
-- local Next.js development
-- Neon free PostgreSQL
-- GitHub
-- open-source libraries
+The current architecture is intentionally simple:
 
-Additional infrastructure is introduced only when justified by real usage.
+- Next.js
+- TypeScript
+- PostgreSQL
+- Neon
+- Drizzle
+- Better Auth
+- Zod
+- Tailwind
 
----
-
-## Technical stack
-
-Application:
-
-Next.js 16.3.6 + React 19 + TypeScript
-
-Database:
-
-PostgreSQL
-
-Database provider:
-
-Neon
-
-ORM:
-
-Drizzle ORM
-
-Validation:
-
-Zod 4
-
-Authentication:
-
-Better Auth
-
-Styling:
-
-Tailwind CSS 4
-
-Package manager:
-
-npm
+A separate backend, Redis, queues, microservices and AI infrastructure are not
+currently required.
 
 ---
 
-## Architecture direction
+## Core domain model
 
-The application is a modular monolith.
+### Organization
 
-Frontend and backend currently live inside the same Next.js application.
+The tenant boundary.
 
-Use Server Components by default.
-
-Use Server Actions for ordinary CRM mutations.
-
-Do not split frontend and backend into separate deployments without a concrete
-need.
-
-Do not introduce Redis, queues, microservices or AI infrastructure prematurely.
-
----
-
-## Multi-tenancy
-
-Multi-tenancy exists from the beginning.
-
-Every tenant-owned business record must belong to an organization.
-
-Primary tenant boundary:
+Tenant-owned CRM data uses:
 
 organizationId
 
-Browser-supplied organizationId must never be trusted as authorization proof.
+Current development organization selection is still fixed.
 
-The current development organization is resolved server-side and is still fixed
-to:
-
-development
-
-A real active-organization selector is planned later.
+Future organization switching must validate active membership.
 
 ---
 
-## Authentication model
+### User
 
-Better Auth handles:
+Authentication identity managed by Better Auth.
 
-- user identity
-- email/password login
-- sessions
-
-CRM authorization is separate.
-
-The stable Better Auth:
+Stable identity:
 
 user.id
 
-is stored in:
-
-organization_members.userId
-
-Security path:
-
-Better Auth user
-→ organization membership
-→ active member
-→ roles
-→ permissions
-→ tenant resources
-
-Registration alone does not grant CRM access.
+A User does not automatically have CRM access.
 
 ---
 
-## Current database model
+### Organization Member
 
-CRM:
+Connects a Better Auth User to an Organization.
 
-organizations
+Membership controls whether the User belongs to the tenant.
 
-organization_members
+Membership also participates in CRM authorization through Roles.
 
-roles
-
-permissions
-
-role_permissions
-
-member_roles
-
-clients
-
-companies
-
-client_companies
-
-pipelines
-
-pipeline_stages
-
-deals
-
-Authentication:
-
-user
-
-session
-
-account
-
-verification
-
-Current total:
-
-16 tables
+Inactive membership denies CRM access.
 
 ---
 
-## Current business model
+### Role
 
-### Client
+Contains CRM Permissions.
 
-Represents a person/contact.
+Members may have multiple Roles.
 
-Supports archive / restore instead of normal physical deletion.
-
-### Company
-
-Represents a company, legal entity or business organization.
-
-Company is a separate entity from Client.
-
-### Client ↔ Company
-
-Many-to-many through:
-
-client_companies
-
-A Client may be associated with multiple Companies.
-
-A Company may have multiple Client contacts.
-
-### Pipeline
-
-Represents a sales/business process pipeline.
-
-An organization may eventually have multiple pipelines.
-
-### Pipeline Stage
-
-Ordered stage inside a pipeline.
-
-Stage types currently are:
-
-open
-won
-lost
-
-### Deal
-
-A Deal belongs to:
-
-- organization
-- pipeline
-- pipeline stage
-
-A Deal may optionally belong to:
-
-- company
-- responsible member
-
-Deal status is derived from the stage type rather than duplicated in a separate
-deal status field.
-
----
-
-## Current permissions model
-
-Permissions are granular strings.
-
-Main groups:
-
-clients.*
-
-companies.*
-
-deals.*
-
-pipelines.*
-
-members.*
-
-roles.*
-
-settings.manage
-
-Roles contain permissions.
-
-Members may have multiple roles.
-
-Current system roles:
+Current system concepts include:
 
 - Owner
 - Admin
 - Manager
 - Viewer
 
----
-
-## Current CRM capabilities
-
-Implemented foundations:
-
-- authentication
-- organization membership
-- RBAC
-- Team management
-- Clients
-- Companies
-- Client ↔ Company relationships
-- Pipelines
-- Pipeline stages
-- Deals
-- Deal Kanban
-- Deal creation
-- Deal detail
-- Deal stage transitions
-
-Still under development:
-
-- deal editing
-- deal archive / restore
-- Kanban drag-and-drop
-- pipeline/stage management UI
-- tasks
-- comments
-- activity timeline
-- custom fields
-- saved views
-- automations
+The long-term design needs a stable system role identifier instead of relying
+only on mutable Role names.
 
 ---
 
-## Data integrity direction
+### Permission
 
-Application code must always validate tenant ownership.
+Granular server-side authorization capability.
 
-This is especially important for relationships such as:
+Current groups include:
 
-Client ↔ Company
+- clients.*
+- companies.*
+- deals.*
+- pipelines.*
+- members.*
+- roles.*
+- settings.manage
 
-Deal → Company
-
-Deal → Member
-
-Deal → Pipeline
-
-Deal → Stage
-
-The database does not yet enforce every cross-tenant relationship through
-composite foreign keys.
-
-Application-level organization validation is therefore mandatory.
+Permission semantics for related reference data still need refinement.
 
 ---
 
-## Deals direction
+### Client
 
-Deal state is derived from:
+Represents a person/contact.
+
+Client is not the same entity as Company.
+
+Lifecycle:
+
+active
+→ archived
+→ restored
+
+Normal workflow avoids physical deletion.
+
+---
+
+### Company
+
+Represents a legal/business organization.
+
+Company may have a responsible Member.
+
+Lifecycle:
+
+active
+→ archived
+→ restored
+
+---
+
+### Client ↔ Company
+
+Many-to-many relationship.
+
+Implemented through:
+
+client_companies
+
+A Client may relate to multiple Companies.
+
+A Company may have multiple Client contacts.
+
+---
+
+### Pipeline
+
+Represents a configurable business/sales process.
+
+An Organization may have multiple Pipelines.
+
+Pipeline management UI is not yet implemented.
+
+---
+
+### Pipeline Stage
+
+Ordered Stage within a Pipeline.
+
+Current Stage types:
+
+- open
+- won
+- lost
+
+Other attributes include:
+
+- name
+- position
+- probability
+- optional color
+
+Stage type defines Deal state semantics.
+
+---
+
+### Deal
+
+Represents an opportunity/business transaction.
+
+A Deal belongs to:
+
+- Organization
+- Pipeline
+- Stage
+
+A Deal may reference:
+
+- Company
+- responsible Member
+
+Current Deal data includes:
+
+- title
+- amount
+- currency
+- expected close date
+- actual closedAt
+- description/notes
+- archive state
+- timestamps
+
+Deal status is not duplicated.
+
+Deal state comes from:
 
 pipeline_stages.type
 
-Do not create a second independent field such as:
+---
 
-deal.status = won
+## Deal state model
 
-because it could contradict the stage.
+open Stage:
 
-When moving to won/lost:
+closedAt = null
 
-closedAt is set.
+won/lost Stage:
 
-When moving back to an open stage:
+closedAt is set
 
-closedAt is cleared.
+Moving a closed Deal back to open clears closedAt.
 
-Deal money is stored as PostgreSQL numeric rather than floating point.
+Current code has multiple paths for Deal transition.
+
+Target architecture is one shared business transition operation.
 
 ---
 
-## Planned systems
+## Money
 
-Current phase:
+Deal amount is stored as PostgreSQL:
 
-early v0.2
+numeric(14,2)
 
-Next systems after the current Deals milestone:
+Currency is stored separately.
 
-- deal editing
-- Kanban drag-and-drop
-- pipeline management
-- tasks
-- comments
-- activity timeline
-- custom fields
-- saved filters/views
-- automation engine
-- audit log
-- external integrations
-- AI assistant
+Different currencies must remain separate in summaries.
+
+Current Kanban already groups totals by currency.
+
+Currency conversion is not part of the current product.
 
 ---
 
-## AI architecture direction
+## Description vs collaborative Notes
 
-AI must never receive unrestricted database access.
+Existing `notes` text fields on Client / Company / Deal are simple descriptions.
 
-Future AI operations should use controlled application tools/functions such as:
+They are not multi-user collaboration.
 
-searchClients()
+Future collaborative Notes are separate records with:
 
-readClient()
+- author
+- created time
+- edited time
+- optional last editor
+- lifecycle policy
 
-searchCompanies()
+Activity history is a separate structured event system.
 
-readCompany()
+---
 
-readDeals()
+## Tasks
 
-createTask()
+Tasks are not implemented yet.
 
-updateDeal()
+Tasks are expected to become the primary daily-work layer.
 
-Every AI action must still pass:
+Likely relationships:
 
-- authentication
-- organization membership
-- tenant scoping
-- permission checks
-- input validation
+- Deal
+- Client
+- Company
+- responsible Member
 
-AI must use the same authorization rules as normal application users.
+Important future views include:
+
+- today
+- overdue
+- mine
+- Deals without a next action
+
+---
+
+## Activity Timeline
+
+Not implemented yet.
+
+Purpose:
+
+- collaboration
+- auditability
+- debugging
+- historical reporting
+- automation input
+- future AI summaries
+
+Current entity state alone is not sufficient for historical analytics such as
+time spent in Pipeline Stages.
+
+---
+
+## Deal contacts
+
+Direct Deal ↔ Client relationship is not implemented.
+
+Future likely direction:
+
+deal_clients
+
+Potential fields:
+
+- organizationId
+- dealId
+- clientId
+- role
+- isPrimary
+- createdAt
+
+Do not restrict Deal contacts only to the selected Company.
+
+---
+
+## Custom fields
+
+Not implemented.
+
+Future custom fields should support typed definitions and server validation.
+
+Core relationships and financial data should remain relational.
+
+JSONB may be appropriate for less frequently queried custom values, with targeted
+indexes added only where needed.
+
+---
+
+## Saved views
+
+Not implemented.
+
+Future saved views must never bypass current permissions.
+
+Likely filters:
+
+- owner
+- Pipeline
+- Stage
+- due date
+- amount
+- activity age
+
+---
+
+## Automation
+
+Not implemented.
+
+Future model:
+
+event
+→ conditions
+→ allowed operation
+
+Automation will require:
+
+- idempotency
+- loop protection
+- execution history
+- retries
+- limits
+
+External guaranteed delivery may later use PostgreSQL outbox.
+
+Do not introduce a broker until requirements justify it.
+
+---
+
+## AI direction
+
+AI is a later layer.
+
+Start with read-oriented capabilities such as:
+
+- Deal summary
+- Client summary
+- Company summary
+- recommended next action
+- permission-aware search
+
+AI changes must call the same business operations used by the application.
+
+AI must not have unrestricted database access.
+
+AI must not bypass RBAC or tenant boundaries.
+
+Collaborative Note text must be treated as untrusted input.
+
+---
+
+## Current architecture concern
+
+The current foundation is suitable.
+
+The main architectural debt is not the choice of framework.
+
+The main debt is that important business rules are distributed between:
+
+- pages
+- Server Actions
+- helper functions
+
+This creates inconsistent implementations.
+
+The next architectural direction is therefore:
+
+central tenant context
++ small business modules
++ shared operations
++ stronger database invariants
+
+without splitting the modular monolith.

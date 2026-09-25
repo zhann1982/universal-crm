@@ -1,47 +1,46 @@
 # Universal CRM — Architecture Decisions
 
-Last updated: 2026-09-25
+Last updated: 2026-09-26
 
 ## D001 — Multi-tenancy from the beginning
 
 Status: accepted
 
-Organizations are first-class entities.
+Organizations are first-class tenants.
 
-Business records must be associated with an organization.
+Tenant-owned business records use organizationId.
 
-Primary tenant boundary:
-
-organizationId
+Browser-supplied organizationId is never authorization proof.
 
 Reason:
 
-Adding multi-tenancy later would require major schema and authorization changes.
+Retrofitting multi-tenancy later would require major schema and authorization
+changes.
 
 ---
 
-## D002 — PostgreSQL
+## D002 — PostgreSQL as primary datastore
 
 Status: accepted
 
-Use PostgreSQL as the main database.
+Use PostgreSQL for CRM data.
 
 Reason:
 
-CRM data contains many relationships and benefits from relational constraints,
-transactions and indexing.
+The product has relational data, cross-entity integrity requirements, indexing
+needs and transactional business rules.
 
 ---
 
-## D003 — Neon
+## D003 — Neon during early development
 
 Status: accepted
 
-Use Neon PostgreSQL during development.
+Use Neon PostgreSQL while the current cost/scale profile remains appropriate.
 
 Reason:
 
-Low cost, PostgreSQL compatibility and suitable free development tier.
+PostgreSQL compatibility and low development cost.
 
 ---
 
@@ -49,11 +48,11 @@ Low cost, PostgreSQL compatibility and suitable free development tier.
 
 Status: accepted
 
-Use Drizzle ORM for schema and application database access.
+Use Drizzle for schema and normal application database access.
 
-Migrations are stored in the repository.
+Schema changes use new migrations.
 
-Do not casually edit migrations that have already been applied.
+Do not casually modify already-applied migrations.
 
 ---
 
@@ -61,483 +60,620 @@ Do not casually edit migrations that have already been applied.
 
 Status: accepted
 
-Frontend and backend initially live inside Next.js.
-
-Use:
-
-- Server Components by default
-- Server Actions for mutations
+Keep frontend and server business code in the Next.js application.
 
 Do not introduce microservices or a separate backend without a concrete
 requirement.
 
----
-
-## D006 — Infrastructure cost minimization
-
-Status: accepted
-
-Avoid paid infrastructure during early development where possible.
-
-Do not add Redis, queues or separate services prematurely.
-
----
-
-## D007 — Configurable CRM
-
-Status: accepted
-
-The application should evolve toward administrator-configurable:
-
-- fields
-- pipelines
-- stages
-- roles
-- permissions
-- automations
-
-Avoid hard-coding one industry's workflow into the core architecture.
-
----
-
-## D008 — AI comes after CRM core
-
-Status: accepted
-
-AI functionality will be introduced after the underlying CRM data model,
-permissions and workflows are reliable.
-
-Future AI functionality must operate through controlled application tools rather
-than unrestricted database access.
-
----
-
-## D009 — Better Auth for authentication
-
-Status: accepted
-
-Use Better Auth for application authentication.
-
-Initial authentication method:
-
-email + password
-
 Reason:
 
-The project needs real session-based authentication without introducing a
-separate paid authentication service.
-
-Better Auth integrates with:
-
-- Next.js
-- PostgreSQL
-- Drizzle ORM
-
-Do not build a parallel custom password/session system unless a future concrete
-requirement cannot be handled by Better Auth.
+Current product scale does not justify distributed-system complexity.
 
 ---
 
-## D010 — Authentication and CRM authorization remain separate
+## D006 — Minimize infrastructure
 
 Status: accepted
 
-Better Auth is responsible for:
+Do not add Redis, queues, brokers, vector databases or paid infrastructure
+without a demonstrated requirement.
 
-- identity
+---
+
+## D007 — Configurable universal CRM
+
+Status: accepted
+
+The core product must remain configurable instead of hard-coded for one
+industry.
+
+Target configurable areas include:
+
+- fields
+- Pipelines
+- Stages
+- Roles
+- Permissions
+- views
+- automations
+
+---
+
+## D008 — AI after stable CRM core
+
+Status: accepted
+
+AI is a later application layer.
+
+AI must use controlled business operations and normal authorization.
+
+AI never receives unrestricted database access.
+
+---
+
+## D009 — Better Auth owns authentication
+
+Status: accepted
+
+Better Auth handles:
+
+- account identity
+- password authentication
 - sessions
 
-CRM is responsible for:
+The CRM does not maintain a parallel password/session system.
 
-- organization membership
-- roles
-- permissions
-- tenant authorization
+---
+
+## D010 — Authentication and CRM authorization are separate
+
+Status: accepted
+
+Authentication answers:
+
+Who is the User?
+
+CRM authorization answers:
+
+Which Organization does the User belong to and what may they do?
 
 Security chain:
 
-authenticated user
-→ organization membership
-→ roles
-→ permissions
-→ CRM resources
+User
+→ Membership
+→ Roles
+→ Permissions
+→ business operation
 
-Registration alone does not grant organization access.
-
----
-
-## D011 — Better Auth user ID is the membership identity
-
-Status: accepted
-
-Store Better Auth:
-
-user.id
-
-inside:
-
-organization_members.userId
-
-Email may be used for lookup and display.
-
-Email must not be the long-term authorization identity.
-
-Reason:
-
-Email can change.
-
-Stable user IDs are more appropriate for identity relationships.
+Registration alone does not grant tenant access.
 
 ---
 
-## D012 — Inactive membership denies CRM access
+## D011 — Better Auth user.id is the CRM identity
 
 Status: accepted
 
-An authenticated user must have an active organization_members record before
-receiving CRM access.
+organization_members.userId stores the stable Better Auth User identifier.
 
-Inactive members must not receive tenant business data.
+Email is not the authorization identity.
 
-Reason:
+Consequence:
 
-Authentication and organization access have separate lifecycles.
-
-This also allows access revocation without deleting the Better Auth account.
+email lookup is only a controlled discovery/invitation mechanism.
 
 ---
 
-## D013 — Organization selection must be membership-validated
+## D012 — Inactive Membership denies CRM access
 
 Status: accepted
 
-The current development version uses the fixed:
+An authenticated User must have an active Membership for CRM access.
 
-development
-
-organization.
-
-Future active-organization selection must validate that the authenticated user
-belongs to the selected organization.
-
-Never treat browser-supplied organizationId as authorization proof.
+Prefer Membership deactivation over deletion because historical records may
+reference Members.
 
 ---
 
-## D014 — Prefer member deactivation over deletion
+## D013 — Organization selection must validate Membership
 
 Status: accepted
 
-Organization memberships should normally be deactivated rather than physically
-deleted.
+Current development uses a fixed Organization.
 
-Reason:
-
-CRM records may reference members historically.
-
-Keeping memberships supports future auditability and ownership history.
+Future Organization switching must validate real active Membership server-side.
 
 ---
 
-## D015 — Company is a separate business entity from Client
+## D014 — Company and Client are separate entities
 
 Status: accepted
 
-Client represents a person/contact.
+Client:
 
-Company represents a business/legal organization.
+person/contact
 
-Do not represent Companies as special Clients.
+Company:
 
-Reason:
+business/legal organization
 
-Companies and people have different attributes, relationships and lifecycle
-requirements.
+Do not model Company as a Client subtype.
 
 ---
 
-## D016 — Client ↔ Company is many-to-many
+## D015 — Client ↔ Company is many-to-many
 
 Status: accepted
 
-Use:
+Use client_companies.
 
-client_companies
-
-as the relationship table.
-
-A Client may be related to multiple Companies.
+A Client may relate to multiple Companies.
 
 A Company may contain multiple Client contacts.
 
-The relationship itself is tenant-owned through:
-
-organizationId
-
-Reason:
-
-A single clients.companyId field would unnecessarily restrict the CRM model and
-create migration debt for real-world cases.
-
 ---
 
-## D017 — Prefer archive / restore for business records
+## D016 — Archive / restore is the normal business lifecycle
 
 Status: accepted
 
-Clients and Companies use:
+Important CRM records prefer:
 
-isArchived
+archive
+→ restore
 
-for normal removal from active workflows.
-
-Physical deletion is not part of normal UI flows.
-
-Deals should follow the same lifecycle direction.
+over normal hard deletion.
 
 Reason:
 
-CRM records may later be referenced by:
-
-- activities
-- tasks
-- history
-- analytics
-- audit logs
-
-Archive / restore preserves history.
+history and future references must be preserved.
 
 ---
 
-## D018 — Pipelines and Stages are first-class entities
+## D017 — Pipelines and Stages are first-class entities
 
 Status: accepted
 
-Deals must use configurable:
+Deals use configurable Pipelines and Stages.
 
-pipelines
+Stage attributes include:
 
-and:
-
-pipeline_stages
-
-rather than hard-coded application status values.
-
-Each Stage contains:
-
-- name
 - position
 - type
 - probability
 - optional color
 
-Current stage types:
-
-open
-won
-lost
-
-Reason:
-
-Different organizations and processes require different sales/business stages.
-
 ---
 
-## D019 — Deal state is derived from Stage type
+## D018 — Deal state derives from Stage type
 
 Status: accepted
 
-Do not store a second independent:
+Do not add a second independent Deal won/lost status.
 
-deal.status
+Stage type is:
 
-for open/won/lost state.
-
-Deal state comes from:
-
-pipeline_stages.type
-
-Reason:
-
-Duplicating state would allow contradictory data such as:
-
-stage = Переговоры
-status = won
+- open
+- won
+- lost
 
 Rules:
 
 open
-→ closedAt = null
+→ closedAt null
 
-won
-→ closedAt is set
-
-lost
-→ closedAt is set
-
-Moving a closed Deal back to an open Stage clears closedAt.
+won/lost
+→ closedAt set
 
 ---
 
-## D020 — Deal keeps both Pipeline ID and Stage ID
+## D019 — Deal stores Pipeline and Stage
 
-Status: accepted
+Status: accepted with strengthening planned
 
-Deals store:
+Deal stores:
 
 pipelineId
-
-and:
-
 stageId
 
-Application code must validate that the Stage belongs to the selected Pipeline.
+Current application code validates the relationship.
 
-Reason:
+Future database design should also enforce:
 
-Storing pipelineId makes filtering and Kanban queries straightforward, while
-stageId identifies the specific business state.
+Organization
++ Pipeline
++ Stage
 
-Current PostgreSQL schema does not enforce every pipeline/stage/organization
-relationship through composite foreign keys.
-
-Therefore server-side relationship validation is mandatory.
+consistency with composite constraints/FKs where practical.
 
 ---
 
-## D021 — Relationship IDs must be authorized server-side
+## D020 — Money uses PostgreSQL numeric
 
 Status: accepted
 
-Never treat a valid UUID from the browser as proof of access.
+Deal amount uses numeric(14,2).
 
-For mutations, validate relationship targets against the authenticated
-organization.
+Currency remains separate.
 
-Examples:
-
-- Client
-- Company
-- Pipeline
-- Stage
-- responsible Member
-- future Tasks and related records
-
-Reason:
-
-Hidden fields, route parameters and request payloads are user-controlled input.
+Different currencies are not added into one financial total.
 
 ---
 
-## D022 — Deal money uses PostgreSQL numeric
+## D021 — Relationship IDs require server authorization
 
 Status: accepted
 
-Deal amount uses:
+A valid UUID is not authorization.
 
-numeric(14,2)
+Every submitted relationship must be checked against:
 
-Do not store persistent monetary values as floating-point numbers.
-
-Currency is stored separately as a three-character code.
-
-Reason:
-
-Floating point is inappropriate for exact persistent financial values.
-
----
-
-## D023 — Neon HTTP execution constraints are explicit
-
-Status: accepted
-
-The application currently uses the Neon serverless HTTP execution path.
-
-Do not assume normal interactive:
-
-db.transaction(async (tx) => ...)
-
-callbacks are available.
-
-Use supported Drizzle/Neon mechanisms such as:
-
-db.batch([...])
-
-where appropriate.
-
-Application-level pre-checks followed by writes must not be described as fully
-serialized concurrency guarantees.
-
----
-
-## D024 — Last active Owner is protected at application level
-
-Status: accepted with limitation
-
-Team role/status mutations attempt to prevent removal or deactivation of the
-last active Owner.
-
-Current Owner identity is based on:
-
-roles.name = "Owner"
-
-Current protection is application-level.
-
-Reason:
-
-The organization must not accidentally lose administrative ownership.
-
-Known limitation:
-
-The check and subsequent mutation are not protected by a serialized database
-invariant, so concurrent administrative requests could require future hardening.
-
-Future improvement:
-
-Use a stable system role key and review stronger concurrency protection.
-
----
-
-## D025 — Deal Kanban is Pipeline-centered
-
-Status: accepted
-
-The main Deals view is organized as:
-
-selected Pipeline
-→ ordered Pipeline Stages
-→ Deal cards
-
-Deal movement between Stages occurs inside the current Pipeline.
-
-Cross-Pipeline movement should be explicit through Deal editing or another
-purpose-built action.
-
-Reason:
-
-A Kanban column represents a Stage belonging to one specific Pipeline.
-
-Implicitly changing both pipeline and stage during drag-and-drop would make
-authorization and state transitions less clear.
-
----
-
-## D026 — AI must use normal CRM authorization
-
-Status: accepted
-
-Future AI operations must use the same authorization model as human-driven CRM
-operations.
-
-AI must not bypass:
-
-- Better Auth
-- organization membership
+- authenticated tenant
 - permissions
-- tenant boundaries
-- input validation
-- business rules
+- lifecycle state
+- relationship invariants
+
+---
+
+## D022 — Neon HTTP transaction limitations must be explicit
+
+Status: accepted
+
+Do not assume normal interactive transaction callbacks are available through the
+current Neon HTTP path.
+
+db.batch does not make earlier pre-checks concurrency-safe.
+
+Critical invariants require deliberate atomic design.
+
+---
+
+## D023 — Kanban is Pipeline-centered
+
+Status: accepted
+
+Kanban shows one selected Pipeline.
+
+Drag-and-drop changes Stage only inside that Pipeline.
+
+Cross-Pipeline movement is an explicit Deal edit/business operation.
+
+---
+
+## D024 — Owner protection needs a stronger identity and atomic invariant
+
+Status: accepted as current limitation
+Target: proposed
+
+Current behavior:
+
+- last active Owner is protected by application pre-check
+- Owner is identified by Role name
+
+Target:
+
+- stable Role systemKey
+- explicit ownership transfer
+- concurrency-safe last-Owner protection
 
 Reason:
 
-AI is an application actor, not a privileged database administrator.
+mutable display names and separate pre-check/write steps are too weak for a
+critical administrative invariant.
+
+---
+
+## D025 — Tenant context should become the single entry point for business operations
+
+Status: proposed
+
+Target flow:
+
+session
+→ active Organization
+→ active Membership
+→ Permissions
+→ module operation
+
+Business functions should receive trusted server-created context.
+
+They should not independently derive tenant identity when unnecessary.
+
+Reason:
+
+this reduces accidental authorization gaps in future API, automation and AI
+entry points.
+
+---
+
+## D026 — Important business logic moves into small domain modules
+
+Status: proposed
+
+Keep the modular monolith.
+
+Introduce focused modules such as:
+
+modules/deals
+modules/companies
+modules/team
+
+Server Actions become thin adapters.
+
+Do not create a generic repository framework.
+
+Reason:
+
+current business rules are duplicated between pages, actions and helpers.
+
+---
+
+## D027 — Deal Stage transition becomes one business operation
+
+Status: proposed
+
+One operation should serve:
+
+- manual Stage change
+- Kanban
+- automation
+- API
+- AI
+
+It owns:
+
+- permission check
+- tenant check
+- Pipeline/Stage validation
+- closedAt rule
+- concurrency rule
+- future Activity event
+
+Reason:
+
+separate current implementations can diverge and have already shown different
+concurrency guarantees.
+
+---
+
+## D028 — Optimistic locking for mutable collaborative records
+
+Status: proposed
+
+Start with Deal.
+
+Preferred model:
+
+version integer
+
+Mutation includes expected version.
+
+Successful write increments version.
+
+Zero affected rows means conflict.
+
+Reason:
+
+multiple Users may edit, archive or move the same record concurrently.
+
+Silent last-write-wins is not acceptable for important CRM state.
+
+---
+
+## D029 — Important tenant invariants also belong in PostgreSQL
+
+Status: proposed
+
+Application validation remains required.
+
+Where feasible, add database constraints for:
+
+- Stage Organization/Pipeline
+- Deal Organization/Pipeline/Stage
+- Member/Role tenant consistency
+- Client/Company tenant consistency
+- probability bounds
+- Stage type values
+- amount/currency consistency
+- default Pipeline uniqueness if confirmed
+
+Reason:
+
+application code alone cannot protect every race or future entry point.
+
+---
+
+## D030 — Exact email comparison for identity workflows
+
+Status: proposed
+
+Identity lookup by email must use canonicalized exact equality.
+
+LIKE/ILIKE pattern semantics are not acceptable.
+
+Production Membership creation should also require verified identity or a secure
+invitation acceptance flow.
+
+Reason:
+
+identity matching is security-sensitive.
+
+---
+
+## D031 — Organization activity is part of tenant access
+
+Status: proposed
+
+organizations.isActive must have defined security meaning.
+
+Target:
+
+inactive Organization
+→ no CRM business access
+
+The check belongs in central tenant context.
+
+---
+
+## D032 — Related reference data needs explicit permission semantics
+
+Status: proposed
+
+Responsible-member selection and related display data should not implicitly
+require or expose full Team information.
+
+Introduce either:
+
+- dedicated permission
+or
+- deliberately restricted directory DTO
+
+as product design requires.
+
+Reason:
+
+current Company, Deal and Dashboard policies are inconsistent.
+
+---
+
+## D033 — Date-only business values should use date semantics
+
+Status: proposed
+
+If expectedCloseAt represents a calendar day, prefer PostgreSQL date.
+
+Do not rely on Date.parse overflow behavior or artificial noon UTC.
+
+If a timestamp is required instead, define Organization timezone explicitly.
+
+---
+
+## D034 — Existing `notes` fields remain descriptions
+
+Status: accepted
+
+Client/Company/Deal `notes` fields are simple descriptive text.
+
+They are not the future collaborative Notes system.
+
+Collaborative Notes will be separate records.
+
+---
+
+## D035 — Collaborative Notes and Activity are separate concepts
+
+Status: proposed
+
+Note:
+
+human-authored collaboration
+
+Activity:
+
+structured business event
+
+Future Note fields include:
+
+- author
+- createdAt
+- updatedAt
+- lastEditedBy
+- deletedAt
+
+Future Activity includes business events such as:
+
+- Stage changed
+- owner changed
+- archive/restore
+- Task state change
+
+Reason:
+
+free-form collaboration and immutable structured history have different
+requirements.
+
+---
+
+## D036 — Activity should be introduced before advanced analytics/automation
+
+Status: proposed
+
+Do not postpone all Activity history to the end of the roadmap.
+
+Historical events are required for:
+
+- debugging
+- collaboration
+- Pipeline duration analytics
+- automation
+- future AI summaries
+
+Current state alone cannot reconstruct historical transitions reliably.
+
+---
+
+## D037 — Tasks are the next major product module after stabilization
+
+Status: proposed
+
+After security/concurrency stabilization, prioritize Tasks before adding broad
+configuration features.
+
+Reason:
+
+Tasks and next actions turn the CRM from a record catalog into a daily operational
+tool.
+
+---
+
+## D038 — Direct Deal contacts should use a flexible relationship model
+
+Status: proposed
+
+Do not add a single Deal.clientId by default.
+
+Likely future model:
+
+deal_clients
+
+Support:
+
+- multiple contacts
+- contact role
+- primary contact
+
+Contacts do not need to be restricted to the Deal's selected Company.
+
+---
+
+## D039 — Scale with incremental loading, not premature infrastructure
+
+Status: proposed
+
+As datasets grow, prefer:
+
+- pagination
+- searchable selectors
+- per-column incremental Kanban loading
+- SQL aggregates
+- query-plan-guided indexes
+
+Do not solve ordinary query/DOM scaling with microservices or Redis by default.
+
+---
+
+## D040 — AI uses the same module operations as the UI
+
+Status: accepted direction
+
+Future AI mutations must call the same domain operations used by human workflows.
+
+AI must respect:
+
+- tenant context
+- RBAC
+- validation
+- optimistic locking
+- database invariants
+- Activity logging
+
+Start AI with read-only/read-mostly use cases.
