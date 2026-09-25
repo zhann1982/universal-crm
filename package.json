@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "node --env-file=.env.local --import tsx src/db/seed.ts"
+    "db:seed": "node --env-file=.env.local --import tsx src/db/seed.ts",
+    "db:link-owner": "node --env-file=.env.local --import tsx src/db/link-dev-owner.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.6",

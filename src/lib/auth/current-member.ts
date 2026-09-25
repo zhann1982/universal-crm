@@ -2,17 +2,27 @@ import {
   and,
   eq,
 } from "drizzle-orm";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import {
   organizationMembers,
 } from "@/db/schema";
+import { auth } from "@/lib/auth/auth";
 import { getCurrentOrganization } from "@/lib/current-organization";
 
-const DEVELOPMENT_USER_ID =
-  "local-dev-owner";
-
 export async function getCurrentMember() {
+  const session =
+    await auth.api.getSession({
+      headers:
+        await headers(),
+    });
+
+  if (!session) {
+    redirect("/login");
+  }
+
   const organization =
     await getCurrentOrganization();
 
@@ -28,7 +38,7 @@ export async function getCurrentMember() {
 
         eq(
           organizationMembers.userId,
-          DEVELOPMENT_USER_ID,
+          session.user.id,
         ),
 
         eq(
@@ -40,13 +50,17 @@ export async function getCurrentMember() {
     .limit(1);
 
   if (!member) {
-    throw new Error(
-      "Current development member not found",
-    );
+    redirect("/no-access");
   }
 
   return {
     organization,
     member,
+
+    user:
+      session.user,
+
+    session:
+      session.session,
   };
 }

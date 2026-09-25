@@ -49,7 +49,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/auth-test");
+      router.push("/crm");
       router.refresh();
 
     } catch (cause) {
