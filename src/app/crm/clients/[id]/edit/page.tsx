@@ -5,6 +5,7 @@ import { getClientById } from "@/lib/clients/get-client";
 import { clientIdSchema } from "@/lib/validation/client";
 
 import { EditClientForm } from "./edit-client-form";
+import { requirePermission } from "@/lib/auth/permissions";
 
 export default async function EditClientPage({
   params,
@@ -13,6 +14,10 @@ export default async function EditClientPage({
     id: string;
   }>;
 }) {
+  await requirePermission(
+    "clients.update",
+  );
+
   const { id } = await params;
 
   const idResult =

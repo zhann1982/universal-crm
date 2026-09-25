@@ -1,8 +1,12 @@
 import Link from "next/link";
 
 import { ClientForm } from "./client-form";
+import { requirePermission } from "@/lib/auth/permissions";
 
-export default function NewClientPage() {
+export default async function NewClientPage() {
+  await requirePermission(
+    "clients.create",
+  );
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-8">

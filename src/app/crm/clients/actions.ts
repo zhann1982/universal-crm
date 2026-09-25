@@ -10,7 +10,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { clients } from "@/db/schema";
-import { getCurrentOrganization } from "@/lib/current-organization";
+import { requirePermission } from "@/lib/auth/permissions";
 import {
   clientIdSchema,
   createClientSchema,
@@ -59,6 +59,11 @@ export async function createClient(
   _previousState: CreateClientState,
   formData: FormData,
 ): Promise<CreateClientState> {
+
+  const { organization } =
+  await requirePermission(
+    "clients.create",
+  );
   const values =
     getFormValues(formData);
 
@@ -76,9 +81,6 @@ export async function createClient(
         "Проверьте данные формы.",
     };
   }
-
-  const organization =
-    await getCurrentOrganization();
 
   try {
     await db.insert(clients).values({
@@ -134,6 +136,11 @@ export async function updateClient(
   _previousState: UpdateClientState,
   formData: FormData,
 ): Promise<UpdateClientState> {
+
+  const { organization } =
+    await requirePermission(
+      "clients.update",
+    );
   const idResult =
     clientIdSchema.safeParse(clientId);
 
@@ -161,9 +168,6 @@ export async function updateClient(
         "Проверьте данные формы.",
     };
   }
-
-  const organization =
-    await getCurrentOrganization();
 
   try {
     const updated =
@@ -259,15 +263,16 @@ export async function updateClient(
 export async function archiveClient(
   clientId: string,
 ) {
+  const { organization } =
+    await requirePermission(
+      "clients.archive",
+    );
   const idResult =
     clientIdSchema.safeParse(clientId);
 
   if (!idResult.success) {
     redirect("/crm/clients");
   }
-
-  const organization =
-    await getCurrentOrganization();
 
   await db
     .update(clients)
@@ -311,15 +316,16 @@ export async function archiveClient(
 export async function restoreClient(
   clientId: string,
 ) {
+  const { organization } =
+  await requirePermission(
+    "clients.archive",
+  );
   const idResult =
     clientIdSchema.safeParse(clientId);
 
   if (!idResult.success) {
     redirect("/crm/clients?view=archive");
   }
-
-  const organization =
-    await getCurrentOrganization();
 
   await db
     .update(clients)

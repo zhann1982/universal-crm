@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ArchiveClientButton } from "./archive-client-button";
 import { getClientById } from "@/lib/clients/get-client";
 import { RestoreClientButton } from "./restore-client-button";
+import { requirePermission } from "@/lib/auth/permissions";
 
 const clientIdSchema = z.string().uuid();
 
@@ -20,6 +21,11 @@ export default async function ClientPage({
     id: string;
   }>;
 }) {
+  const {
+    permissions: currentPermissions,
+  } = await requirePermission(
+    "clients.read",
+  );
   const { id } = await params;
 
   const idResult =
@@ -83,16 +89,35 @@ export default async function ClientPage({
 
           {!client.isArchived && (
             <div className="flex flex-wrap gap-3">
-              <Link
-                href={`/crm/clients/${client.id}/edit`}
-                className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
-              >
-                Редактировать
-              </Link>
+              {!client.isArchived &&
+                currentPermissions.has(
+                  "clients.update",
+                ) && (
+                  <Link
+                    href={`/crm/clients/${client.id}/edit`}
+                    className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
+                  >
+                    Редактировать
+                  </Link>
+                )}
 
-              <ArchiveClientButton
-                clientId={client.id}
-              />
+              {!client.isArchived &&
+                currentPermissions.has(
+                  "clients.archive",
+                ) && (
+                  <ArchiveClientButton
+                    clientId={client.id}
+                  />
+                )}
+
+              {client.isArchived &&
+                currentPermissions.has(
+                  "clients.archive",
+                ) && (
+                  <RestoreClientButton
+                    clientId={client.id}
+                  />
+                )}
             </div>
           )}
 

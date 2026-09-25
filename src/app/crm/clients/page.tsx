@@ -12,7 +12,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { clients } from "@/db/schema";
-import { getCurrentOrganization } from "@/lib/current-organization";
+import { requirePermission } from "@/lib/auth/permissions";
 import {
   clientListQuerySchema,
   type ClientListQuery,
@@ -59,8 +59,12 @@ export default async function ClientsPage({
     page,
   } = query;
 
-  const organization =
-    await getCurrentOrganization();
+  const {
+    organization,
+    permissions: currentPermissions,
+  } = await requirePermission(
+    "clients.read",
+  );
 
   const searchCondition = q
     ? or(
@@ -232,12 +236,16 @@ export default async function ClientsPage({
           </p>
         </div>
 
-        <Link
-          href="/crm/clients/new"
-          className="rounded-lg bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
-        >
-          + Новый клиент
-        </Link>
+        {currentPermissions.has(
+          "clients.create",
+        ) && (
+          <Link
+            href="/crm/clients/new"
+            className="rounded-lg bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+          >
+            + Новый клиент
+          </Link>
+        )}
       </div>
 
       <div className="mb-5 flex gap-2">
