@@ -10,6 +10,12 @@ import {
 } from "react";
 
 import {
+  formatMoney,
+  formatNumber,
+  groupMoneyByCurrency,
+} from "@/lib/money";
+
+import {
   moveDealOnBoard,
 } from "./board-actions";
 
@@ -19,6 +25,7 @@ type StageItem = {
   type: string;
   position: number;
   probability: number;
+
   color:
     | string
     | null;
@@ -128,7 +135,6 @@ export function KanbanBoard({
       pending
     ) {
       clearDragState();
-
       return;
     }
 
@@ -141,7 +147,6 @@ export function KanbanBoard({
 
     if (!deal) {
       clearDragState();
-
       return;
     }
 
@@ -150,7 +155,6 @@ export function KanbanBoard({
       targetStageId
     ) {
       clearDragState();
-
       return;
     }
 
@@ -234,31 +238,9 @@ export function KanbanBoard({
                     stage.id,
                 );
 
-              const stageAmount =
-                stageDeals.reduce(
-                  (
-                    sum,
-                    deal,
-                  ) => {
-                    if (
-                      !deal.amount
-                    ) {
-                      return sum;
-                    }
-
-                    const value =
-                      Number(
-                        deal.amount,
-                      );
-
-                    return Number.isFinite(
-                      value,
-                    )
-                      ? sum +
-                          value
-                      : sum;
-                  },
-                  0,
+              const stageTotals =
+                groupMoneyByCurrency(
+                  stageDeals,
                 );
 
               const isOver =
@@ -386,11 +368,32 @@ export function KanbanBoard({
                       </span>
                     </div>
 
-                    {stageAmount >
+                    {stageTotals.length >
                       0 && (
-                      <div className="mt-3 text-sm font-medium text-slate-700">
-                        {formatAmount(
-                          stageAmount,
+                      <div className="mt-3 space-y-1 border-t border-slate-100 pt-3">
+                        {stageTotals.map(
+                          (
+                            total,
+                          ) => (
+                            <div
+                              key={
+                                total.currency
+                              }
+                              className="flex items-center justify-between gap-3 text-sm"
+                            >
+                              <span className="font-medium text-slate-700">
+                                {formatNumber(
+                                  total.amount,
+                                )}
+                              </span>
+
+                              <span className="text-xs font-semibold text-slate-500">
+                                {
+                                  total.currency
+                                }
+                              </span>
+                            </div>
+                          ),
                         )}
                       </div>
                     )}
@@ -447,7 +450,6 @@ export function KanbanBoard({
                                   pending
                                 ) {
                                   event.preventDefault();
-
                                   return;
                                 }
 
@@ -507,7 +509,7 @@ export function KanbanBoard({
 
                               <div className="mt-3 text-lg font-semibold">
                                 {deal.amount
-                                  ? formatDealAmount(
+                                  ? formatMoney(
                                       deal.amount,
                                       deal.currency,
                                     )
@@ -575,46 +577,4 @@ export function KanbanBoard({
       </div>
     </div>
   );
-}
-
-function formatAmount(
-  value: number,
-) {
-  return new Intl.NumberFormat(
-    "ru-RU",
-    {
-      maximumFractionDigits: 2,
-    },
-  ).format(value);
-}
-
-function formatDealAmount(
-  amount: string,
-  currency:
-    | string
-    | null,
-) {
-  const value =
-    Number(amount);
-
-  if (
-    !Number.isFinite(
-      value,
-    )
-  ) {
-    return amount;
-  }
-
-  const formatted =
-    new Intl.NumberFormat(
-      "ru-RU",
-      {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      },
-    ).format(value);
-
-  return currency
-    ? `${formatted} ${currency}`
-    : formatted;
 }

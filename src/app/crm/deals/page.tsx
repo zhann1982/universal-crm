@@ -22,6 +22,10 @@ import {
 import {
   requirePermission,
 } from "@/lib/auth/permissions";
+import {
+  formatNumber,
+  groupMoneyByCurrency,
+} from "@/lib/money";
 
 import {
   KanbanBoard,
@@ -315,28 +319,9 @@ export default async function DealsPage({
         ),
       );
 
-  const totalAmount =
-    dealList.reduce(
-      (
-        sum,
-        deal,
-      ) => {
-        if (!deal.amount) {
-          return sum;
-        }
-
-        const value =
-          Number(
-            deal.amount,
-          );
-
-        return Number.isFinite(
-          value,
-        )
-          ? sum + value
-          : sum;
-      },
-      0,
+  const currencyTotals =
+    groupMoneyByCurrency(
+      dealList,
     );
 
   const kanbanDeals =
@@ -481,14 +466,9 @@ export default async function DealsPage({
           )}
         />
 
-        <SummaryCard
-          label="Общая сумма"
-          value={
-            totalAmount > 0
-              ? formatAmount(
-                  totalAmount,
-                )
-              : "—"
+        <MoneySummaryCard
+          totals={
+            currencyTotals
           }
         />
 
@@ -546,13 +526,50 @@ function SummaryCard({
   );
 }
 
-function formatAmount(
-  value: number,
-) {
-  return new Intl.NumberFormat(
-    "ru-RU",
-    {
-      maximumFractionDigits: 2,
-    },
-  ).format(value);
+function MoneySummaryCard({
+  totals,
+}: {
+  totals: Array<{
+    currency: string;
+    amount: number;
+  }>;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="text-sm text-slate-500">
+        Сумма по валютам
+      </div>
+
+      {totals.length === 0 ? (
+        <div className="mt-2 text-2xl font-bold">
+          —
+        </div>
+      ) : (
+        <div className="mt-2 space-y-1">
+          {totals.map(
+            (total) => (
+              <div
+                key={
+                  total.currency
+                }
+                className="flex items-baseline justify-between gap-4"
+              >
+                <span className="text-xl font-bold">
+                  {formatNumber(
+                    total.amount,
+                  )}
+                </span>
+
+                <span className="text-sm font-semibold text-slate-500">
+                  {
+                    total.currency
+                  }
+                </span>
+              </div>
+            ),
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
