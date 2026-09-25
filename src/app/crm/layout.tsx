@@ -1,43 +1,18 @@
 import Link from "next/link";
 
-const navigation = [
-  {
-    href: "/crm",
-    label: "Dashboard",
-    enabled: true,
-  },
-  {
-    href: "/crm/clients",
-    label: "Клиенты",
-    enabled: true,
-  },
-  {
-    href: "/crm/deals",
-    label: "Сделки",
-    enabled: false,
-  },
-  {
-    href: "/crm/tasks",
-    label: "Задачи",
-    enabled: false,
-  },
-  {
-    href: "/crm/team",
-    label: "Команда",
-    enabled: false,
-  },
-  {
-    href: "/crm/settings",
-    label: "Настройки",
-    enabled: false,
-  },
-];
+import { getCurrentAccessContext } from "@/lib/auth/permissions";
 
-export default function CrmLayout({
+export default async function CrmLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const {
+    member,
+    permissions,
+  } =
+    await getCurrentAccessContext();
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950">
       <div className="flex min-h-screen">
@@ -53,24 +28,44 @@ export default function CrmLayout({
           </div>
 
           <nav className="space-y-1 p-4">
-            {navigation.map((item) =>
-              item.enabled ? (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="block rounded-lg px-4 py-3 text-sm font-medium transition hover:bg-slate-100"
-                >
-                  {item.label}
-                </Link>
-              ) : (
-                <div
-                  key={item.href}
-                  className="cursor-not-allowed rounded-lg px-4 py-3 text-sm text-slate-400"
-                >
-                  {item.label}
-                </div>
-              ),
+            <NavigationLink
+              href="/crm"
+              label="Dashboard"
+            />
+
+            {permissions.has(
+              "clients.read",
+            ) && (
+              <NavigationLink
+                href="/crm/clients"
+                label="Клиенты"
+              />
             )}
+
+            <DisabledNavigation
+              label="Сделки"
+            />
+
+            <DisabledNavigation
+              label="Задачи"
+            />
+
+            {permissions.has(
+              "members.read",
+            ) ? (
+              <NavigationLink
+                href="/crm/team"
+                label="Команда"
+              />
+            ) : (
+              <DisabledNavigation
+                label="Команда"
+              />
+            )}
+
+            <DisabledNavigation
+              label="Настройки"
+            />
           </nav>
         </aside>
 
@@ -81,7 +76,9 @@ export default function CrmLayout({
             </div>
 
             <div className="text-sm text-slate-500">
-              Development Owner
+              {member.displayName ||
+                member.email ||
+                member.userId}
             </div>
           </header>
 
@@ -90,6 +87,35 @@ export default function CrmLayout({
           </main>
         </div>
       </div>
+    </div>
+  );
+}
+
+function NavigationLink({
+  href,
+  label,
+}: {
+  href: string;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="block rounded-lg px-4 py-3 text-sm font-medium transition hover:bg-slate-100"
+    >
+      {label}
+    </Link>
+  );
+}
+
+function DisabledNavigation({
+  label,
+}: {
+  label: string;
+}) {
+  return (
+    <div className="cursor-not-allowed rounded-lg px-4 py-3 text-sm text-slate-400">
+      {label}
     </div>
   );
 }

@@ -63,7 +63,12 @@ async function main() {
   let [organization] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, "development"))
+    .where(
+      eq(
+        organizations.slug,
+        "development",
+      ),
+    )
     .limit(1);
 
   if (!organization) {
@@ -75,22 +80,34 @@ async function main() {
       })
       .returning();
 
-    console.log("Created organization:", organization.name);
+    console.log(
+      "Created organization:",
+      organization.name,
+    );
   } else {
-    console.log("Organization already exists:", organization.name);
+    console.log(
+      "Organization already exists:",
+      organization.name,
+    );
   }
 
   // --------------------------------------------------
   // Permissions
   // --------------------------------------------------
 
-  const permissionMap = new Map<string, string>();
+  const permissionMap =
+    new Map<string, string>();
 
   for (const permission of PERMISSIONS) {
     let [record] = await db
       .select()
       .from(permissions)
-      .where(eq(permissions.key, permission.key))
+      .where(
+        eq(
+          permissions.key,
+          permission.key,
+        ),
+      )
       .limit(1);
 
     if (!record) {
@@ -99,10 +116,16 @@ async function main() {
         .values(permission)
         .returning();
 
-      console.log("Created permission:", record.key);
+      console.log(
+        "Created permission:",
+        record.key,
+      );
     }
 
-    permissionMap.set(record.key, record.id);
+    permissionMap.set(
+      record.key,
+      record.id,
+    );
   }
 
   // --------------------------------------------------
@@ -112,17 +135,31 @@ async function main() {
   const roleDefinitions = [
     {
       name: "Owner",
-      description: "Полный доступ к организации",
-      permissions: PERMISSIONS.map((item) => item.key),
+      description:
+        "Полный доступ к организации",
+
+      permissions:
+        PERMISSIONS.map(
+          (item) => item.key,
+        ),
     },
+
     {
       name: "Admin",
-      description: "Администрирование CRM",
-      permissions: PERMISSIONS.map((item) => item.key),
+      description:
+        "Администрирование CRM",
+
+      permissions:
+        PERMISSIONS.map(
+          (item) => item.key,
+        ),
     },
+
     {
       name: "Manager",
-      description: "Работа с клиентами",
+      description:
+        "Работа с клиентами",
+
       permissions: [
         "clients.read",
         "clients.create",
@@ -130,23 +167,39 @@ async function main() {
         "clients.archive",
       ],
     },
+
     {
       name: "Viewer",
-      description: "Только просмотр",
-      permissions: ["clients.read"],
+      description:
+        "Только просмотр",
+
+      permissions: [
+        "clients.read",
+      ],
     },
   ] as const;
 
-  const roleMap = new Map<string, string>();
+  const roleMap =
+    new Map<string, string>();
 
-  for (const roleDefinition of roleDefinitions) {
+  for (
+    const roleDefinition of
+    roleDefinitions
+  ) {
     let [role] = await db
       .select()
       .from(roles)
       .where(
         and(
-          eq(roles.organizationId, organization.id),
-          eq(roles.name, roleDefinition.name),
+          eq(
+            roles.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            roles.name,
+            roleDefinition.name,
+          ),
         ),
       )
       .limit(1);
@@ -155,23 +208,43 @@ async function main() {
       [role] = await db
         .insert(roles)
         .values({
-          organizationId: organization.id,
-          name: roleDefinition.name,
-          description: roleDefinition.description,
+          organizationId:
+            organization.id,
+
+          name:
+            roleDefinition.name,
+
+          description:
+            roleDefinition.description,
+
           isSystem: true,
         })
         .returning();
 
-      console.log("Created role:", role.name);
+      console.log(
+        "Created role:",
+        role.name,
+      );
     }
 
-    roleMap.set(role.name, role.id);
+    roleMap.set(
+      role.name,
+      role.id,
+    );
 
-    for (const permissionKey of roleDefinition.permissions) {
-      const permissionId = permissionMap.get(permissionKey);
+    for (
+      const permissionKey of
+      roleDefinition.permissions
+    ) {
+      const permissionId =
+        permissionMap.get(
+          permissionKey,
+        );
 
       if (!permissionId) {
-        throw new Error(`Permission not found: ${permissionKey}`);
+        throw new Error(
+          `Permission not found: ${permissionKey}`,
+        );
       }
 
       await db
@@ -188,59 +261,237 @@ async function main() {
   // Development owner
   // --------------------------------------------------
   //
-  // Это временный пользователь до подключения настоящей
-  // системы авторизации.
+  // Это временный пользователь до подключения
+  // настоящей системы авторизации.
   //
 
   let [member] = await db
     .select()
-    .from(organizationMembers)
+    .from(
+      organizationMembers,
+    )
     .where(
       and(
-        eq(organizationMembers.organizationId, organization.id),
-        eq(organizationMembers.userId, "local-dev-owner"),
+        eq(
+          organizationMembers.organizationId,
+          organization.id,
+        ),
+
+        eq(
+          organizationMembers.userId,
+          "local-dev-owner",
+        ),
       ),
     )
     .limit(1);
 
   if (!member) {
     [member] = await db
-      .insert(organizationMembers)
+      .insert(
+        organizationMembers,
+      )
       .values({
-        organizationId: organization.id,
-        userId: "local-dev-owner",
-        displayName: "Development Owner",
-        email: "owner@local.dev",
+        organizationId:
+          organization.id,
+
+        userId:
+          "local-dev-owner",
+
+        displayName:
+          "Development Owner",
+
+        email:
+          "owner@local.dev",
       })
       .returning();
 
-    console.log("Created development owner.");
+    console.log(
+      "Created development owner.",
+    );
+  } else {
+    console.log(
+      "Development owner already exists.",
+    );
   }
 
-  const ownerRoleId = roleMap.get("Owner");
+  const ownerRoleId =
+    roleMap.get("Owner");
 
   if (!ownerRoleId) {
-    throw new Error("Owner role not found");
+    throw new Error(
+      "Owner role not found",
+    );
   }
 
   await db
     .insert(memberRoles)
     .values({
-      memberId: member.id,
-      roleId: ownerRoleId,
+      memberId:
+        member.id,
+
+      roleId:
+        ownerRoleId,
     })
     .onConflictDoNothing();
 
+  // --------------------------------------------------
+  // Development test members
+  // --------------------------------------------------
+
+  const developmentMembers = [
+    {
+      userId:
+        "local-dev-manager",
+
+      displayName:
+        "Development Manager",
+
+      email:
+        "manager@local.dev",
+
+      roleName:
+        "Manager",
+    },
+
+    {
+      userId:
+        "local-dev-viewer",
+
+      displayName:
+        "Development Viewer",
+
+      email:
+        "viewer@local.dev",
+
+      roleName:
+        "Viewer",
+    },
+  ] as const;
+
+  for (
+    const definition of
+    developmentMembers
+  ) {
+    let [developmentMember] =
+      await db
+        .select()
+        .from(
+          organizationMembers,
+        )
+        .where(
+          and(
+            eq(
+              organizationMembers.organizationId,
+              organization.id,
+            ),
+
+            eq(
+              organizationMembers.userId,
+              definition.userId,
+            ),
+          ),
+        )
+        .limit(1);
+
+    if (!developmentMember) {
+      [developmentMember] =
+        await db
+          .insert(
+            organizationMembers,
+          )
+          .values({
+            organizationId:
+              organization.id,
+
+            userId:
+              definition.userId,
+
+            displayName:
+              definition.displayName,
+
+            email:
+              definition.email,
+          })
+          .returning();
+
+      console.log(
+        "Created development member:",
+        definition.displayName,
+      );
+    } else {
+      console.log(
+        "Development member already exists:",
+        definition.displayName,
+      );
+    }
+
+    const roleId =
+      roleMap.get(
+        definition.roleName,
+      );
+
+    if (!roleId) {
+      throw new Error(
+        `Role not found: ${definition.roleName}`,
+      );
+    }
+
+    await db
+      .insert(memberRoles)
+      .values({
+        memberId:
+          developmentMember.id,
+
+        roleId,
+      })
+      .onConflictDoNothing();
+  }
+
+  // --------------------------------------------------
+  // Finished
+  // --------------------------------------------------
+
   console.log("");
-  console.log("Seed completed successfully.");
-  console.log("Organization:", organization.name);
-  console.log("Organization ID:", organization.id);
+  console.log(
+    "Seed completed successfully.",
+  );
+
+  console.log(
+    "Organization:",
+    organization.name,
+  );
+
+  console.log(
+    "Organization ID:",
+    organization.id,
+  );
+
+  console.log("");
+  console.log(
+    "Development users:",
+  );
+
+  console.log(
+    "- local-dev-owner -> Owner",
+  );
+
+  console.log(
+    "- local-dev-manager -> Manager",
+  );
+
+  console.log(
+    "- local-dev-viewer -> Viewer",
+  );
 }
 
 main()
   .catch((error) => {
-    console.error("Seed failed:");
+    console.error(
+      "Seed failed:",
+    );
+
     console.error(error);
+
     process.exit(1);
   })
   .finally(() => {
