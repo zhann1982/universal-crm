@@ -22,6 +22,13 @@
       "when": 1790341977099,
       "tag": "0002_colossal_darwin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790351277071,
+      "tag": "0003_cooing_vision",
+      "breakpoints": true
     }
   ]
 }

@@ -576,3 +576,86 @@ export const companies = pgTable(
     ),
   ],
 );
+
+/*
+|--------------------------------------------------------------------------
+| Client Companies
+|--------------------------------------------------------------------------
+|
+| Связь многие-ко-многим:
+|
+| Client <-> Company
+|
+| Один клиент может быть связан с несколькими компаниями.
+| Одна компания может иметь несколько клиентов/контактов.
+|
+*/
+
+export const clientCompanies = pgTable(
+  "client_companies",
+  {
+    organizationId: uuid(
+      "organization_id",
+    )
+      .notNull()
+      .references(
+        () => organizations.id,
+        {
+          onDelete: "cascade",
+        },
+      ),
+
+    clientId: uuid(
+      "client_id",
+    )
+      .notNull()
+      .references(
+        () => clients.id,
+        {
+          onDelete: "cascade",
+        },
+      ),
+
+    companyId: uuid(
+      "company_id",
+    )
+      .notNull()
+      .references(
+        () => companies.id,
+        {
+          onDelete: "cascade",
+        },
+      ),
+
+    createdAt: timestamp(
+      "created_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.clientId,
+        table.companyId,
+      ],
+    }),
+
+    index(
+      "client_companies_org_client_idx",
+    ).on(
+      table.organizationId,
+      table.clientId,
+    ),
+
+    index(
+      "client_companies_org_company_idx",
+    ).on(
+      table.organizationId,
+      table.companyId,
+    ),
+  ],
+);
