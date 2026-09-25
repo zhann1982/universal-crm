@@ -25,6 +25,7 @@ import {
 } from "@/lib/auth/permissions";
 import {
   createDealSchema,
+  dealIdSchema,
   type CreateDealState,
 } from "@/lib/validation/deal";
 
@@ -463,5 +464,185 @@ export async function createDeal(
 
   redirect(
     `/crm/deals?pipeline=${pipeline.id}`,
+  );
+}
+
+export async function moveDealToStage(
+  dealId: string,
+  formData: FormData,
+) {
+  const {
+    organization,
+  } = await requirePermission(
+    "deals.update",
+  );
+
+  const dealIdResult =
+    dealIdSchema.safeParse(
+      dealId,
+    );
+
+  const stageIdResult =
+    dealIdSchema.safeParse(
+      String(
+        formData.get(
+          "stageId",
+        ) ?? "",
+      ),
+    );
+
+  if (
+    !dealIdResult.success ||
+    !stageIdResult.success
+  ) {
+    redirect(
+      "/crm/deals",
+    );
+  }
+
+  const [deal] =
+    await db
+      .select({
+        id:
+          deals.id,
+
+        pipelineId:
+          deals.pipelineId,
+
+        stageId:
+          deals.stageId,
+
+        closedAt:
+          deals.closedAt,
+      })
+      .from(deals)
+      .where(
+        and(
+          eq(
+            deals.id,
+            dealIdResult.data,
+          ),
+
+          eq(
+            deals.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            deals.isArchived,
+            false,
+          ),
+
+          isNull(
+            deals.deletedAt,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!deal) {
+    redirect(
+      "/crm/forbidden",
+    );
+  }
+
+  const [targetStage] =
+    await db
+      .select({
+        id:
+          pipelineStages.id,
+
+        type:
+          pipelineStages.type,
+      })
+      .from(
+        pipelineStages,
+      )
+      .where(
+        and(
+          eq(
+            pipelineStages.id,
+            stageIdResult.data,
+          ),
+
+          eq(
+            pipelineStages.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            pipelineStages.pipelineId,
+            deal.pipelineId,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!targetStage) {
+    redirect(
+      "/crm/forbidden",
+    );
+  }
+
+  const targetIsClosed =
+    targetStage.type ===
+      "won" ||
+    targetStage.type ===
+      "lost";
+
+  const closedAt =
+    targetIsClosed
+      ? deal.closedAt ??
+        new Date()
+      : null;
+
+  await db
+    .update(deals)
+    .set({
+      stageId:
+        targetStage.id,
+
+      closedAt,
+
+      updatedAt:
+        new Date(),
+    })
+    .where(
+      and(
+        eq(
+          deals.id,
+          deal.id,
+        ),
+
+        eq(
+          deals.organizationId,
+          organization.id,
+        ),
+
+        eq(
+          deals.isArchived,
+          false,
+        ),
+
+        isNull(
+          deals.deletedAt,
+        ),
+      ),
+    );
+
+  revalidatePath(
+    "/crm",
+  );
+
+  revalidatePath(
+    "/crm/deals",
+  );
+
+  revalidatePath(
+    `/crm/deals/${deal.id}`,
+  );
+
+  redirect(
+    `/crm/deals/${deal.id}`,
   );
 }

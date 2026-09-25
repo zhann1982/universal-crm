@@ -4,333 +4,421 @@ Last updated: 2026-09-25
 
 ## Current checkpoint
 
-The authentication foundation is now working.
+The core identity and CRM entity foundations are working.
 
-Implemented:
+Current chain:
 
 Better Auth
-→ email/password registration
-→ login
-→ session
-→ stable authenticated user ID
-→ organization membership
-→ roles
-→ permissions
-→ CRM
+→ Organization membership
+→ RBAC
+→ Clients
+→ Companies
+→ Client / Company relationships
+→ Pipelines
+→ Pipeline stages
+→ Deals
+→ Kanban
+→ Deal creation
+→ Deal detail
+→ Deal stage transitions
 
-The previous runtime dependency on:
+The immediate development priority is now:
 
-local-dev-owner
+DEAL LIFECYCLE + KANBAN INTERACTION
 
-has been removed from current-member resolution.
-
-Clients and Team already use the same RBAC layer.
-
-The immediate priority is now:
-
-REAL MEMBER MANAGEMENT + REAL RBAC TESTING
-
-Do not start Companies yet.
+Do not start AI features.
 
 ---
 
-# Step 1 — Finish CRM logout UX
+# Step 1 — Full Deal editing
 
-The CRM should provide logout directly from the application shell.
+Add:
 
-Logout must:
+/crm/deals/[id]/edit
 
-- invalidate the Better Auth session
-- redirect to /login
-- make protected CRM routes inaccessible
-- prevent Server Actions from executing without a valid session
+Editable fields:
 
-Do not rely only on the temporary /auth-test page for logout.
-
----
-
-# Step 2 — Add registered users to the organization
-
-Current authentication allows anyone using the development application to create
-a Better Auth account.
-
-Registration alone must NOT grant CRM access.
-
-A user needs an active organization_members record.
-
-Implement a simple first Team workflow:
-
-Owner/Admin
-→ enters registered user's email
-→ application finds Better Auth user
-→ creates organization_members row
-→ stores Better Auth user.id in organization_members.userId
-→ assigns initial role
+- title
+- pipeline
+- stage
+- amount
+- currency
+- company
+- responsible member
+- expected close date
+- notes
 
 Requirements:
 
-- members.manage
-- user must exist in Better Auth
-- target organization is resolved server-side
-- selected role must belong to current organization
-- duplicate membership must be rejected
-- email may be used for lookup
-- stable user.id must be stored as identity
+- deals.update
+- tenant-scoped Deal lookup
+- tenant-scoped Pipeline validation
+- Stage must belong to selected Pipeline
+- Company must belong to current organization
+- Company must not be deleted
+- selected responsible member must belong to current organization
+- selected responsible member should be active
+- Zod validation
+- updatedAt must be updated
 
-Do not use email itself as the membership identity.
+If pipeline changes, stage selection must also change to a valid stage in the new
+pipeline.
 
----
-
-# Step 3 — Test Manager with a real session
-
-Create a real Better Auth account representing Manager.
-
-Connect it to the development organization.
-
-Assign:
-
-Manager
-
-Expected permissions:
-
-- clients.read
-- clients.create
-- clients.update
-- clients.archive
-
-Expected restrictions:
-
-- no members.read
-- no members.manage
-- Team navigation hidden
-- direct /crm/team access denied
-- no administrative role management
-
-Verify both UI behavior and direct server authorization.
+Do not allow a stage from another pipeline to be submitted through manipulated
+form data.
 
 ---
 
-# Step 4 — Test Viewer with a real session
+# Step 2 — Preserve Deal closedAt rules during editing
 
-Create a real Better Auth account representing Viewer.
+Deal state continues to come from:
 
-Assign:
+pipeline_stages.type
 
-Viewer
+Rules:
 
-Expected:
+open
+→ closedAt = null
 
-- can view Clients
-- cannot create Client
-- cannot edit Client
-- cannot archive Client
-- cannot restore Client
-- cannot access Team
+won
+→ closedAt = existing closedAt or current time
 
-Again verify:
+lost
+→ closedAt = existing closedAt or current time
 
-UI
-+
-direct protected routes
-+
-Server Actions
+If Deal editing changes the stage, apply the same rules used by manual stage
+movement.
 
-The server is the security boundary.
+Avoid duplicating this logic in many independent places.
 
----
+A small reusable server helper may be appropriate once Deal editing is added.
 
-# Step 5 — Reduce legacy development fixtures
-
-The seed currently contains historical development members:
-
-- local-dev-owner
-- local-dev-manager
-- local-dev-viewer
-
-They were useful before real authentication.
-
-Do not delete them blindly if they are still useful for database development.
-
-However:
-
-- runtime authentication must not depend on them
-- production assumptions must not reference them
-- real RBAC tests should use Better Auth identities
-
-Eventually simplify the seed around real development scenarios.
+Do not create a separate Deal status field.
 
 ---
 
-# Step 6 — Harden role replacement
+# Step 3 — Deal archive / restore
 
-Current member role update:
+Implement the same lifecycle pattern already used by:
 
-DELETE current assignments
-→ INSERT new assignments
+Clients
 
-This is not atomic.
+Companies
 
-Failure after DELETE can leave a member without roles.
+Requirements:
 
-Target behavior:
+- deals.archive
+- archive action
+- restore action
+- tenant scope
+- deletedAt remains null
+- normal hard deletion is not exposed
+- active/archive views or equivalent discoverability
+- archived Deals should not appear in the normal Kanban
 
-BEGIN
-→ validate target
-→ validate roles
-→ delete old roles
-→ insert new roles
-→ COMMIT
+Decide whether archived Deal detail remains readable.
 
-If the current Neon/Drizzle execution path supports transactions cleanly, use
-one.
-
-Preserve all existing checks:
-
-- members.manage
-- target member organization
-- role organization
-- at least one role
-- no own-role accidental lockout
+Prefer archive / restore over physical deletion.
 
 ---
 
-# Step 7 — Prevent last-owner lockout
+# Step 4 — Drag-and-drop Kanban
 
-Current protection prevents a user from changing their own roles.
+After manual stage movement and edit behavior are stable, add drag-and-drop.
 
-This is useful but incomplete.
+Target UX:
 
-Future role management should also ensure that an organization cannot
-accidentally lose its last Owner-equivalent administrator.
+Deal card
+→ drag
+→ drop into another stage
+→ Server Action
+→ validate Deal
+→ validate target Stage
+→ update stageId
+→ update closedAt if required
+→ refresh board
 
-Before allowing broader Owner/Admin management, define the invariant.
+Security requirements:
 
-Possible rule:
+- deals.update
+- tenant-scoped Deal
+- target Stage belongs to current organization
+- target Stage belongs to Deal's current Pipeline
 
-Every active organization must have at least one active member with an Owner
-role.
+Client-side drag-and-drop state is not an authorization boundary.
 
-Do not implement destructive administrative workflows without this protection.
+The server must validate every move.
 
----
+Do not allow drag/drop to mutate pipelineId implicitly.
 
-# Step 8 — Member lifecycle
-
-After real-role tests are successful, add:
-
-- deactivate member
-- reactivate member
-
-An inactive member must not pass getCurrentMember().
-
-Current member resolution already requires:
-
-status = active
-
-Do not physically delete memberships by default.
-
-Deactivation is safer and preserves historical ownership references.
+Cross-pipeline movement should happen through explicit Deal editing or a later
+dedicated action.
 
 ---
 
-# Step 9 — Production authentication gaps
+# Step 5 — Improve Kanban summaries
 
-Current auth is sufficient for local development but not yet complete for public
-production.
+Current board shows counts and monetary totals.
 
-Before public launch address:
+Before adding more analytics, decide how to handle multiple currencies.
+
+Current simple total:
+
+Number(deal.amount)
+
+is acceptable only as a temporary display when data is effectively one currency.
+
+Do not present:
+
+KZT + USD + EUR
+
+as one meaningful financial total.
+
+Possible next approach:
+
+group stage totals by currency.
+
+Example:
+
+KZT 1 500 000
+USD 4 000
+
+Do not implement exchange-rate conversion without a concrete product requirement.
+
+---
+
+# Step 6 — Pipeline management UI
+
+Current database supports multiple Pipelines and Stages.
+
+Current seed creates:
+
+Основная воронка
+
+with standard stages.
+
+Add administration UI for:
+
+- create Pipeline
+- rename Pipeline
+- archive Pipeline
+- choose default Pipeline
+- create Stage
+- rename Stage
+- reorder Stage
+- probability
+- type: open / won / lost
+- optional color
+
+Permission:
+
+pipelines.manage
+
+Important constraints:
+
+A Pipeline or Stage currently referenced by Deals must not be casually deleted.
+
+Prefer archive / controlled migration over destructive deletion.
+
+---
+
+# Step 7 — Pipeline invariants
+
+Before allowing flexible Pipeline administration, define stronger invariants.
+
+Consider:
+
+- only one default Pipeline per organization
+- at least one usable Stage per active Pipeline
+- deterministic Stage positions
+- whether each Pipeline requires a won Stage
+- whether each Pipeline requires a lost Stage
+- behavior when archiving a Pipeline containing active Deals
+
+Current database does not enforce all of these.
+
+Do not add constraints until the desired product behavior is clear.
+
+---
+
+# Step 8 — Deal relationships
+
+Current Deal directly supports:
+
+- Company
+- responsible Member
+
+Current Deal does not directly reference a Client/contact.
+
+After basic Deal lifecycle is complete, decide whether Deals need:
+
+- one primary Client
+- many Client contacts
+- reuse of client_companies
+- dedicated deal_clients join table
+
+Do not add a single clientId without deciding the desired CRM relationship model.
+
+For a universal CRM, a many-to-many Deal ↔ Client relationship may eventually be
+more flexible.
+
+---
+
+# Step 9 — Tasks
+
+After Deals and Pipeline interaction are stable, begin Tasks.
+
+Likely Task fields:
+
+- title
+- description
+- dueAt
+- status
+- priority
+- ownerMemberId
+- createdByMemberId
+- completedAt
+- organizationId
+- createdAt
+- updatedAt
+
+Tasks should eventually be linkable to business entities such as:
+
+- Client
+- Company
+- Deal
+
+Do not over-generalize the first implementation before the real workflow is
+tested.
+
+---
+
+# Step 10 — Comments and activity timeline
+
+After Tasks:
+
+Comments
+
+Activity timeline
+
+Likely tracked Deal events:
+
+- Deal created
+- Stage changed
+- Pipeline changed
+- amount changed
+- responsible member changed
+- archived
+- restored
+
+Activity history will later be important for:
+
+- CRM auditability
+- analytics
+- automations
+- AI summaries
+
+Design history data before introducing AI summaries.
+
+---
+
+# Step 11 — Team hardening
+
+Team is working, but some design debt remains.
+
+Improve later:
+
+- replace role-name checks such as "Owner" with a stable role key/system identity
+- review last-owner concurrency guarantees
+- improve production invitation flow
+- add pending invitations if needed
+- member detail page
+- custom role management UI
+- permission editor UI
+
+Do not block current Deal development on these improvements unless security work
+touches the same code.
+
+---
+
+# Step 12 — Active organization
+
+Current active organization remains:
+
+development
+
+Before real multi-organization UX, design:
+
+authenticated user
+→ memberships
+→ selected organization
+→ validated active membership
+→ member
+→ roles
+→ permissions
+
+Never trust an arbitrary organizationId supplied by the browser.
+
+Possible storage for selected organization may be:
+
+- signed/server-controlled cookie
+- URL context plus server validation
+- another server-managed preference
+
+The exact design is not decided yet.
+
+---
+
+# Step 13 — Production authentication gaps
+
+Before public production release, address:
 
 - email verification
 - forgot password
 - password reset
 - production email delivery
-- rate limiting / brute-force strategy
+- rate limiting
+- brute-force protection
 - account recovery
-- secure production BETTER_AUTH_URL
-- deployment cookie behavior
 - HTTPS
+- production cookie settings
 - secret management
 
-Do not block CRM core development on all of these yet.
-
----
-
-# Step 10 — Active organization design
-
-Current organization is still:
-
-development
-
-The database already supports one authenticated user belonging to multiple
-organizations.
-
-Before multi-organization UI is required, design:
-
-authenticated user
-→ memberships
-→ active organization
-→ member
-→ permissions
-
-Possible future active organization state must always be validated against real
-membership.
-
-Never trust arbitrary organizationId from the browser.
-
----
-
-# Step 11 — Companies module
-
-Begin Companies only after:
-
-- real Owner works
-- real Manager works
-- real Viewer works
-- member addition works
-- membership security is stable
-- role management is hardened enough
-
-Before schema creation, design Companies as a distinct entity.
-
-Potential fields:
-
-- name
-- legalName
-- tax identifier / BIN
-- website
-- phone
-- email
-- address
-- industry
-- notes
-- ownerMemberId
-- isArchived
-- deletedAt
-- createdAt
-- updatedAt
-
-Resolve the Client ↔ Company relationship deliberately.
-
-Do not model Company as merely another Client.
+These are important but should not block the current local CRM core milestone.
 
 ---
 
 # Later roadmap
 
-After Companies:
+After Phase 0.2:
 
-1. Deals
-2. Pipelines
-3. Stages
-4. Tasks
-5. Comments
-6. Activity timeline
-7. Custom fields
-8. Saved views
-9. Automation engine
-10. Audit log
-11. Integrations
-12. AI assistant
+Phase 0.3:
+
+- custom fields
+- advanced filters
+- saved views
+- configurable entity fields
+- configurable CRM structure
+
+Phase 0.4:
+
+- automation engine
+- triggers
+- conditions
+- actions
+
+Later:
+
+- audit log
+- external integrations
+
+Phase 0.5:
+
+- AI assistant
+- natural-language search
+- summaries
+- analytics
+- controlled AI actions
 
 ---
 
@@ -340,19 +428,13 @@ After Companies:
 
 Better Auth owns authentication.
 
-Do not create a parallel custom password/session system.
+Do not build a second password/session system.
 
-Do not parse authentication independently in every page.
-
-Use centralized helpers.
+---
 
 ## Authorization
 
-CRM permissions remain application-owned.
-
-Better Auth identifies users.
-
-Better Auth does not replace CRM RBAC.
+CRM authorization remains application-owned.
 
 Use:
 
@@ -364,34 +446,74 @@ hasPermission()
 
 requirePermission()
 
+Server-side authorization is mandatory.
+
+---
+
 ## Multi-tenancy
 
-Every tenant-owned operation must be scoped to the authenticated member's
-organization.
+Every tenant-owned operation must use the authenticated member's organization.
 
-Never accept browser-supplied organizationId as proof of access.
+Never use browser organizationId as proof of authorization.
+
+---
+
+## Relationships
+
+All submitted relationship IDs must be revalidated.
+
+Examples:
+
+clientId
+companyId
+pipelineId
+stageId
+ownerMemberId
+
+UUID validity alone is not authorization.
+
+---
 
 ## Validation
 
 Use Zod for external input.
 
+---
+
 ## Database
 
-Use Drizzle.
+Use Drizzle migrations.
 
-Generate migrations for schema changes.
+Never casually edit an already-applied migration.
 
-Never edit an already-applied migration casually.
+---
+
+## Neon
+
+The current Neon HTTP driver does not use normal interactive transaction
+callbacks.
+
+Use supported patterns such as db.batch where appropriate.
+
+Do not overstate concurrency guarantees.
+
+---
 
 ## Frontend
 
 Prefer Server Components.
 
-Use Client Components only when interaction requires them.
+Use Client Components only for actual interaction such as:
+
+- dynamic dependent selects
+- drag-and-drop
+- confirmation interaction
+
+---
 
 ## Infrastructure
 
-Do not add without a concrete requirement:
+Do not introduce without a real requirement:
 
 - Redis
 - queues
@@ -404,23 +526,28 @@ Do not add without a concrete requirement:
 
 # Immediate next task
 
-Finish the Team identity workflow.
+Implement:
 
-Target:
+/crm/deals/[id]/edit
 
-Owner login
-→ Team
-→ add already-registered user
-→ assign Manager or Viewer
-→ logout
-→ login as new user
-→ verify real permission behavior
+Expected flow:
 
-Once this works reliably:
+Deal detail
+→ Edit
+→ validate form
+→ validate Pipeline
+→ validate Stage belongs to Pipeline
+→ validate Company
+→ validate responsible Member
+→ update Deal
+→ apply closedAt rules
+→ return to Deal detail
 
-Better Auth
-→ membership
-→ RBAC
-→ tenant data
+After that:
 
-will be proven end-to-end for multiple real identities.
+Deal archive / restore
+→ drag-and-drop Kanban
+→ Pipeline management
+→ Tasks
+→ Comments
+→ Activity timeline

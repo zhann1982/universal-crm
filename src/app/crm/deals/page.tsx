@@ -584,9 +584,12 @@ export default async function DealsPage({
                               className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
                             >
                               <div className="font-medium leading-5">
-                                {
-                                  deal.title
-                                }
+                                <Link
+                                  href={`/crm/deals/${deal.id}`}
+                                  className="transition hover:text-blue-600 hover:underline"
+                                >
+                                  {deal.title}
+                                </Link>
                               </div>
 
                               <div className="mt-3 text-lg font-semibold">
