@@ -1,29 +1,51 @@
-import { count } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
   clients,
   organizationMembers,
-  organizations,
   roles,
 } from "@/db/schema";
+import { getCurrentOrganization } from "@/lib/current-organization";
 
 export default async function CrmDashboardPage() {
+  const organization = await getCurrentOrganization();
+
   const [clientsResult] = await db
-    .select({ count: count() })
-    .from(clients);
+    .select({
+      count: count(),
+    })
+    .from(clients)
+    .where(
+      and(
+        eq(clients.organizationId, organization.id),
+        eq(clients.isArchived, false),
+      ),
+    );
 
   const [membersResult] = await db
-    .select({ count: count() })
-    .from(organizationMembers);
+    .select({
+      count: count(),
+    })
+    .from(organizationMembers)
+    .where(
+      eq(
+        organizationMembers.organizationId,
+        organization.id,
+      ),
+    );
 
   const [rolesResult] = await db
-    .select({ count: count() })
-    .from(roles);
-
-  const [organizationsResult] = await db
-    .select({ count: count() })
-    .from(organizations);
+    .select({
+      count: count(),
+    })
+    .from(roles)
+    .where(
+      eq(
+        roles.organizationId,
+        organization.id,
+      ),
+    );
 
   const cards = [
     {
@@ -39,18 +61,20 @@ export default async function CrmDashboardPage() {
       value: rolesResult.count,
     },
     {
-      title: "Организации",
-      value: organizationsResult.count,
+      title: "Организация",
+      value: organization.name,
     },
   ];
 
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <h1 className="text-3xl font-bold">
+          Dashboard
+        </h1>
 
         <p className="mt-2 text-slate-500">
-          Обзор вашей CRM.
+          Основные показатели CRM.
         </p>
       </div>
 
@@ -64,22 +88,26 @@ export default async function CrmDashboardPage() {
               {card.title}
             </div>
 
-            <div className="mt-3 text-3xl font-bold">
+            <div className="mt-3 text-2xl font-bold">
               {card.value}
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6">
+      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="text-lg font-semibold">
-          CRM работает
+          Состояние системы
         </h2>
 
-        <p className="mt-2 text-sm text-slate-500">
-          Dashboard получает данные непосредственно из PostgreSQL Neon.
-        </p>
-      </div>
+        <div className="mt-4 flex items-center gap-3">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+
+          <span className="text-sm text-slate-600">
+            PostgreSQL Neon подключён
+          </span>
+        </div>
+      </section>
     </div>
   );
 }
