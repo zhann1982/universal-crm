@@ -7,6 +7,8 @@ const optionalText = (max: number) =>
     .max(max, `Максимум ${max} символов`)
     .transform((value) => (value === "" ? null : value));
 
+export const clientIdSchema = z.string().uuid();
+
 export const createClientSchema = z.object({
   firstName: z
     .string()
@@ -43,16 +45,25 @@ export const createClientSchema = z.object({
   notes: optionalText(5000),
 });
 
-export type CreateClientInput = z.infer<
+export const updateClientSchema =
+  createClientSchema;
+
+export type ClientFormInput = z.infer<
   typeof createClientSchema
 >;
 
-export type CreateClientState = {
+export type ClientFormState = {
   errors?: Partial<
-    Record<keyof CreateClientInput, string[]>
+    Record<keyof ClientFormInput, string[]>
   >;
 
   message?: string;
 
   values?: Record<string, string>;
 };
+
+export type CreateClientState =
+  ClientFormState;
+
+export type UpdateClientState =
+  ClientFormState;

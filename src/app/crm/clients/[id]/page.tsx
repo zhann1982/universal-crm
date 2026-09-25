@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-
+import { ArchiveClientButton } from "./archive-client-button";
 import { getClientById } from "@/lib/clients/get-client";
 
 const clientIdSchema = z.string().uuid();
@@ -80,12 +80,20 @@ export default async function ClientPage({
             </p>
           </div>
 
-          <Link
-            href={`/crm/clients/${client.id}/edit`}
-            className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
-          >
-            Редактировать
-          </Link>
+          {!client.isArchived && (
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={`/crm/clients/${client.id}/edit`}
+                className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
+              >
+                Редактировать
+              </Link>
+
+              <ArchiveClientButton
+                clientId={client.id}
+              />
+            </div>
+          )}
         </div>
       </div>
 
