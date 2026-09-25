@@ -32,6 +32,26 @@ const PERMISSIONS = [
     name: "Удаление клиентов",
   },
   {
+    key: "companies.read",
+    name: "Просмотр компаний",
+  },
+  {
+    key: "companies.create",
+    name: "Создание компаний",
+  },
+  {
+    key: "companies.update",
+    name: "Изменение компаний",
+  },
+  {
+    key: "companies.archive",
+    name: "Архивация компаний",
+  },
+  {
+    key: "companies.delete",
+    name: "Удаление компаний",
+  },
+  {
     key: "members.read",
     name: "Просмотр сотрудников",
   },
@@ -165,6 +185,11 @@ async function main() {
         "clients.create",
         "clients.update",
         "clients.archive",
+
+        "companies.read",
+        "companies.create",
+        "companies.update",
+        "companies.archive",
       ],
     },
 
@@ -175,6 +200,7 @@ async function main() {
 
       permissions: [
         "clients.read",
+        "companies.read",
       ],
     },
   ] as const;

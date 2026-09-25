@@ -417,3 +417,162 @@ export const clients = pgTable(
     index("clients_phone_idx").on(table.phone),
   ],
 );
+
+/* 
+|--------------------------------------------------------------------------
+| Companies
+|--------------------------------------------------------------------------
+|
+| Организации и юридические лица, с которыми работает CRM.
+|
+| Company является отдельной бизнес-сущностью и не должна
+| моделироваться как Client.
+|
+*/
+
+export const companies = pgTable(
+  "companies",
+  {
+    id: uuid("id")
+      .defaultRandom()
+      .primaryKey(),
+
+    organizationId: uuid(
+      "organization_id",
+    )
+      .notNull()
+      .references(
+        () => organizations.id,
+        {
+          onDelete: "cascade",
+        },
+      ),
+
+    ownerMemberId: uuid(
+      "owner_member_id",
+    ).references(
+      () => organizationMembers.id,
+      {
+        onDelete: "set null",
+      },
+    ),
+
+    name: varchar("name", {
+      length: 200,
+    }).notNull(),
+
+    legalName: varchar(
+      "legal_name",
+      {
+        length: 300,
+      },
+    ),
+
+    taxId: varchar("tax_id", {
+      length: 100,
+    }),
+
+    email: varchar("email", {
+      length: 320,
+    }),
+
+    phone: varchar("phone", {
+      length: 50,
+    }),
+
+    website: varchar("website", {
+      length: 500,
+    }),
+
+    industry: varchar("industry", {
+      length: 160,
+    }),
+
+    address: text("address"),
+
+    status: varchar("status", {
+      length: 50,
+    })
+      .default("active")
+      .notNull(),
+
+    notes: text("notes"),
+
+    isArchived: boolean(
+      "is_archived",
+    )
+      .default(false)
+      .notNull(),
+
+    createdAt: timestamp(
+      "created_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .defaultNow()
+      .notNull(),
+
+    updatedAt: timestamp(
+      "updated_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .defaultNow()
+      .notNull(),
+
+    deletedAt: timestamp(
+      "deleted_at",
+      {
+        withTimezone: true,
+      },
+    ),
+  },
+  (table) => [
+    index(
+      "companies_organization_idx",
+    ).on(
+      table.organizationId,
+    ),
+
+    index(
+      "companies_owner_idx",
+    ).on(
+      table.ownerMemberId,
+    ),
+
+    index(
+      "companies_org_status_idx",
+    ).on(
+      table.organizationId,
+      table.status,
+    ),
+
+    index(
+      "companies_org_created_at_idx",
+    ).on(
+      table.organizationId,
+      table.createdAt,
+    ),
+
+    index(
+      "companies_name_idx",
+    ).on(
+      table.name,
+    ),
+
+    index(
+      "companies_tax_id_idx",
+    ).on(
+      table.taxId,
+    ),
+
+    uniqueIndex(
+      "companies_org_tax_id_unique",
+    ).on(
+      table.organizationId,
+      table.taxId,
+    ),
+  ],
+);

@@ -15,6 +15,13 @@
       "when": 1790330811766,
       "tag": "0001_material_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790341977099,
+      "tag": "0002_colossal_darwin",
+      "breakpoints": true
     }
   ]
 }
