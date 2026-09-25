@@ -13,11 +13,15 @@ import {
 import { requirePermission } from "@/lib/auth/permissions";
 
 import { AddMemberForm } from "./add-member-form";
-import { updateMemberRoles } from "./actions";
+import {
+  updateMemberRoles,
+  updateMemberStatus,
+} from "./actions";
 
 type SearchParams = {
   saved?: string;
   added?: string;
+  statusUpdated?: string;
   error?: string;
 };
 
@@ -203,20 +207,35 @@ export default async function TeamPage({
         </h1>
 
         <p className="mt-2 text-slate-500">
-          Сотрудники и роли организации.
+          Сотрудники, роли и доступ
+          к организации.
         </p>
       </div>
 
       {params.saved === "1" && (
-        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <SuccessMessage>
           Роли сотрудника обновлены.
-        </div>
+        </SuccessMessage>
       )}
 
       {params.added === "1" && (
-        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <SuccessMessage>
           Сотрудник добавлен в организацию.
-        </div>
+        </SuccessMessage>
+      )}
+
+      {params.statusUpdated ===
+        "inactive" && (
+        <SuccessMessage>
+          Сотрудник деактивирован.
+        </SuccessMessage>
+      )}
+
+      {params.statusUpdated ===
+        "active" && (
+        <SuccessMessage>
+          Сотрудник снова активирован.
+        </SuccessMessage>
       )}
 
       {params.error && (
@@ -239,6 +258,10 @@ export default async function TeamPage({
             const isCurrent =
               member.id ===
               currentMember.id;
+
+            const isActive =
+              member.status ===
+              "active";
 
             const selectedRoleIds =
               new Set(
@@ -267,8 +290,16 @@ export default async function TeamPage({
                         </span>
                       )}
 
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium">
-                        {member.status}
+                      <span
+                        className={
+                          isActive
+                            ? "rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700"
+                            : "rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600"
+                        }
+                      >
+                        {isActive
+                          ? "Активен"
+                          : "Неактивен"}
                       </span>
                     </div>
 
@@ -317,70 +348,124 @@ export default async function TeamPage({
 
                 {canManage &&
                   !isCurrent && (
-                    <form
-                      action={
-                        updateMemberRoles
-                      }
-                      className="mt-6 border-t border-slate-200 pt-5"
-                    >
-                      <input
-                        type="hidden"
-                        name="memberId"
-                        value={
-                          member.id
+                    <>
+                      <form
+                        action={
+                          updateMemberRoles
                         }
-                      />
+                        className="mt-6 border-t border-slate-200 pt-5"
+                      >
+                        <input
+                          type="hidden"
+                          name="memberId"
+                          value={
+                            member.id
+                          }
+                        />
 
-                      <div className="text-sm font-medium">
-                        Роли сотрудника
-                      </div>
+                        <div className="text-sm font-medium">
+                          Роли сотрудника
+                        </div>
 
-                      <div className="mt-3 flex flex-wrap gap-3">
-                        {roleList.map(
-                          (role) => (
-                            <label
-                              key={
-                                role.id
-                              }
-                              className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                            >
-                              <input
-                                type="checkbox"
-                                name="roleIds"
-                                value={
+                        <div className="mt-3 flex flex-wrap gap-3">
+                          {roleList.map(
+                            (role) => (
+                              <label
+                                key={
                                   role.id
                                 }
-                                defaultChecked={selectedRoleIds.has(
-                                  role.id,
-                                )}
-                              />
+                                className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                              >
+                                <input
+                                  type="checkbox"
+                                  name="roleIds"
+                                  value={
+                                    role.id
+                                  }
+                                  defaultChecked={selectedRoleIds.has(
+                                    role.id,
+                                  )}
+                                />
 
-                              <span>
-                                {
-                                  role.name
-                                }
-                              </span>
-                            </label>
-                          ),
-                        )}
-                      </div>
+                                <span>
+                                  {
+                                    role.name
+                                  }
+                                </span>
+                              </label>
+                            ),
+                          )}
+                        </div>
 
-                      <button
-                        type="submit"
-                        className="mt-4 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                        <button
+                          type="submit"
+                          className="mt-4 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                        >
+                          Сохранить роли
+                        </button>
+                      </form>
+
+                      <form
+                        action={
+                          updateMemberStatus
+                        }
+                        className="mt-5 border-t border-slate-200 pt-5"
                       >
-                        Сохранить роли
-                      </button>
-                    </form>
+                        <input
+                          type="hidden"
+                          name="memberId"
+                          value={
+                            member.id
+                          }
+                        />
+
+                        <input
+                          type="hidden"
+                          name="status"
+                          value={
+                            isActive
+                              ? "inactive"
+                              : "active"
+                          }
+                        />
+
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                          <div>
+                            <div className="text-sm font-medium">
+                              Доступ к CRM
+                            </div>
+
+                            <div className="mt-1 text-sm text-slate-500">
+                              {isActive
+                                ? "Деактивация запретит сотруднику доступ к этой организации."
+                                : "Активация снова разрешит сотруднику доступ к этой организации."}
+                            </div>
+                          </div>
+
+                          <button
+                            type="submit"
+                            className={
+                              isActive
+                                ? "rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
+                                : "rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
+                            }
+                          >
+                            {isActive
+                              ? "Деактивировать"
+                              : "Активировать"}
+                          </button>
+                        </div>
+                      </form>
+                    </>
                   )}
 
                 {canManage &&
                   isCurrent && (
                     <div className="mt-6 border-t border-slate-200 pt-5 text-sm text-slate-500">
                       Изменение собственных
-                      ролей временно запрещено,
-                      чтобы не потерять
-                      административный доступ.
+                      ролей и деактивация
+                      собственной учётной
+                      записи запрещены.
                     </div>
                   )}
               </section>
@@ -392,12 +477,30 @@ export default async function TeamPage({
   );
 }
 
+function SuccessMessage({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+      {children}
+    </div>
+  );
+}
+
 function getErrorMessage(
   error: string,
 ) {
   switch (error) {
     case "self":
       return "Нельзя изменять собственные роли.";
+
+    case "self-status":
+      return "Нельзя деактивировать собственную учётную запись.";
+
+    case "last-owner":
+      return "Нельзя деактивировать последнего активного Owner организации.";
 
     case "member":
       return "Сотрудник не найден.";
@@ -407,6 +510,9 @@ function getErrorMessage(
 
     case "invalid":
       return "Выберите хотя бы одну корректную роль.";
+
+    case "status-invalid":
+      return "Некорректный статус сотрудника.";
 
     case "add-invalid":
       return "Проверьте email и выбранную роль.";

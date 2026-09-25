@@ -6,6 +6,12 @@ export const memberIdSchema =
 export const roleIdSchema =
   z.string().uuid();
 
+export const memberStatusSchema =
+  z.enum([
+    "active",
+    "inactive",
+  ]);
+
 export const addMemberSchema =
   z.object({
     email: z
@@ -29,4 +35,13 @@ export const updateMemberRolesSchema =
         "У сотрудника должна быть хотя бы одна роль",
       )
       .max(20),
+  });
+
+export const updateMemberStatusSchema =
+  z.object({
+    memberId:
+      memberIdSchema,
+
+    status:
+      memberStatusSchema,
   });

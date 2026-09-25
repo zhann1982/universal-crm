@@ -22,6 +22,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import {
   addMemberSchema,
   updateMemberRolesSchema,
+  updateMemberStatusSchema,
 } from "@/lib/validation/member";
 
 export async function addMember(
@@ -193,6 +194,203 @@ export async function addMember(
 
   redirect(
     "/crm/team?added=1",
+  );
+}
+
+export async function updateMemberStatus(
+  formData: FormData,
+) {
+  const {
+    organization,
+    member: currentMember,
+  } = await requirePermission(
+    "members.manage",
+  );
+
+  const result =
+    updateMemberStatusSchema.safeParse({
+      memberId: String(
+        formData.get("memberId") ?? "",
+      ),
+
+      status: String(
+        formData.get("status") ?? "",
+      ),
+    });
+
+  if (!result.success) {
+    redirect(
+      "/crm/team?error=status-invalid",
+    );
+  }
+
+  const {
+    memberId,
+    status,
+  } = result.data;
+
+  if (
+    memberId === currentMember.id
+  ) {
+    redirect(
+      "/crm/team?error=self-status",
+    );
+  }
+
+  const [targetMember] =
+    await db
+      .select({
+        id: organizationMembers.id,
+        status:
+          organizationMembers.status,
+      })
+      .from(organizationMembers)
+      .where(
+        and(
+          eq(
+            organizationMembers.id,
+            memberId,
+          ),
+
+          eq(
+            organizationMembers.organizationId,
+            organization.id,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!targetMember) {
+    redirect(
+      "/crm/team?error=member",
+    );
+  }
+
+  if (
+    status === "inactive" &&
+    targetMember.status === "active"
+  ) {
+    const [targetOwnerRole] =
+      await db
+        .select({
+          roleId:
+            memberRoles.roleId,
+        })
+        .from(memberRoles)
+        .innerJoin(
+          roles,
+          eq(
+            memberRoles.roleId,
+            roles.id,
+          ),
+        )
+        .where(
+          and(
+            eq(
+              memberRoles.memberId,
+              targetMember.id,
+            ),
+
+            eq(
+              roles.organizationId,
+              organization.id,
+            ),
+
+            eq(
+              roles.name,
+              "Owner",
+            ),
+          ),
+        )
+        .limit(1);
+
+    if (targetOwnerRole) {
+      const activeOwners =
+        await db
+          .selectDistinct({
+            memberId:
+              organizationMembers.id,
+          })
+          .from(
+            organizationMembers,
+          )
+          .innerJoin(
+            memberRoles,
+            eq(
+              memberRoles.memberId,
+              organizationMembers.id,
+            ),
+          )
+          .innerJoin(
+            roles,
+            eq(
+              memberRoles.roleId,
+              roles.id,
+            ),
+          )
+          .where(
+            and(
+              eq(
+                organizationMembers.organizationId,
+                organization.id,
+              ),
+
+              eq(
+                organizationMembers.status,
+                "active",
+              ),
+
+              eq(
+                roles.organizationId,
+                organization.id,
+              ),
+
+              eq(
+                roles.name,
+                "Owner",
+              ),
+            ),
+          );
+
+      if (
+        activeOwners.length <= 1
+      ) {
+        redirect(
+          "/crm/team?error=last-owner",
+        );
+      }
+    }
+  }
+
+  await db
+    .update(
+      organizationMembers,
+    )
+    .set({
+      status,
+      updatedAt:
+        new Date(),
+    })
+    .where(
+      and(
+        eq(
+          organizationMembers.id,
+          targetMember.id,
+        ),
+
+        eq(
+          organizationMembers.organizationId,
+          organization.id,
+        ),
+      ),
+    );
+
+  revalidatePath(
+    "/crm/team",
+  );
+
+  redirect(
+    `/crm/team?statusUpdated=${status}`,
   );
 }
 
