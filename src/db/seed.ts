@@ -6,6 +6,8 @@ import {
   organizationMembers,
   organizations,
   permissions,
+  pipelineStages,
+  pipelines,
   rolePermissions,
   roles,
 } from "./schema";
@@ -50,6 +52,34 @@ const PERMISSIONS = [
   {
     key: "companies.delete",
     name: "Удаление компаний",
+  },
+  {
+    key: "deals.read",
+    name: "Просмотр сделок",
+  },
+  {
+    key: "deals.create",
+    name: "Создание сделок",
+  },
+  {
+    key: "deals.update",
+    name: "Изменение сделок",
+  },
+  {
+    key: "deals.archive",
+    name: "Архивация сделок",
+  },
+  {
+    key: "deals.delete",
+    name: "Удаление сделок",
+  },
+  {
+    key: "pipelines.read",
+    name: "Просмотр воронок",
+  },
+  {
+    key: "pipelines.manage",
+    name: "Управление воронками",
   },
   {
     key: "members.read",
@@ -190,6 +220,13 @@ async function main() {
         "companies.create",
         "companies.update",
         "companies.archive",
+
+        "deals.read",
+        "deals.create",
+        "deals.update",
+        "deals.archive",
+
+        "pipelines.read",
       ],
     },
 
@@ -201,6 +238,8 @@ async function main() {
       permissions: [
         "clients.read",
         "companies.read",
+        "deals.read",
+        "pipelines.read",
       ],
     },
   ] as const;
@@ -280,6 +319,152 @@ async function main() {
           permissionId,
         })
         .onConflictDoNothing();
+    }
+  }
+
+  // --------------------------------------------------
+  // Default pipeline
+  // --------------------------------------------------
+
+  let [defaultPipeline] =
+    await db
+      .select()
+      .from(pipelines)
+      .where(
+        and(
+          eq(
+            pipelines.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            pipelines.name,
+            "Основная воронка",
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!defaultPipeline) {
+    [defaultPipeline] =
+      await db
+        .insert(pipelines)
+        .values({
+          organizationId:
+            organization.id,
+
+          name:
+            "Основная воронка",
+
+          description:
+            "Стандартная воронка продаж",
+
+          isDefault: true,
+        })
+        .returning();
+
+    console.log(
+      "Created default pipeline:",
+      defaultPipeline.name,
+    );
+  }
+
+  const defaultStages = [
+    {
+      name: "Новая",
+      type: "open",
+      position: 10,
+      probability: 10,
+    },
+    {
+      name: "Квалификация",
+      type: "open",
+      position: 20,
+      probability: 25,
+    },
+    {
+      name: "Предложение",
+      type: "open",
+      position: 30,
+      probability: 50,
+    },
+    {
+      name: "Переговоры",
+      type: "open",
+      position: 40,
+      probability: 75,
+    },
+    {
+      name: "Выиграна",
+      type: "won",
+      position: 50,
+      probability: 100,
+    },
+    {
+      name: "Проиграна",
+      type: "lost",
+      position: 60,
+      probability: 0,
+    },
+  ] as const;
+
+  for (
+    const stage of
+    defaultStages
+  ) {
+    const [existingStage] =
+      await db
+        .select({
+          id:
+            pipelineStages.id,
+        })
+        .from(
+          pipelineStages,
+        )
+        .where(
+          and(
+            eq(
+              pipelineStages.pipelineId,
+              defaultPipeline.id,
+            ),
+
+            eq(
+              pipelineStages.name,
+              stage.name,
+            ),
+          ),
+        )
+        .limit(1);
+
+    if (!existingStage) {
+      await db
+        .insert(
+          pipelineStages,
+        )
+        .values({
+          organizationId:
+            organization.id,
+
+          pipelineId:
+            defaultPipeline.id,
+
+          name:
+            stage.name,
+
+          type:
+            stage.type,
+
+          position:
+            stage.position,
+
+          probability:
+            stage.probability,
+        });
+
+      console.log(
+        "Created pipeline stage:",
+        stage.name,
+      );
     }
   }
 

@@ -8,6 +8,8 @@ import {
   uniqueIndex,
   uuid,
   varchar,
+  integer,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 /*
@@ -656,6 +658,374 @@ export const clientCompanies = pgTable(
     ).on(
       table.organizationId,
       table.companyId,
+    ),
+  ],
+);
+
+/*
+|--------------------------------------------------------------------------
+| Pipelines
+|--------------------------------------------------------------------------
+|
+| Воронки продаж.
+|
+| Одна организация может иметь несколько независимых воронок.
+|
+*/
+
+export const pipelines = pgTable(
+  "pipelines",
+  {
+    id: uuid("id")
+      .defaultRandom()
+      .primaryKey(),
+
+    organizationId: uuid(
+      "organization_id",
+    )
+      .notNull()
+      .references(
+        () => organizations.id,
+        {
+          onDelete: "cascade",
+        },
+      ),
+
+    name: varchar("name", {
+      length: 160,
+    }).notNull(),
+
+    description: text(
+      "description",
+    ),
+
+    isDefault: boolean(
+      "is_default",
+    )
+      .default(false)
+      .notNull(),
+
+    isArchived: boolean(
+      "is_archived",
+    )
+      .default(false)
+      .notNull(),
+
+    createdAt: timestamp(
+      "created_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .defaultNow()
+      .notNull(),
+
+    updatedAt: timestamp(
+      "updated_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex(
+      "pipelines_org_name_unique",
+    ).on(
+      table.organizationId,
+      table.name,
+    ),
+
+    index(
+      "pipelines_organization_idx",
+    ).on(
+      table.organizationId,
+    ),
+  ],
+);
+
+/*
+|--------------------------------------------------------------------------
+| Pipeline Stages
+|--------------------------------------------------------------------------
+|
+| Этапы конкретной воронки.
+|
+| type:
+| open
+| won
+| lost
+|
+*/
+
+export const pipelineStages = pgTable(
+  "pipeline_stages",
+  {
+    id: uuid("id")
+      .defaultRandom()
+      .primaryKey(),
+
+    organizationId: uuid(
+      "organization_id",
+    )
+      .notNull()
+      .references(
+        () => organizations.id,
+        {
+          onDelete: "cascade",
+        },
+      ),
+
+    pipelineId: uuid(
+      "pipeline_id",
+    )
+      .notNull()
+      .references(
+        () => pipelines.id,
+        {
+          onDelete: "cascade",
+        },
+      ),
+
+    name: varchar("name", {
+      length: 160,
+    }).notNull(),
+
+    type: varchar("type", {
+      length: 20,
+    })
+      .default("open")
+      .notNull(),
+
+    position: integer(
+      "position",
+    ).notNull(),
+
+    probability: integer(
+      "probability",
+    )
+      .default(0)
+      .notNull(),
+
+    color: varchar("color", {
+      length: 32,
+    }),
+
+    createdAt: timestamp(
+      "created_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .defaultNow()
+      .notNull(),
+
+    updatedAt: timestamp(
+      "updated_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex(
+      "pipeline_stages_pipeline_position_unique",
+    ).on(
+      table.pipelineId,
+      table.position,
+    ),
+
+    uniqueIndex(
+      "pipeline_stages_pipeline_name_unique",
+    ).on(
+      table.pipelineId,
+      table.name,
+    ),
+
+    index(
+      "pipeline_stages_org_pipeline_idx",
+    ).on(
+      table.organizationId,
+      table.pipelineId,
+    ),
+  ],
+);
+
+/*
+|--------------------------------------------------------------------------
+| Deals
+|--------------------------------------------------------------------------
+|
+| Сделки CRM.
+|
+*/
+
+export const deals = pgTable(
+  "deals",
+  {
+    id: uuid("id")
+      .defaultRandom()
+      .primaryKey(),
+
+    organizationId: uuid(
+      "organization_id",
+    )
+      .notNull()
+      .references(
+        () => organizations.id,
+        {
+          onDelete: "cascade",
+        },
+      ),
+
+    pipelineId: uuid(
+      "pipeline_id",
+    )
+      .notNull()
+      .references(
+        () => pipelines.id,
+        {
+          onDelete: "restrict",
+        },
+      ),
+
+    stageId: uuid(
+      "stage_id",
+    )
+      .notNull()
+      .references(
+        () => pipelineStages.id,
+        {
+          onDelete: "restrict",
+        },
+      ),
+
+    ownerMemberId: uuid(
+      "owner_member_id",
+    ).references(
+      () => organizationMembers.id,
+      {
+        onDelete: "set null",
+      },
+    ),
+
+    companyId: uuid(
+      "company_id",
+    ).references(
+      () => companies.id,
+      {
+        onDelete: "set null",
+      },
+    ),
+
+    title: varchar("title", {
+      length: 240,
+    }).notNull(),
+
+    amount: numeric(
+      "amount",
+      {
+        precision: 14,
+        scale: 2,
+      },
+    ),
+
+    currency: varchar(
+      "currency",
+      {
+        length: 3,
+      },
+    ),
+
+    expectedCloseAt:
+      timestamp(
+        "expected_close_at",
+        {
+          withTimezone: true,
+        },
+      ),
+
+    closedAt: timestamp(
+      "closed_at",
+      {
+        withTimezone: true,
+      },
+    ),
+
+    notes: text("notes"),
+
+    isArchived: boolean(
+      "is_archived",
+    )
+      .default(false)
+      .notNull(),
+
+    createdAt: timestamp(
+      "created_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .defaultNow()
+      .notNull(),
+
+    updatedAt: timestamp(
+      "updated_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .defaultNow()
+      .notNull(),
+
+    deletedAt: timestamp(
+      "deleted_at",
+      {
+        withTimezone: true,
+      },
+    ),
+  },
+  (table) => [
+    index(
+      "deals_organization_idx",
+    ).on(
+      table.organizationId,
+    ),
+
+    index(
+      "deals_org_pipeline_idx",
+    ).on(
+      table.organizationId,
+      table.pipelineId,
+    ),
+
+    index(
+      "deals_org_stage_idx",
+    ).on(
+      table.organizationId,
+      table.stageId,
+    ),
+
+    index(
+      "deals_owner_idx",
+    ).on(
+      table.ownerMemberId,
+    ),
+
+    index(
+      "deals_company_idx",
+    ).on(
+      table.companyId,
+    ),
+
+    index(
+      "deals_org_created_at_idx",
+    ).on(
+      table.organizationId,
+      table.createdAt,
     ),
   ],
 );
