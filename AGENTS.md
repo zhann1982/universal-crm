@@ -168,7 +168,8 @@ Before doing significant work, read in this order:
 1. AGENTS.md
 2. docs/ai/CONTEXT.md
 3. docs/ai/STATUS.md
-4. docs/ai/DECISIONS.md
+4. docs/ai/NEXT.md
+5. docs/ai/DECISIONS.md
 
 After significant development work:
 

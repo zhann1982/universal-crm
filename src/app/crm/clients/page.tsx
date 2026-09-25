@@ -117,7 +117,12 @@ export default async function ClientsPage() {
                       className="border-b border-slate-100 last:border-b-0"
                     >
                       <td className="px-5 py-4 font-medium">
-                        {fullName || "Без имени"}
+                        <Link
+                          href={`/crm/clients/${client.id}`}
+                          className="transition hover:text-blue-600 hover:underline"
+                        >
+                          {fullName || "Без имени"}
+                        </Link>
                       </td>
 
                       <td className="px-5 py-4 text-slate-600">

@@ -4,29 +4,29 @@ Last updated: 2026-09-25
 
 ## Current phase
 
-CRM Core / v0.1 foundation.
+CRM Core / v0.1
 
 ## Completed
 
-Next.js project created.
-
-Stack installed:
+Project foundation:
 
 - Next.js 16.3.6
 - TypeScript
-- Tailwind
+- Tailwind CSS
 - Drizzle ORM
-- Neon serverless driver
+- Neon PostgreSQL
 - Zod
 - drizzle-kit
 - tsx
 - dotenv
 
-Neon PostgreSQL connected successfully.
+Database:
 
-Drizzle migrations configured.
-
-Initial migration created and applied.
+- Neon PostgreSQL connected
+- Drizzle configured
+- Initial migration created and applied
+- Migration tracking verified
+- Database seed works
 
 Current tables:
 
@@ -38,10 +38,6 @@ Current tables:
 - member_roles
 - clients
 
-Drizzle migration tracking exists in Neon.
-
-Database seed works.
-
 Seed creates:
 
 - Development CRM organization
@@ -52,11 +48,50 @@ Seed creates:
 - Viewer role
 - 10 initial permissions
 
-Database health endpoint works:
+Infrastructure:
+
+- Git repository initialized
+- GitHub repository:
+  zhann1982/universal-crm
+- repository is public
+- .env.local is ignored
+
+CRM UI:
+
+- CRM layout created
+- sidebar navigation created
+- dashboard created
+- clients list created
+- root page redirects to /crm
+- dashboard reads real data from Neon
+- client queries are scoped by organization
+
+Client creation:
+
+- New Client page created
+- client form created
+- Zod validation implemented
+- Server Action implemented
+- clients are inserted into Neon
+- successful creation redirects to /crm/clients
+- dashboard and client list are revalidated
+
+Database health endpoint:
 
 GET /api/health/db
 
-Next.js can successfully query Neon through Drizzle.
+## Multi-tenancy status
+
+Development organization:
+
+development
+
+Current organization is resolved server-side.
+
+organizationId is not accepted from the client form.
+
+This is temporary until real authentication and organization membership
+resolution are implemented.
 
 ## Temporary development assumptions
 
@@ -70,16 +105,19 @@ Development organization slug:
 
 development
 
-These are temporary and must not become production authentication logic.
+Do not use these assumptions as production authentication logic.
 
 ## Not implemented yet
 
 - real authentication
-- organization selection
+- organization switching
 - authorization enforcement
-- CRM dashboard UI
-- clients UI
-- client CRUD
+- client detail page
+- client editing
+- client archiving
+- client deletion
+- client search
+- client filters
 - companies
 - deals
 - pipelines
@@ -89,22 +127,27 @@ These are temporary and must not become production authentication logic.
 - automations
 - AI
 
+## Current checkpoint
+
+A user can open the CRM, view the dashboard, open the clients list,
+create a client, validate the form and persist the client to Neon PostgreSQL.
+
 ## Next planned development
 
-1. Create CRM application layout.
-2. Create sidebar/navigation.
-3. Create dashboard.
-4. Create Clients page.
-5. Add client creation.
-6. Add Zod validation.
-7. Add editing.
-8. Add archiving.
-9. Add search/filtering.
+1. Client detail page.
+2. Client editing.
+3. Client archiving.
+4. Client search.
+5. Client filters.
+6. Add server-side permission helpers.
+7. Start companies module.
 
 ## Important
 
-Before continuing implementation, check:
+Before continuing implementation, read:
 
-AGENTS.md
-docs/ai/CONTEXT.md
-docs/ai/DECISIONS.md
+1. AGENTS.md
+2. docs/ai/CONTEXT.md
+3. docs/ai/STATUS.md
+4. docs/ai/NEXT.md
+5. docs/ai/DECISIONS.md

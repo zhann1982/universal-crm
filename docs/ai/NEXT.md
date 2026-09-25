@@ -1,19 +1,88 @@
 # Next Development Steps
 
-1. Create CRM application layout.
-2. Add sidebar navigation.
-3. Create dashboard.
-4. Create Clients page.
-5. Implement client creation.
-6. Validate client data with Zod.
-7. Add editing and archiving.
-8. Add search and filters.
+## Immediate next step
 
-Current checkpoint:
+Complete the Clients module.
 
-- Next.js works
-- Neon connected
-- Drizzle configured
-- Initial migration applied
-- Seed completed
-- Database health endpoint works
+### 1. Client detail page
+
+Create:
+
+/crm/clients/[id]
+
+Show:
+
+- name
+- phone
+- email
+- status
+- source
+- notes
+- created date
+- responsible member when available
+
+All queries must be scoped by organizationId.
+
+### 2. Client editing
+
+Add:
+
+/crm/clients/[id]/edit
+
+Use:
+
+- Zod
+- Server Actions
+- Drizzle
+- server-side organization checks
+
+### 3. Client archiving
+
+Implement soft archival using:
+
+isArchived = true
+
+Do not physically delete records by default.
+
+### 4. Client search
+
+Search by:
+
+- first name
+- last name
+- phone
+- email
+
+Prefer server-side filtering.
+
+### 5. Client filters
+
+Initial filters:
+
+- active
+- lead
+- inactive
+- archived
+
+## After Clients module
+
+Next modules:
+
+1. Companies
+2. Deals
+3. Pipelines
+4. Tasks
+5. Activity timeline
+
+## Current checkpoint
+
+Working:
+
+- CRM layout
+- dashboard
+- clients list
+- client creation
+- Zod validation
+- Server Action
+- Neon persistence
+- organization-scoped client queries
