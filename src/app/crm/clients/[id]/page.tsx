@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { ArchiveClientButton } from "./archive-client-button";
 import { getClientById } from "@/lib/clients/get-client";
+import { RestoreClientButton } from "./restore-client-button";
 
 const clientIdSchema = z.string().uuid();
 
@@ -93,6 +94,12 @@ export default async function ClientPage({
                 clientId={client.id}
               />
             </div>
+          )}
+
+          {client.isArchived && (
+            <RestoreClientButton
+              clientId={client.id}
+            />
           )}
         </div>
       </div>

@@ -307,3 +307,57 @@ export async function archiveClient(
 
   redirect("/crm/clients");
 }
+
+export async function restoreClient(
+  clientId: string,
+) {
+  const idResult =
+    clientIdSchema.safeParse(clientId);
+
+  if (!idResult.success) {
+    redirect("/crm/clients?view=archive");
+  }
+
+  const organization =
+    await getCurrentOrganization();
+
+  await db
+    .update(clients)
+    .set({
+      isArchived: false,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(
+          clients.id,
+          idResult.data,
+        ),
+
+        eq(
+          clients.organizationId,
+          organization.id,
+        ),
+
+        eq(
+          clients.isArchived,
+          true,
+        ),
+
+        isNull(
+          clients.deletedAt,
+        ),
+      ),
+    );
+
+  revalidatePath("/crm");
+  revalidatePath("/crm/clients");
+
+  revalidatePath(
+    `/crm/clients/${idResult.data}`,
+  );
+
+  redirect(
+    `/crm/clients/${idResult.data}`,
+  );
+}
