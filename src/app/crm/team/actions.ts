@@ -3,6 +3,7 @@
 import {
   and,
   eq,
+  ilike,
   inArray,
 } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -10,12 +11,190 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import {
+  user as authUsers,
+} from "@/db/auth-schema";
+import {
   memberRoles,
   organizationMembers,
   roles,
 } from "@/db/schema";
 import { requirePermission } from "@/lib/auth/permissions";
-import { updateMemberRolesSchema } from "@/lib/validation/member";
+import {
+  addMemberSchema,
+  updateMemberRolesSchema,
+} from "@/lib/validation/member";
+
+export async function addMember(
+  formData: FormData,
+) {
+  const {
+    organization,
+  } = await requirePermission(
+    "members.manage",
+  );
+
+  const result =
+    addMemberSchema.safeParse({
+      email: String(
+        formData.get("email") ?? "",
+      ),
+
+      roleId: String(
+        formData.get("roleId") ?? "",
+      ),
+    });
+
+  if (!result.success) {
+    redirect(
+      "/crm/team?error=add-invalid",
+    );
+  }
+
+  const {
+    email,
+    roleId,
+  } = result.data;
+
+  const [authUser] = await db
+    .select({
+      id: authUsers.id,
+      name: authUsers.name,
+      email: authUsers.email,
+    })
+    .from(authUsers)
+    .where(
+      ilike(
+        authUsers.email,
+        email,
+      ),
+    )
+    .limit(1);
+
+  if (!authUser) {
+    redirect(
+      "/crm/team?error=user-not-found",
+    );
+  }
+
+  const [existingMember] =
+    await db
+      .select({
+        id: organizationMembers.id,
+      })
+      .from(organizationMembers)
+      .where(
+        and(
+          eq(
+            organizationMembers.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            organizationMembers.userId,
+            authUser.id,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (existingMember) {
+    redirect(
+      "/crm/team?error=member-exists",
+    );
+  }
+
+  const [selectedRole] =
+    await db
+      .select({
+        id: roles.id,
+      })
+      .from(roles)
+      .where(
+        and(
+          eq(
+            roles.id,
+            roleId,
+          ),
+
+          eq(
+            roles.organizationId,
+            organization.id,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!selectedRole) {
+    redirect(
+      "/crm/team?error=role",
+    );
+  }
+
+  const [newMember] =
+    await db
+      .insert(
+        organizationMembers,
+      )
+      .values({
+        organizationId:
+          organization.id,
+
+        userId:
+          authUser.id,
+
+        displayName:
+          authUser.name,
+
+        email:
+          authUser.email,
+
+        status:
+          "active",
+      })
+      .returning({
+        id: organizationMembers.id,
+      });
+
+  try {
+    await db
+      .insert(memberRoles)
+      .values({
+        memberId:
+          newMember.id,
+
+        roleId:
+          selectedRole.id,
+      });
+  } catch (error) {
+    await db
+      .delete(
+        organizationMembers,
+      )
+      .where(
+        and(
+          eq(
+            organizationMembers.id,
+            newMember.id,
+          ),
+
+          eq(
+            organizationMembers.organizationId,
+            organization.id,
+          ),
+        ),
+      );
+
+    throw error;
+  }
+
+  revalidatePath(
+    "/crm/team",
+  );
+
+  redirect(
+    "/crm/team?added=1",
+  );
+}
 
 export async function updateMemberRoles(
   formData: FormData,
@@ -49,9 +228,6 @@ export async function updateMemberRoles(
     roleIds,
   } = result.data;
 
-  // Пока запрещаем изменять собственные роли,
-  // чтобы Development Owner случайно
-  // не заблокировал сам себе доступ.
   if (
     memberId === currentMember.id
   ) {
@@ -131,17 +307,21 @@ export async function updateMemberRoles(
   await db
     .insert(memberRoles)
     .values(
-      validRoles.map((role) => ({
-        memberId:
-          targetMember.id,
+      validRoles.map(
+        (role) => ({
+          memberId:
+            targetMember.id,
 
-        roleId:
-          role.id,
-      })),
+          roleId:
+            role.id,
+        }),
+      ),
     )
     .onConflictDoNothing();
 
-  revalidatePath("/crm/team");
+  revalidatePath(
+    "/crm/team",
+  );
 
   redirect(
     "/crm/team?saved=1",

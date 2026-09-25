@@ -4,346 +4,299 @@ Last updated: 2026-09-25
 
 ## Current checkpoint
 
-The Clients module is now substantially complete for CRM Core v0.1.
+The authentication foundation is now working.
 
-Implemented client capabilities:
+Implemented:
 
-- create
-- view
-- edit
-- archive
-- restore
-- server-side search
-- status filtering
-- active/archive views
-- server-side pagination
-- tenant scoping
-- RBAC enforcement
-
-The Team module now supports:
-
-- viewing organization members
-- viewing assigned roles
-- assigning multiple roles
-- server-side permission enforcement
-
-Server-side permission helpers are implemented.
-
-Current permissions are resolved through member roles stored in PostgreSQL.
-
-The biggest missing foundation is now:
-
-REAL AUTHENTICATION
-
----
-
-# Immediate objective
-
-Replace the temporary development identity with a real authenticated user while
-preserving the existing multi-tenant and RBAC architecture.
-
-Current temporary identity:
-
-local-dev-owner
-
-Current development organization:
-
-development
-
-Do not remove the current permission architecture.
-
-Authentication should provide identity.
-
-RBAC should continue deciding authorization.
-
-These are separate responsibilities.
-
----
-
-# Step 1 — Design authentication before coding
-
-Before installing an authentication library or creating new database tables,
-decide the authentication model.
-
-The design must answer:
-
-1. How users register or are created.
-2. How users log in.
-3. Whether authentication uses:
-   - email/password
-   - external providers
-   - magic links
-   - another method
-4. How sessions are stored and verified.
-5. How an authenticated user maps to organization_members.userId.
-6. How users with multiple organizations select the active organization.
-7. How logout works.
-8. How disabled organization members are prevented from accessing CRM data.
-9. How account recovery works if passwords are used.
-
-Do not implement multiple authentication strategies at once.
-
-Start with the smallest approach that supports the product requirements.
-
----
-
-# Step 2 — Preserve the existing membership model
-
-Current organization membership table:
-
-organization_members
-
-Important fields:
-
-- id
-- organizationId
-- userId
-- displayName
-- email
-- status
-
-Currently:
-
-userId
-
-is a temporary string.
-
-Later it should reference or correspond to the authenticated user's stable ID.
-
-Do not use email as the long-term authorization identity if a stable user ID is
-available.
-
----
-
-# Step 3 — Replace current-member development logic
-
-Current helper:
-
-src/lib/auth/current-member.ts
-
-Currently it resolves:
-
-local-dev-owner
-
-The goal is to change this helper so callers do not need major rewrites.
-
-Desired conceptual flow:
-
-authenticated user
-→ userId
+Better Auth
+→ email/password registration
+→ login
+→ session
+→ stable authenticated user ID
 → organization membership
-→ active organization
-→ current member
 → roles
 → permissions
+→ CRM
 
-Existing application code should continue using helpers rather than reading
-sessions directly everywhere.
+The previous runtime dependency on:
 
----
+local-dev-owner
 
-# Step 4 — Preserve RBAC
+has been removed from current-member resolution.
 
-Current access layer:
+Clients and Team already use the same RBAC layer.
 
-src/lib/auth/permissions.ts
+The immediate priority is now:
 
-Important functions:
+REAL MEMBER MANAGEMENT + REAL RBAC TESTING
 
-- getCurrentAccessContext()
-- hasPermission()
-- requirePermission()
-
-Do not bypass these helpers after authentication is added.
-
-Authentication answers:
-
-Who is this user?
-
-Authorization answers:
-
-What may this user do?
-
-Both checks are required.
+Do not start Companies yet.
 
 ---
 
-# Step 5 — Login
+# Step 1 — Finish CRM logout UX
 
-Implement a login route/page after the authentication design is decided.
+The CRM should provide logout directly from the application shell.
 
-Possible route:
+Logout must:
 
-/login
+- invalidate the Better Auth session
+- redirect to /login
+- make protected CRM routes inaccessible
+- prevent Server Actions from executing without a valid session
 
-After successful login, a user with a valid CRM membership should be able to
-enter:
-
-/crm
-
-Unauthorized users must not receive CRM business data.
-
-Do not rely only on hidden navigation items.
+Do not rely only on the temporary /auth-test page for logout.
 
 ---
 
-# Step 6 — Logout
+# Step 2 — Add registered users to the organization
 
-Implement logout.
+Current authentication allows anyone using the development application to create
+a Better Auth account.
 
-After logout:
+Registration alone must NOT grant CRM access.
 
-- session must be invalidated
-- protected CRM routes must no longer be accessible
-- protected Server Actions must fail authorization
-- stale browser state must not grant access
+A user needs an active organization_members record.
 
----
+Implement a simple first Team workflow:
 
-# Step 7 — Authenticated organization membership
+Owner/Admin
+→ enters registered user's email
+→ application finds Better Auth user
+→ creates organization_members row
+→ stores Better Auth user.id in organization_members.userId
+→ assigns initial role
 
-After login, resolve organization membership from the authenticated user.
+Requirements:
 
-Do not trust:
+- members.manage
+- user must exist in Better Auth
+- target organization is resolved server-side
+- selected role must belong to current organization
+- duplicate membership must be rejected
+- email may be used for lookup
+- stable user.id must be stored as identity
 
-organizationId from forms
-organizationId from arbitrary browser state
-
-The selected organization must belong to the authenticated user.
-
-Current development organization helper can then be replaced or refactored.
-
----
-
-# Step 8 — Multiple organizations
-
-The database already supports the concept that one user can belong to multiple
-organizations.
-
-Do not hardcode the architecture to a single organization.
-
-The first authentication implementation may initially support one organization
-per user in the UI, but helpers should not make multiple organizations
-impossible later.
-
-A future active-organization selector may be needed.
+Do not use email itself as the membership identity.
 
 ---
 
-# Step 9 — Test RBAC with real identities
+# Step 3 — Test Manager with a real session
 
-Once authentication works, create or connect real test accounts representing:
+Create a real Better Auth account representing Manager.
 
-Owner
+Connect it to the development organization.
 
-Admin
+Assign:
 
 Manager
 
-Viewer
+Expected permissions:
 
-Expected client access:
-
-Owner:
-- read
-- create
-- update
-- archive
-- delete permission exists
-
-Admin:
-- same current permission set as Owner
-
-Manager:
 - clients.read
 - clients.create
 - clients.update
 - clients.archive
 
-Viewer:
-- clients.read only
+Expected restrictions:
 
-Expected Team access:
+- no members.read
+- no members.manage
+- Team navigation hidden
+- direct /crm/team access denied
+- no administrative role management
 
-Owner:
-- members.read
-- members.manage
-
-Admin:
-- members.read
-- members.manage
-
-Manager:
-- no Team access with current seed permissions
-
-Viewer:
-- no Team access with current seed permissions
-
-Verify both:
-
-UI visibility
-
-and:
-
-direct server access / Server Actions
-
-The server remains the security boundary.
+Verify both UI behavior and direct server authorization.
 
 ---
 
-# Step 10 — Harden role management
+# Step 4 — Test Viewer with a real session
 
-Current Team role update performs:
+Create a real Better Auth account representing Viewer.
 
-DELETE old member roles
-→ INSERT selected member roles
+Assign:
 
-This should eventually become atomic.
+Viewer
 
-Recommended improvement:
+Expected:
 
-use a PostgreSQL transaction if supported cleanly by the chosen Drizzle / Neon
-execution path.
+- can view Clients
+- cannot create Client
+- cannot edit Client
+- cannot archive Client
+- cannot restore Client
+- cannot access Team
 
-Requirements must remain:
+Again verify:
 
-- members.manage permission
-- target member belongs to current organization
-- selected roles belong to current organization
-- at least one role remains
-- current user cannot accidentally remove their own administrative access
+UI
++
+direct protected routes
++
+Server Actions
 
-Do not weaken these checks for UI convenience.
+The server is the security boundary.
 
 ---
 
-# Step 11 — Team improvements after authentication
+# Step 5 — Reduce legacy development fixtures
 
-After real login works, useful Team improvements include:
+The seed currently contains historical development members:
 
-- invite/create member
+- local-dev-owner
+- local-dev-manager
+- local-dev-viewer
+
+They were useful before real authentication.
+
+Do not delete them blindly if they are still useful for database development.
+
+However:
+
+- runtime authentication must not depend on them
+- production assumptions must not reference them
+- real RBAC tests should use Better Auth identities
+
+Eventually simplify the seed around real development scenarios.
+
+---
+
+# Step 6 — Harden role replacement
+
+Current member role update:
+
+DELETE current assignments
+→ INSERT new assignments
+
+This is not atomic.
+
+Failure after DELETE can leave a member without roles.
+
+Target behavior:
+
+BEGIN
+→ validate target
+→ validate roles
+→ delete old roles
+→ insert new roles
+→ COMMIT
+
+If the current Neon/Drizzle execution path supports transactions cleanly, use
+one.
+
+Preserve all existing checks:
+
+- members.manage
+- target member organization
+- role organization
+- at least one role
+- no own-role accidental lockout
+
+---
+
+# Step 7 — Prevent last-owner lockout
+
+Current protection prevents a user from changing their own roles.
+
+This is useful but incomplete.
+
+Future role management should also ensure that an organization cannot
+accidentally lose its last Owner-equivalent administrator.
+
+Before allowing broader Owner/Admin management, define the invariant.
+
+Possible rule:
+
+Every active organization must have at least one active member with an Owner
+role.
+
+Do not implement destructive administrative workflows without this protection.
+
+---
+
+# Step 8 — Member lifecycle
+
+After real-role tests are successful, add:
+
 - deactivate member
 - reactivate member
-- member detail page
-- role display improvements
-- custom role management
-- role permission management
 
-These are not required before proving authentication.
+An inactive member must not pass getCurrentMember().
+
+Current member resolution already requires:
+
+status = active
+
+Do not physically delete memberships by default.
+
+Deactivation is safer and preserves historical ownership references.
 
 ---
 
-# Step 12 — Companies module
+# Step 9 — Production authentication gaps
 
-Start Companies after authentication and real member resolution are stable.
+Current auth is sufficient for local development but not yet complete for public
+production.
 
-Before creating the companies table, design the entity.
+Before public launch address:
 
-Questions to resolve:
+- email verification
+- forgot password
+- password reset
+- production email delivery
+- rate limiting / brute-force strategy
+- account recovery
+- secure production BETTER_AUTH_URL
+- deployment cookie behavior
+- HTTPS
+- secret management
 
-- company name
-- legal name
-- BIN / tax identifier where applicable
+Do not block CRM core development on all of these yet.
+
+---
+
+# Step 10 — Active organization design
+
+Current organization is still:
+
+development
+
+The database already supports one authenticated user belonging to multiple
+organizations.
+
+Before multi-organization UI is required, design:
+
+authenticated user
+→ memberships
+→ active organization
+→ member
+→ permissions
+
+Possible future active organization state must always be validated against real
+membership.
+
+Never trust arbitrary organizationId from the browser.
+
+---
+
+# Step 11 — Companies module
+
+Begin Companies only after:
+
+- real Owner works
+- real Manager works
+- real Viewer works
+- member addition works
+- membership security is stable
+- role management is hardened enough
+
+Before schema creation, design Companies as a distinct entity.
+
+Potential fields:
+
+- name
+- legalName
+- tax identifier / BIN
 - website
 - phone
 - email
@@ -351,122 +304,94 @@ Questions to resolve:
 - industry
 - notes
 - ownerMemberId
-- archive state
-- relation between company and contacts/clients
-- whether one client can belong to zero, one or multiple companies
+- isArchived
+- deletedAt
+- createdAt
+- updatedAt
 
-Do not model Companies as merely another Client record.
+Resolve the Client ↔ Company relationship deliberately.
 
-Clients/contacts and Companies should remain distinct concepts.
+Do not model Company as merely another Client.
 
 ---
 
-# Later CRM roadmap
+# Later roadmap
 
 After Companies:
 
 1. Deals
 2. Pipelines
-3. Pipeline stages
+3. Stages
 4. Tasks
-5. Activity timeline
-6. Comments
+5. Comments
+6. Activity timeline
 7. Custom fields
 8. Saved views
 9. Automation engine
 10. Audit log
-11. External integrations
+11. Integrations
 12. AI assistant
-
-AI remains intentionally later in the roadmap.
-
-The CRM core and permission model should be stable before AI receives tools for
-business actions.
 
 ---
 
 # Architectural rules
 
-## Multi-tenancy
-
-Every tenant-owned business query must remain scoped by:
-
-organizationId
-
-Never accept organizationId from the browser as authorization proof.
-
----
-
 ## Authentication
 
-Authentication identifies the user.
+Better Auth owns authentication.
 
-Do not spread session parsing across every component.
+Do not create a parallel custom password/session system.
 
-Prefer centralized server helpers.
+Do not parse authentication independently in every page.
 
----
+Use centralized helpers.
 
 ## Authorization
 
-Continue using server-side permission checks.
+CRM permissions remain application-owned.
 
-UI checks may improve UX but do not replace authorization.
+Better Auth identifies users.
 
----
+Better Auth does not replace CRM RBAC.
+
+Use:
+
+getCurrentMember()
+
+getCurrentAccessContext()
+
+hasPermission()
+
+requirePermission()
+
+## Multi-tenancy
+
+Every tenant-owned operation must be scoped to the authenticated member's
+organization.
+
+Never accept browser-supplied organizationId as proof of access.
 
 ## Validation
 
-Validate external input with Zod.
-
-This includes:
-
-- forms
-- route parameters
-- search parameters
-- identifiers
-- role selections
-- future API payloads
-
----
+Use Zod for external input.
 
 ## Database
 
-PostgreSQL / Neon remains the primary source of truth.
+Use Drizzle.
 
-Use Drizzle for database access.
+Generate migrations for schema changes.
 
-Do not manually modify an already-applied migration.
-
-Generate a new migration when the schema actually changes.
-
----
-
-## Mutations
-
-Tenant-owned mutations must include tenant scoping.
-
-For updates, manually update:
-
-updatedAt
-
-where appropriate.
-
----
+Never edit an already-applied migration casually.
 
 ## Frontend
 
-Prefer Server Components for data reading.
+Prefer Server Components.
 
-Use Client Components only when browser interactivity is needed.
-
-Prefer Server Actions for ordinary CRM mutations.
-
----
+Use Client Components only when interaction requires them.
 
 ## Infrastructure
 
-Do not introduce without a concrete requirement:
+Do not add without a concrete requirement:
 
 - Redis
 - queues
@@ -475,72 +400,27 @@ Do not introduce without a concrete requirement:
 - paid infrastructure
 - AI API dependencies
 
-Keep the modular monolith architecture while the CRM core is still developing.
-
----
-
-# Security rules
-
-Never commit:
-
-- DATABASE_URL
-- passwords
-- API keys
-- session secrets
-- authentication secrets
-
-`.env.local` must remain untracked.
-
-If a secret is ever pushed to GitHub, rotate the secret.
-
-Do not treat deleting it from the latest commit as sufficient.
-
----
-
-# Current development test members
-
-Seed currently creates:
-
-local-dev-owner
-→ Development Owner
-→ Owner
-
-local-dev-manager
-→ Development Manager
-→ Manager
-
-local-dev-viewer
-→ Development Viewer
-→ Viewer
-
-These are development records.
-
-They are not yet real login accounts.
-
-Do not build production authentication around these literal IDs.
-
 ---
 
 # Immediate next task
 
-Do not start coding Companies yet.
+Finish the Team identity workflow.
 
-First:
+Target:
 
-1. decide the authentication approach
-2. define the user/session model
-3. define how authenticated user IDs map to organization_members.userId
-4. define active-organization resolution
+Owner login
+→ Team
+→ add already-registered user
+→ assign Manager or Viewer
+→ logout
+→ login as new user
+→ verify real permission behavior
 
-Then implement the smallest working authentication flow.
+Once this works reliably:
 
-After authentication works:
-
-authenticated user
+Better Auth
 → membership
-→ organization
-→ roles
-→ permissions
-→ CRM
+→ RBAC
+→ tenant data
 
-should become the standard request security path.
+will be proven end-to-end for multiple real identities.

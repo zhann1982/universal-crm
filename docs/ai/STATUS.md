@@ -6,13 +6,19 @@ Last updated: 2026-09-25
 
 CRM Core / v0.1
 
-The first functional CRM module, Clients, is substantially implemented.
+The application now has working foundations for:
 
-The project now also has working multi-tenant RBAC foundations and an initial
-Team / role-management interface.
+- multi-tenancy
+- authentication
+- organization membership
+- RBAC
+- Clients
+- Team management
 
-The next major objective is real authentication and authenticated member
-resolution.
+The current major authentication milestone is complete.
+
+The next immediate work is to validate real RBAC identities, improve Team
+membership management and then harden role management.
 
 ---
 
@@ -27,6 +33,7 @@ resolution.
 - Drizzle ORM
 - drizzle-kit
 - Zod
+- Better Auth 1.7.x
 - npm
 
 Architecture:
@@ -35,9 +42,10 @@ Architecture:
 - Server Components by default
 - Server Actions for application mutations
 - modular monolith
-- PostgreSQL as primary datastore
-- multi-tenancy from the beginning
-- RBAC from the beginning
+- PostgreSQL primary datastore
+- multi-tenancy
+- Better Auth authentication
+- server-side RBAC
 
 No separate backend is currently used.
 
@@ -45,35 +53,95 @@ No Redis, queues, microservices or AI APIs are currently required.
 
 ---
 
-## Repository
+# Authentication
 
-GitHub repository:
+Real authentication is implemented.
 
-zhann1982/universal-crm
+Authentication library:
 
-Repository visibility:
+Better Auth
 
-public
+Authentication method:
 
-The project is tracked with Git.
+email + password
 
-Environment files such as `.env.local` are ignored and must never be committed.
+Implemented:
 
-Never commit database credentials or other secrets.
+- Better Auth database schema
+- Better Auth API route
+- registration page
+- login page
+- logout
+- session cookies
+- server-side session lookup
+- authenticated user ID
+- mapping authenticated users to organization_members
+- redirect unauthenticated users to /login
+- redirect authenticated users without active membership to /no-access
+
+Better Auth tables:
+
+- user
+- session
+- account
+- verification
+
+Authentication schema:
+
+src/db/auth-schema.ts
+
+Authentication configuration:
+
+src/lib/auth/auth.ts
+
+Client auth helper:
+
+src/lib/auth/auth-client.ts
+
+Current-member resolver:
+
+src/lib/auth/current-member.ts
+
+Authentication API:
+
+src/app/api/auth/[...all]/route.ts
 
 ---
 
-## Database
+## Authentication security path
+
+Current request path:
+
+Better Auth session
+→ session.user.id
+→ organization_members.userId
+→ active member
+→ roles
+→ permissions
+→ CRM
+
+The previous hardcoded runtime identity:
+
+local-dev-owner
+
+is no longer used by getCurrentMember().
+
+Legacy development records may remain in the database for development purposes.
+
+They must not be used as production identity.
+
+---
+
+# Database
 
 Neon PostgreSQL is connected and working.
 
-Drizzle ORM is configured.
+Drizzle ORM is configured with both:
 
-Initial migration has been generated and applied.
+- src/db/schema.ts
+- src/db/auth-schema.ts
 
-Drizzle migration tracking is active.
-
-Current tables:
+Applied CRM tables:
 
 - organizations
 - organization_members
@@ -83,86 +151,97 @@ Current tables:
 - member_roles
 - clients
 
-No new database migration has been required for the recent Clients, RBAC and
-Team UI work.
+Applied Better Auth tables:
+
+- user
+- session
+- account
+- verification
+
+Better Auth migration has been generated and applied successfully.
+
+Current database table count:
+
+11
 
 ---
 
-## Multi-tenancy
+# Multi-tenancy
 
-Multi-tenancy is a core architectural requirement.
+Multi-tenancy remains a core requirement.
 
 Business records are scoped by:
 
 organizationId
 
-Current development organization:
+Current organization:
 
 development
 
-Current organization resolution is temporary and server-side.
+Current organization resolution is still temporary and server-side through:
 
-Browser forms must never be trusted to provide organizationId.
+src/lib/current-organization.ts
 
-All business reads and mutations must remain scoped to the current organization.
+The browser must never be trusted to provide organizationId as authorization
+proof.
 
-Examples already implemented:
-
-- client list
-- client detail
-- client editing
-- client archiving
-- client restoring
-- role lookup
-- member lookup
-- team role management
+A multi-organization selector is not yet implemented.
 
 ---
 
-## Development identity
+# Organization membership
 
-Real authentication is not implemented yet.
+Authenticated Better Auth users are mapped to CRM memberships through:
 
-Current development user:
+organization_members.userId
 
-local-dev-owner
+The value is the stable Better Auth:
 
-Current development organization:
+user.id
 
-development
+Email is not used as the long-term authorization identity.
 
-The development user is resolved through:
+Only active organization members may enter the CRM.
+
+An authenticated user without a valid active membership is redirected to:
+
+/no-access
+
+A development helper exists for connecting an existing Better Auth account to
+the development organization as Owner:
+
+npm run db:link-owner -- email@example.com
+
+---
+
+# RBAC
+
+Server-side RBAC is implemented.
+
+Main helpers:
 
 src/lib/auth/current-member.ts
 
-The hardcoded development identity must remain isolated behind helper
-functions and must not be spread throughout the application.
+src/lib/auth/permissions.ts
 
-It will later be replaced by the authenticated user's real identity.
+Implemented functions:
+
+- getCurrentMember()
+- getCurrentAccessContext()
+- hasPermission()
+- requirePermission()
+
+Permission failure redirects to:
+
+/crm/forbidden
+
+Authorization remains server-side.
+
+UI visibility is only a UX layer and is not treated as the security boundary.
 
 ---
 
-## Seed
-
-Database seed works and is safe for repeated development use.
-
-Development organization:
-
-Development CRM
-
-Development users:
-
-- local-dev-owner
-  - Development Owner
-  - Owner role
-
-- local-dev-manager
-  - Development Manager
-  - Manager role
-
-- local-dev-viewer
-  - Development Viewer
-  - Viewer role
+# Current roles
 
 System roles:
 
@@ -171,7 +250,7 @@ System roles:
 - Manager
 - Viewer
 
-Initial permissions:
+Current permissions:
 
 - clients.read
 - clients.create
@@ -184,15 +263,13 @@ Initial permissions:
 - roles.manage
 - settings.manage
 
-Default role permissions:
-
 Owner:
 
-- all current permissions
+all current permissions
 
 Admin:
 
-- all current permissions
+all current permissions
 
 Manager:
 
@@ -205,93 +282,25 @@ Viewer:
 
 - clients.read
 
----
-
-## Authorization / RBAC
-
-Server-side RBAC is implemented.
-
-Main helpers:
-
-src/lib/auth/current-member.ts
-
-src/lib/auth/permissions.ts
-
-Implemented concepts:
-
-- current organization resolution
-- current member resolution
-- role lookup
-- permission lookup
-- permission Set generation
-- hasPermission()
-- requirePermission()
-
-Permission denial redirects to:
-
-/crm/forbidden
-
-A dedicated 403 page exists.
-
-Authorization is enforced on the server.
-
-Client-side UI visibility is not treated as the security boundary.
+Members may have multiple roles.
 
 ---
 
-## Client permission enforcement
-
-Clients module now enforces permissions.
-
-### clients.read
-
-Required for:
-
-- clients list
-- client detail page
-
-### clients.create
-
-Required for:
-
-- New Client page
-- createClient Server Action
-
-### clients.update
-
-Required for:
-
-- Edit Client page
-- updateClient Server Action
-
-### clients.archive
-
-Required for:
-
-- archiveClient Server Action
-- restoreClient Server Action
-
-UI buttons are also hidden when the current member does not have the required
-permission.
-
-Server Actions still enforce permissions independently.
-
----
-
-## CRM application shell
+# CRM shell
 
 Implemented:
 
-- `/` redirects to `/crm`
-- CRM layout
-- sidebar navigation
-- dashboard
-- permission-aware navigation
-- current member display in header
-- CRM not-found page
-- forbidden / 403 page
+- /
+- /register
+- /login
+- /auth-test
+- /no-access
+- /crm
+- /crm/forbidden
+- permission-aware CRM navigation
+- authenticated member display
 
-Current sidebar sections:
+CRM sidebar sections:
 
 - Dashboard
 - Clients
@@ -300,31 +309,19 @@ Current sidebar sections:
 - Team
 - Settings
 
-Deals, Tasks and Settings are not implemented yet.
+Deals, Tasks and Settings are placeholders.
 
-Clients visibility depends on `clients.read`.
+Clients visibility depends on:
 
-Team visibility depends on `members.read`.
+clients.read
 
----
+Team visibility depends on:
 
-## Database health
-
-Database health endpoint works:
-
-GET /api/health/db
-
-Next.js can query Neon successfully through Drizzle.
-
-This endpoint is currently for development diagnostics.
-
-It should later be restricted or removed for production if unnecessary.
+members.read
 
 ---
 
 # Clients module
-
-## Client list
 
 Route:
 
@@ -332,35 +329,21 @@ Route:
 
 Implemented:
 
-- organization-scoped query
-- active clients view
-- archived clients view
-- server-side search
-- status filtering
-- URL-driven filter state
+- create
+- list
+- detail
+- edit
+- archive
+- restore
+- search
+- status filter
+- active/archive views
+- URL-driven filters
 - server-side pagination
-- 25 records per page
-- total count query
-- invalid page normalization
-- pagination preserving filters
-- links to client details
+- tenant scoping
+- permission enforcement
 
-Displayed fields:
-
-- name
-- phone
-- email
-- status
-- source
-- created date
-
----
-
-## Client search
-
-Search runs on PostgreSQL through Drizzle.
-
-Searchable fields:
+Search fields:
 
 - first name
 - last name
@@ -368,375 +351,203 @@ Searchable fields:
 - phone
 - email
 
-Example:
-
-/crm/clients?q=ivanov
-
-Search is not implemented as browser-only filtering.
-
----
-
-## Client status filters
-
-Current statuses:
+Current client statuses:
 
 - active
 - lead
 - inactive
 
-Example:
+Pagination:
 
-/crm/clients?status=lead
+25 records per page
 
-Status filters can be combined with search and archive view.
-
----
-
-## Active / Archive views
-
-Implemented:
-
-Active:
-
-isArchived = false
-
-Archive:
-
-isArchived = true
-
-Example:
-
-/crm/clients?view=archive
-
-Normal client queries also exclude:
-
-deletedAt IS NOT NULL
-
-Physical deletion is not part of the normal client workflow.
-
----
-
-## Pagination
-
-Implemented server-side.
-
-Page size:
-
-25
-
-Example:
-
-/crm/clients?page=2
-
-Pagination works with:
-
-- q
-- status
-- view
-
-Example:
-
-/crm/clients?q=ivan&status=lead&view=archive&page=2
-
-The application uses:
+Pagination uses:
 
 - COUNT
 - LIMIT
 - OFFSET
 
-It does not load the complete client dataset into the browser.
+Current client permission model:
 
----
+clients.read:
+- list
+- detail
 
-## Client creation
+clients.create:
+- create page
+- create Server Action
 
-Route:
+clients.update:
+- edit page
+- update Server Action
 
-/crm/clients/new
+clients.archive:
+- archive
+- restore
 
-Implemented:
-
-- client form
-- Zod validation
-- Server Action
-- Drizzle INSERT
-- Neon persistence
-- permission enforcement
-- server-side organization resolution
-- form errors
-- redirect after successful creation
-- path revalidation
-
-organizationId is resolved server-side.
-
-It is never accepted from the client form as trusted input.
-
----
-
-## Client detail
-
-Route:
-
-/crm/clients/[id]
-
-Implemented:
-
-- UUID validation
-- tenant-scoped lookup
-- clients.read enforcement
-- status display
-- archive state display
-- contact information
-- source
-- notes
-- created date
-- updated date
-- permission-aware action buttons
-
-Invalid or inaccessible client records use notFound().
-
----
-
-## Client editing
-
-Route:
-
-/crm/clients/[id]/edit
-
-Implemented:
-
-- existing values loaded into form
-- Zod validation
-- clients.update enforcement
-- Server Action
-- tenant-scoped UPDATE
-- updatedAt update
-- redirect after successful update
-- route revalidation
-
-Archived clients cannot be edited.
-
----
-
-## Client archiving
-
-Implemented.
-
-Archive operation sets:
-
-isArchived = true
-
-Requirements enforced:
-
-- valid client UUID
-- current organization
-- clients.archive permission
-- client organization match
-- currently not archived
-- deletedAt IS NULL
-
-Records are not physically deleted.
-
----
-
-## Client restore
-
-Implemented.
-
-Restore operation sets:
-
-isArchived = false
-
-Requirements enforced:
-
-- valid client UUID
-- current organization
-- clients.archive permission
-- client organization match
-- currently archived
-- deletedAt IS NULL
-
-Archived clients have a Restore action in their detail page when permitted.
+clients.delete exists but physical deletion is not part of the current normal
+workflow.
 
 ---
 
 # Team module
 
-## Team page
-
 Route:
 
 /crm/team
 
-Implemented.
+Implemented stable functionality:
 
-The page displays organization members with:
-
-- display name
-- email
-- userId
-- status
-- joined date
-- assigned roles
-
-The query is scoped to the current organization.
-
-Access requires:
-
-members.read
-
----
-
-## Role management
-
-Members can have multiple roles.
-
-The Team page allows authorized users to assign one or more roles to another
-member.
-
-Role-management action requires:
-
-members.manage
-
-The action validates:
-
-- member UUID
-- role UUIDs
-- member belongs to current organization
-- every selected role belongs to current organization
-- at least one role is selected
-
-Current member cannot edit their own roles.
-
-This restriction is temporary protection against locking the development owner
-out of the CRM.
-
-The current implementation replaces the selected member's role assignments with
-the submitted role set.
-
----
-
-## Current security properties
-
-Implemented:
-
-- tenant-scoped business queries
-- tenant-scoped business mutations
-- server-side input validation
-- server-side permission enforcement
-- permission-aware UI
-- no browser-supplied trusted organizationId
-- organization-scoped role validation
+- list organization members
+- show display name
+- show email
+- show userId
+- show status
+- show joined date
+- show assigned roles
+- multiple role assignments
+- update another member's roles
+- members.read enforcement
+- members.manage enforcement
 - organization-scoped member validation
-- development identity isolated in auth helper
-- environment secrets excluded from Git
+- organization-scoped role validation
+
+Current user cannot edit their own roles.
+
+This prevents accidental administrative lockout.
+
+The role replacement flow currently performs:
+
+DELETE existing member roles
+→ INSERT submitted roles
+
+It is not yet transactional.
 
 ---
 
-## Known temporary limitations
+# Development users
 
-### Authentication
-
-Real authentication does not exist yet.
-
-The application always resolves:
+Historical seed records:
 
 local-dev-owner
+→ Owner
 
-as the current development user.
+local-dev-manager
+→ Manager
 
-The Manager and Viewer seed users exist in the database but are not real login
-accounts yet.
+local-dev-viewer
+→ Viewer
+
+These records are development fixtures.
+
+They are not Better Auth login accounts.
+
+Real RBAC testing should increasingly use Better Auth accounts connected to
+organization_members.
 
 ---
 
-### Organization selection
+# Security properties already implemented
 
-There is no real organization switcher.
+- Better Auth sessions
+- server-side session resolution
+- tenant-scoped business queries
+- tenant-scoped business mutations
+- server-side Zod validation
+- server-side permission enforcement
+- permission-aware UI
+- stable authenticated user IDs
+- active membership requirement
+- organization-scoped role validation
+- organization-scoped member validation
+- secrets excluded from Git
+- browser organizationId is not trusted
 
-The current organization is:
+---
+
+# Known temporary limitations
+
+## Organization selection
+
+There is still no active organization selector.
+
+The current organization is resolved as:
 
 development
 
-Real organization membership resolution must later derive the organization from
-the authenticated user and selected organization.
+Future authenticated users may belong to multiple organizations.
+
+The organization selector must validate membership server-side.
 
 ---
 
-### Role updates
+## Team membership workflow
 
-Role replacement currently performs:
+The full production invitation lifecycle is not implemented yet.
 
-1. delete existing member roles
-2. insert selected roles
+Missing or still being developed:
 
-This is not yet wrapped in a database transaction.
-
-Before production-hardening role management, consider making this operation
-atomic.
-
----
-
-### Cross-tenant foreign-key consistency
-
-The database contains organizationId on tenant-owned entities, but PostgreSQL
-does not yet enforce every possible cross-tenant relationship at the composite
-foreign-key level.
-
-Application code must continue validating organization ownership.
-
----
-
-### Client deletion
-
-clients.delete exists as a permission but physical deletion is not implemented
-in the ordinary UI.
-
-Archive / restore is the preferred current lifecycle.
-
----
-
-## Not implemented yet
-
-### Authentication
-
-- real user accounts
-- login
-- logout
-- sessions
-- authenticated current-user resolution
-- password or external identity flow
-- account recovery
-- real organization selection
-
-### Team
-
-- invite member
-- create member from UI
+- invitation emails
+- pending invitations
+- accept invitation
 - deactivate member
 - reactivate member
-- member detail page
+- member detail
 - custom role creation UI
-- custom permission editing UI
-- transactional role replacement
+- role permission editing UI
 
-### Clients
+A simple workflow for adding already-registered users is the current next Team
+improvement.
 
-- responsible employee selector
-- client activity timeline
-- comments
-- duplicate detection
-- bulk actions
-- saved views
-- custom fields
+---
 
-### CRM entities
+## Role updates
+
+Role replacement is not transactional yet.
+
+A failure between DELETE and INSERT could leave a member without roles.
+
+This must be hardened before production use.
+
+---
+
+## Cross-tenant database consistency
+
+Application code validates tenant ownership.
+
+PostgreSQL does not yet enforce every possible cross-tenant relationship with
+composite foreign keys.
+
+Application-level organization validation must remain mandatory.
+
+---
+
+## Account lifecycle
+
+Not implemented:
+
+- email verification workflow
+- forgot password
+- password reset email
+- account lockout policy
+- production email provider
+- external identity providers
+
+These are not required for the current local CRM milestone but are required
+before a production launch with public users.
+
+---
+
+# Not implemented yet
+
+CRM entities:
 
 - companies
 - deals
 - pipelines
 - pipeline stages
 - tasks
+- comments
 - activity timeline
 - custom fields
 - saved views
@@ -745,11 +556,40 @@ Archive / restore is the preferred current lifecycle.
 - integrations
 - AI assistant
 
+Client improvements:
+
+- responsible employee selector
+- activity timeline
+- comments
+- duplicate detection
+- bulk actions
+- saved views
+- custom fields
+
+Team improvements:
+
+- production invitation lifecycle
+- deactivate/reactivate
+- member detail
+- custom roles
+- custom permission editor
+- transactional role replacement
+
 ---
 
-## Current checkpoint
+# Current checkpoint
 
-Clients currently support:
+Authentication:
+
+Register
+→ Login
+→ Session
+→ Better Auth user
+→ Organization membership
+→ RBAC
+→ CRM
+
+Clients:
 
 Create
 → Read
@@ -760,44 +600,33 @@ Create
 → Filter
 → Paginate
 
-Clients are protected by server-side RBAC.
-
-Team currently supports:
+Team:
 
 Read members
 → View roles
-→ Assign multiple roles
+→ Assign roles
 
-Team management is also protected by server-side RBAC.
-
-The application now has a usable foundation for:
-
-Multi-tenancy
-+
-RBAC
-+
-CRM data
-
-The main missing identity layer is real authentication.
+The project now has a functional identity and authorization chain rather than a
+hardcoded runtime user.
 
 ---
 
-## Next planned development
+# Next planned development
 
-1. Design the real authentication model.
-2. Choose authentication implementation compatible with the current architecture.
-3. Add login and logout.
-4. Replace `local-dev-owner` with authenticated user resolution.
-5. Resolve organization membership from the authenticated user.
-6. Preserve the existing RBAC helpers on top of real authentication.
-7. Test Owner / Admin / Manager / Viewer with real sessions.
-8. Harden Team role updates.
-9. Update AI documentation.
+1. Add convenient logout directly to CRM shell.
+2. Add already-registered Better Auth users to an organization from Team.
+3. Create real Manager and Viewer Better Auth test accounts.
+4. Verify RBAC with real sessions.
+5. Remove dependence on legacy development-member fixtures.
+6. Make member role replacement atomic.
+7. Add member activation/deactivation.
+8. Review active-organization strategy.
+9. Update AI documentation after Team hardening.
 10. Begin Companies module.
 
 ---
 
-## Important
+# Important
 
 Before significant implementation work, read:
 
@@ -807,11 +636,10 @@ Before significant implementation work, read:
 4. docs/ai/NEXT.md
 5. docs/ai/DECISIONS.md
 
-Do not assume a feature is missing without checking STATUS.md and the current
-repository.
+Continue using organizationId as the tenant boundary.
+
+Do not weaken server-side permission enforcement.
 
 Do not introduce unnecessary infrastructure.
 
-Continue using organizationId as the tenant boundary.
-
-Never weaken server-side permission enforcement when adding authentication.
+Do not reintroduce hardcoded development identities into authentication.

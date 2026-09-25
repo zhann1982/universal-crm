@@ -2,28 +2,48 @@
 
 ## Project
 
-Universal CRM is a multi-tenant CRM platform where administrators can configure
-business processes, pipelines, fields, roles, permissions and automations.
+Universal CRM is a configurable multi-tenant CRM platform.
 
-AI features will be added after the CRM core is stable.
+Administrators should eventually be able to configure:
+
+- business processes
+- pipelines
+- stages
+- fields
+- roles
+- permissions
+- workflows
+- automations
+
+AI features will be added only after the CRM core is stable.
 
 ## Current stack
 
-- Next.js 16
-- React
+- Next.js 16.3.6
+- React 19
 - TypeScript
-- Tailwind CSS
+- Tailwind CSS 4
 - PostgreSQL
 - Neon
 - Drizzle ORM
+- drizzle-kit
 - Zod
+- Better Auth
 - npm
 
 ## Architecture
 
-The application currently uses a monolithic Next.js architecture.
+The application is a modular monolith built with Next.js App Router.
 
-Do not introduce additional infrastructure unless it is actually required.
+Use:
+
+- Server Components by default
+- Server Actions for normal CRM mutations
+- PostgreSQL as the primary datastore
+- server-side authorization
+- organization-scoped business queries
+
+Do not introduce additional infrastructure without a concrete need.
 
 Avoid adding:
 
@@ -34,9 +54,9 @@ Avoid adding:
 - paid infrastructure
 - AI APIs
 
-until the project needs them.
+while the CRM core is still developing.
 
-The development goal is to keep infrastructure cost at or close to $0.
+Development infrastructure should remain at or close to $0.
 
 ## Multi-tenancy
 
@@ -46,7 +66,21 @@ Business entities must belong to an organization.
 
 Never expose records from one organization to another.
 
-Queries for CRM business data should normally be scoped by organizationId.
+Tenant-owned reads and writes must normally be scoped by:
+
+organizationId
+
+Never trust organizationId supplied by the browser as authorization proof.
+
+The current development organization is still resolved through:
+
+src/lib/current-organization.ts
+
+Current organization slug:
+
+development
+
+A real organization selector is not implemented yet.
 
 ## Database
 
@@ -58,9 +92,13 @@ ORM:
 
 Drizzle ORM.
 
-Schema:
+CRM schema:
 
 src/db/schema.ts
+
+Authentication schema:
+
+src/db/auth-schema.ts
 
 Database connection:
 
@@ -70,32 +108,14 @@ Migrations:
 
 drizzle/
 
-Never manually modify an already-applied migration unless there is a specific
-reason to do so.
+Never manually modify an already-applied migration unless there is a very
+specific reason.
 
-Create schema changes through Drizzle migrations.
+Create new schema changes through Drizzle migrations.
 
-## Security
+Current main tables:
 
-Never commit:
-
-- .env
-- .env.local
-- passwords
-- tokens
-- API keys
-- DATABASE_URL
-- private credentials
-
-Authorization must be enforced on the server.
-
-Do not trust client-side role or permission checks as security controls.
-
-## Validation
-
-Validate user input with Zod before writing business data.
-
-## Current core entities
+CRM:
 
 - organizations
 - organization_members
@@ -105,17 +125,226 @@ Validate user input with Zod before writing business data.
 - member_roles
 - clients
 
-More entities will be added incrementally.
+Better Auth:
+
+- user
+- session
+- account
+- verification
 
 ## Authentication
 
-Real authentication is not implemented yet.
+Real authentication is implemented with Better Auth.
 
-The seed currently creates a temporary development user:
+Current authentication method:
 
-local-dev-owner
+email + password
 
-Do not treat this as production authentication.
+Main files:
+
+src/lib/auth/auth.ts
+
+src/lib/auth/auth-client.ts
+
+src/lib/auth/current-member.ts
+
+src/app/api/auth/[...all]/route.ts
+
+Routes include:
+
+- /register
+- /login
+- /auth-test
+
+Better Auth provides the authenticated user identity.
+
+The stable Better Auth user ID is stored in:
+
+organization_members.userId
+
+Do not use email as the authorization identity.
+
+Do not spread direct session parsing throughout the application.
+
+Prefer centralized server helpers.
+
+## Authentication and authorization separation
+
+Authentication answers:
+
+Who is the user?
+
+Authorization answers:
+
+What may the user do?
+
+These responsibilities must remain separate.
+
+Authentication is provided by Better Auth.
+
+Authorization is provided by organization membership, roles and permissions.
+
+Current request security flow:
+
+Better Auth session
+→ authenticated user
+→ organization_members
+→ member_roles
+→ roles
+→ role_permissions
+→ permissions
+→ CRM access
+
+## Authorization / RBAC
+
+Authorization must be enforced on the server.
+
+Do not trust client-side role or permission checks as security controls.
+
+Main access helpers:
+
+src/lib/auth/current-member.ts
+
+src/lib/auth/permissions.ts
+
+Important functions:
+
+- getCurrentMember()
+- getCurrentAccessContext()
+- hasPermission()
+- requirePermission()
+
+Permission denial currently redirects to:
+
+/crm/forbidden
+
+Authenticated users without an active CRM membership redirect to:
+
+/no-access
+
+## Security
+
+Never commit:
+
+- .env
+- .env.local
+- DATABASE_URL
+- BETTER_AUTH_SECRET
+- passwords
+- tokens
+- API keys
+- private credentials
+
+If a secret is accidentally committed, rotate it.
+
+Do not assume deleting it from a later commit makes the secret safe.
+
+## Validation
+
+Validate external input with Zod before database mutations.
+
+Examples:
+
+- forms
+- identifiers
+- route parameters
+- search parameters
+- role selections
+- future API payloads
+
+## Current permissions
+
+Current permission keys:
+
+- clients.read
+- clients.create
+- clients.update
+- clients.archive
+- clients.delete
+- members.read
+- members.manage
+- roles.read
+- roles.manage
+- settings.manage
+
+## Current roles
+
+Current system roles:
+
+Owner
+
+Admin
+
+Manager
+
+Viewer
+
+Owner and Admin currently have all defined permissions.
+
+Manager currently has:
+
+- clients.read
+- clients.create
+- clients.update
+- clients.archive
+
+Viewer currently has:
+
+- clients.read
+
+Members can have multiple roles.
+
+## Clients
+
+The Clients module currently supports:
+
+- create
+- read
+- update
+- archive
+- restore
+- search
+- status filtering
+- active/archive views
+- server-side pagination
+- RBAC
+- tenant scoping
+
+Physical deletion is not part of the normal client workflow.
+
+Archive / restore is currently preferred.
+
+## Team
+
+The Team module currently supports:
+
+- organization member listing
+- assigned role display
+- multiple roles per member
+- role assignment
+- server-side permission checks
+
+Role management requires:
+
+members.manage
+
+The current user cannot edit their own roles.
+
+Current role replacement is not yet transactional.
+
+## Development identity
+
+The old development records may still exist:
+
+- local-dev-owner
+- local-dev-manager
+- local-dev-viewer
+
+They are legacy development records.
+
+They are not the current authentication mechanism.
+
+Do not reintroduce literal development IDs into request authentication.
 
 ## Development commands
 
@@ -135,6 +364,10 @@ Seed database:
 
 npm run db:seed
 
+Link a Better Auth user to the development organization as Owner:
+
+npm run db:link-owner -- email@example.com
+
 Build:
 
 npm run build
@@ -150,6 +383,7 @@ Prefer:
 - simple architecture
 - Server Components by default
 - server-side database access
+- Server Actions
 - TypeScript strictness
 - small reusable components
 - explicit validation
@@ -158,12 +392,11 @@ Prefer:
 
 Avoid premature abstraction.
 
-Do not add a dependency when the same task can reasonably be done with the
-current stack.
+Do not add a dependency when the current stack reasonably solves the problem.
 
 ## AI context protocol
 
-Before doing significant work, read in this order:
+Before significant work, read in this order:
 
 1. AGENTS.md
 2. docs/ai/CONTEXT.md
@@ -174,7 +407,8 @@ Before doing significant work, read in this order:
 After significant development work:
 
 - update docs/ai/STATUS.md
-- update docs/ai/DECISIONS.md only when an architectural/product decision changes
+- update docs/ai/NEXT.md
+- update docs/ai/DECISIONS.md only when an architectural or product decision changes
 
 Keep these files concise.
 
@@ -183,13 +417,16 @@ Do not turn them into session transcripts.
 ## Main product roadmap
 
 Phase 0.1:
+
 - organizations
+- authentication
 - users/members
 - roles and permissions
 - clients
 - companies
 
 Phase 0.2:
+
 - deals
 - pipelines
 - stages
@@ -198,18 +435,21 @@ Phase 0.2:
 - activity timeline
 
 Phase 0.3:
+
 - custom fields
 - advanced filters
 - saved views
 - configurable CRM structure
 
 Phase 0.4:
+
 - automation engine
 - triggers
 - conditions
 - actions
 
 Phase 0.5:
+
 - AI assistant
 - natural language search
 - summaries
@@ -218,6 +458,6 @@ Phase 0.5:
 
 ## Important principle
 
-Build the CRM core first.
+Build and stabilize the CRM core first.
 
 Do not allow AI features to drive the architecture prematurely.

@@ -6,6 +6,18 @@ export const memberIdSchema =
 export const roleIdSchema =
   z.string().uuid();
 
+export const addMemberSchema =
+  z.object({
+    email: z
+      .string()
+      .trim()
+      .email()
+      .max(320),
+
+    roleId:
+      roleIdSchema,
+  });
+
 export const updateMemberRolesSchema =
   z.object({
     memberId: memberIdSchema,

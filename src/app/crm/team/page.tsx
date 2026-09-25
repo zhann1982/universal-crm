@@ -12,10 +12,12 @@ import {
 } from "@/db/schema";
 import { requirePermission } from "@/lib/auth/permissions";
 
+import { AddMemberForm } from "./add-member-form";
 import { updateMemberRoles } from "./actions";
 
 type SearchParams = {
   saved?: string;
+  added?: string;
   error?: string;
 };
 
@@ -119,13 +121,17 @@ export default async function TeamPage({
       {
         id: string;
         userId: string;
+
         displayName:
           | string
           | null;
+
         email:
           | string
           | null;
+
         status: string;
+
         joinedAt: Date;
 
         roles: Array<{
@@ -207,12 +213,24 @@ export default async function TeamPage({
         </div>
       )}
 
+      {params.added === "1" && (
+        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Сотрудник добавлен в организацию.
+        </div>
+      )}
+
       {params.error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {getErrorMessage(
             params.error,
           )}
         </div>
+      )}
+
+      {canManage && (
+        <AddMemberForm
+          roles={roleList}
+        />
       )}
 
       <div className="grid gap-5">
@@ -390,7 +408,16 @@ function getErrorMessage(
     case "invalid":
       return "Выберите хотя бы одну корректную роль.";
 
+    case "add-invalid":
+      return "Проверьте email и выбранную роль.";
+
+    case "user-not-found":
+      return "Пользователь с таким email ещё не зарегистрирован.";
+
+    case "member-exists":
+      return "Этот пользователь уже состоит в организации.";
+
     default:
-      return "Не удалось изменить роли.";
+      return "Не удалось выполнить операцию.";
   }
 }

@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { getCurrentAccessContext } from "@/lib/auth/permissions";
 
+import { LogoutButton } from "./logout-button";
+
 export default async function CrmLayout({
   children,
 }: Readonly<{
@@ -9,6 +11,7 @@ export default async function CrmLayout({
 }>) {
   const {
     member,
+    user,
     permissions,
   } =
     await getCurrentAccessContext();
@@ -70,15 +73,25 @@ export default async function CrmLayout({
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-8">
+          <header className="flex min-h-16 items-center justify-between gap-6 border-b border-slate-200 bg-white px-8 py-3">
             <div className="font-medium">
               Universal CRM
             </div>
 
-            <div className="text-sm text-slate-500">
-              {member.displayName ||
-                member.email ||
-                member.userId}
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-sm font-medium">
+                  {member.displayName ||
+                    user.name ||
+                    member.userId}
+                </div>
+
+                <div className="text-xs text-slate-500">
+                  {user.email}
+                </div>
+              </div>
+
+              <LogoutButton />
             </div>
           </header>
 
