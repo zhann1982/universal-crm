@@ -70,6 +70,13 @@ export const clientListQuerySchema = z.object({
       "archive",
     ])
     .catch("active"),
+
+  page: z
+    .coerce
+    .number()
+    .int()
+    .min(1)
+    .catch(1),
 });
 
 export type ClientFormInput = z.infer<

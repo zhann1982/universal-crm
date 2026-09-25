@@ -1,5 +1,6 @@
 import {
   and,
+  count,
   desc,
   eq,
   ilike,
@@ -7,6 +8,7 @@ import {
   or,
 } from "drizzle-orm";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { clients } from "@/db/schema";
@@ -22,6 +24,8 @@ type SearchParams = {
     | string[]
     | undefined;
 };
+
+const PAGE_SIZE = 25;
 
 const statusLabels: Record<
   string,
@@ -45,12 +49,14 @@ export default async function ClientsPage({
       q: rawSearchParams.q,
       status: rawSearchParams.status,
       view: rawSearchParams.view,
+      page: rawSearchParams.page,
     });
 
   const {
     q,
     status,
     view,
+    page,
   } = query;
 
   const organization =
@@ -89,39 +95,79 @@ export default async function ClientsPage({
         )
       : undefined;
 
+  const whereCondition = and(
+    eq(
+      clients.organizationId,
+      organization.id,
+    ),
+
+    eq(
+      clients.isArchived,
+      view === "archive",
+    ),
+
+    isNull(
+      clients.deletedAt,
+    ),
+
+    searchCondition,
+
+    statusCondition,
+  );
+
+  const [countResult] = await db
+    .select({
+      total: count(),
+    })
+    .from(clients)
+    .where(whereCondition);
+
+  const totalClients =
+    countResult.total;
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      totalClients / PAGE_SIZE,
+    ),
+  );
+
+  const currentPage = Math.min(
+    page,
+    totalPages,
+  );
+
+  if (page !== currentPage) {
+    redirect(
+      buildClientsHref({
+        q,
+        status,
+        view,
+        page: currentPage,
+      }),
+    );
+  }
+
+  const offset =
+    (currentPage - 1) *
+    PAGE_SIZE;
+
   const clientList = await db
     .select()
     .from(clients)
-    .where(
-      and(
-        eq(
-          clients.organizationId,
-          organization.id,
-        ),
-
-        eq(
-          clients.isArchived,
-          view === "archive",
-        ),
-
-        isNull(
-          clients.deletedAt,
-        ),
-
-        searchCondition,
-
-        statusCondition,
-      ),
-    )
+    .where(whereCondition)
     .orderBy(
       desc(clients.createdAt),
-    );
+    )
+    .limit(PAGE_SIZE)
+    .offset(offset);
 
   const activeHref =
     buildClientsHref({
       q,
       status,
       view: "active",
+      page: 1,
     });
 
   const archiveHref =
@@ -129,12 +175,46 @@ export default async function ClientsPage({
       q,
       status,
       view: "archive",
+      page: 1,
     });
+
+  const previousHref =
+    currentPage > 1
+      ? buildClientsHref({
+          q,
+          status,
+          view,
+          page:
+            currentPage - 1,
+        })
+      : null;
+
+  const nextHref =
+    currentPage < totalPages
+      ? buildClientsHref({
+          q,
+          status,
+          view,
+          page:
+            currentPage + 1,
+        })
+      : null;
 
   const resetHref =
     view === "archive"
       ? "/crm/clients?view=archive"
       : "/crm/clients";
+
+  const firstVisible =
+    totalClients === 0
+      ? 0
+      : offset + 1;
+
+  const lastVisible =
+    Math.min(
+      offset + clientList.length,
+      totalClients,
+    );
 
   return (
     <div>
@@ -148,7 +228,7 @@ export default async function ClientsPage({
             {view === "archive"
               ? "Архив клиентов"
               : "Активные клиенты"}
-            : {clientList.length}
+            : {totalClients}
           </p>
         </div>
 
@@ -269,7 +349,7 @@ export default async function ClientsPage({
           <div className="border-b border-slate-200 bg-slate-50 px-5 py-3 text-sm text-slate-600">
             Найдено записей:{" "}
             <span className="font-medium text-slate-900">
-              {clientList.length}
+              {totalClients}
             </span>
 
             {q && (
@@ -326,6 +406,8 @@ export default async function ClientsPage({
                         q,
                         status,
                         view,
+                        page:
+                          currentPage,
                       })}
                     </div>
 
@@ -334,6 +416,8 @@ export default async function ClientsPage({
                         q,
                         status,
                         view,
+                        page:
+                          currentPage,
                       })}
                     </div>
                   </td>
@@ -409,6 +493,64 @@ export default async function ClientsPage({
             </tbody>
           </table>
         </div>
+
+        {totalClients > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 px-5 py-4">
+            <div className="text-sm text-slate-500">
+              Показано{" "}
+              <span className="font-medium text-slate-900">
+                {firstVisible}
+              </span>
+              {" — "}
+              <span className="font-medium text-slate-900">
+                {lastVisible}
+              </span>
+              {" из "}
+              <span className="font-medium text-slate-900">
+                {totalClients}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {previousHref ? (
+                <Link
+                  href={previousHref}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium transition hover:bg-slate-50"
+                >
+                  ← Назад
+                </Link>
+              ) : (
+                <span className="cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-400">
+                  ← Назад
+                </span>
+              )}
+
+              <span className="text-sm text-slate-600">
+                Страница{" "}
+                <span className="font-medium text-slate-900">
+                  {currentPage}
+                </span>
+                {" из "}
+                <span className="font-medium text-slate-900">
+                  {totalPages}
+                </span>
+              </span>
+
+              {nextHref ? (
+                <Link
+                  href={nextHref}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium transition hover:bg-slate-50"
+                >
+                  Вперёд →
+                </Link>
+              ) : (
+                <span className="cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-400">
+                  Вперёд →
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -418,6 +560,7 @@ function buildClientsHref({
   q,
   status,
   view,
+  page,
 }: ClientListQuery) {
   const params =
     new URLSearchParams();
@@ -437,6 +580,13 @@ function buildClientsHref({
     params.set(
       "view",
       view,
+    );
+  }
+
+  if (page > 1) {
+    params.set(
+      "page",
+      String(page),
     );
   }
 
