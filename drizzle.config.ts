@@ -6,12 +6,19 @@ config({
 });
 
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is not defined");
+  throw new Error(
+    "DATABASE_URL is not defined",
+  );
 }
 
 export default defineConfig({
-  schema: "./src/db/schema.ts",
+  schema: [
+    "./src/db/schema.ts",
+    "./src/db/auth-schema.ts",
+  ],
+
   out: "./drizzle",
+
   dialect: "postgresql",
 
   dbCredentials: {

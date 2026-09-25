@@ -12,7 +12,9 @@
     "db:seed": "node --env-file=.env.local --import tsx src/db/seed.ts"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.7.6",
     "@neondatabase/serverless": "^1.1.0",
+    "better-auth": "^1.7.6",
     "drizzle-orm": "^0.45.3",
     "next": "16.3.6",
     "react": "19.2.8",
