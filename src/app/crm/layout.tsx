@@ -45,6 +45,15 @@ export default async function CrmLayout({
               />
             )}
 
+            {permissions.has(
+              "companies.read",
+            ) && (
+              <NavigationLink
+                href="/crm/companies"
+                label="Компании"
+              />
+            )}
+
             <DisabledNavigation
               label="Сделки"
             />
