@@ -1,18 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { z } from "zod";
-import { ArchiveClientButton } from "./archive-client-button";
-import { getClientById } from "@/lib/clients/get-client";
-import { RestoreClientButton } from "./restore-client-button";
-import { requirePermission } from "@/lib/auth/permissions";
 
-const clientIdSchema = z.string().uuid();
+import {
+  requirePermission,
+} from "@/lib/auth/permissions";
+import {
+  getClientById,
+} from "@/lib/clients/get-client";
+import {
+  clientIdSchema,
+} from "@/lib/validation/client";
 
-const statusLabels: Record<string, string> = {
-  active: "Активный",
-  lead: "Лид",
-  inactive: "Неактивный",
-};
+import {
+  ArchiveClientButton,
+} from "./archive-client-button";
+import {
+  ClientCompaniesSection,
+} from "./client-companies-section";
+import {
+  RestoreClientButton,
+} from "./restore-client-button";
+
+const statusLabels:
+  Record<string, string> = {
+    active: "Активный",
+    lead: "Лид",
+    inactive: "Неактивный",
+  };
 
 export default async function ClientPage({
   params,
@@ -22,21 +36,29 @@ export default async function ClientPage({
   }>;
 }) {
   const {
-    permissions: currentPermissions,
+    organization,
+    permissions:
+      currentPermissions,
   } = await requirePermission(
     "clients.read",
   );
-  const { id } = await params;
+
+  const { id } =
+    await params;
 
   const idResult =
-    clientIdSchema.safeParse(id);
+    clientIdSchema.safeParse(
+      id,
+    );
 
   if (!idResult.success) {
     notFound();
   }
 
   const client =
-    await getClientById(idResult.data);
+    await getClientById(
+      idResult.data,
+    );
 
   if (!client) {
     notFound();
@@ -54,7 +76,11 @@ export default async function ClientPage({
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
         <Link
-          href="/crm/clients"
+          href={
+            client.isArchived
+              ? "/crm/clients?view=archive"
+              : "/crm/clients"
+          }
           className="text-sm text-slate-500 transition hover:text-slate-900"
         >
           ← Назад к клиентам
@@ -64,11 +90,14 @@ export default async function ClientPage({
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-bold">
-                {fullName || "Без имени"}
+                {fullName ||
+                  "Без имени"}
               </h1>
 
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium">
-                {statusLabels[client.status] ??
+                {statusLabels[
+                  client.status
+                ] ??
                   client.status}
               </span>
 
@@ -87,45 +116,41 @@ export default async function ClientPage({
             </p>
           </div>
 
-          {!client.isArchived && (
-            <div className="flex flex-wrap gap-3">
-              {!client.isArchived &&
-                currentPermissions.has(
-                  "clients.update",
-                ) && (
-                  <Link
-                    href={`/crm/clients/${client.id}/edit`}
-                    className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
-                  >
-                    Редактировать
-                  </Link>
-                )}
+          <div className="flex flex-wrap gap-3">
+            {!client.isArchived &&
+              currentPermissions.has(
+                "clients.update",
+              ) && (
+                <Link
+                  href={`/crm/clients/${client.id}/edit`}
+                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
+                >
+                  Редактировать
+                </Link>
+              )}
 
-              {!client.isArchived &&
-                currentPermissions.has(
-                  "clients.archive",
-                ) && (
-                  <ArchiveClientButton
-                    clientId={client.id}
-                  />
-                )}
+            {!client.isArchived &&
+              currentPermissions.has(
+                "clients.archive",
+              ) && (
+                <ArchiveClientButton
+                  clientId={
+                    client.id
+                  }
+                />
+              )}
 
-              {client.isArchived &&
-                currentPermissions.has(
-                  "clients.archive",
-                ) && (
-                  <RestoreClientButton
-                    clientId={client.id}
-                  />
-                )}
-            </div>
-          )}
-
-          {client.isArchived && (
-            <RestoreClientButton
-              clientId={client.id}
-            />
-          )}
+            {client.isArchived &&
+              currentPermissions.has(
+                "clients.archive",
+              ) && (
+                <RestoreClientButton
+                  clientId={
+                    client.id
+                  }
+                />
+              )}
+          </div>
         </div>
       </div>
 
@@ -138,32 +163,44 @@ export default async function ClientPage({
           <dl className="mt-6 grid gap-6 sm:grid-cols-2">
             <InfoItem
               label="Имя"
-              value={client.firstName}
+              value={
+                client.firstName
+              }
             />
 
             <InfoItem
               label="Фамилия"
-              value={client.lastName}
+              value={
+                client.lastName
+              }
             />
 
             <InfoItem
               label="Отчество"
-              value={client.middleName}
+              value={
+                client.middleName
+              }
             />
 
             <InfoItem
               label="Телефон"
-              value={client.phone}
+              value={
+                client.phone
+              }
             />
 
             <InfoItem
               label="Email"
-              value={client.email}
+              value={
+                client.email
+              }
             />
 
             <InfoItem
               label="Источник"
-              value={client.source}
+              value={
+                client.source
+              }
             />
           </dl>
         </section>
@@ -177,7 +214,9 @@ export default async function ClientPage({
             <InfoItem
               label="Статус"
               value={
-                statusLabels[client.status] ??
+                statusLabels[
+                  client.status
+                ] ??
                 client.status
               }
             />
@@ -198,6 +237,31 @@ export default async function ClientPage({
           </dl>
         </section>
       </div>
+
+      <ClientCompaniesSection
+        organizationId={
+          organization.id
+        }
+        clientId={
+          client.id
+        }
+        clientIsArchived={
+          client.isArchived
+        }
+        canReadCompanies={
+          currentPermissions.has(
+            "companies.read",
+          )
+        }
+        canManageRelations={
+          currentPermissions.has(
+            "clients.update",
+          ) &&
+          currentPermissions.has(
+            "companies.read",
+          )
+        }
+      />
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">
@@ -223,6 +287,7 @@ function InfoItem({
   value,
 }: {
   label: string;
+
   value:
     | string
     | null

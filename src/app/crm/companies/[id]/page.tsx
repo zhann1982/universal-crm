@@ -27,6 +27,9 @@ import {
 import {
   RestoreCompanyButton,
 } from "./restore-company-button";
+import {
+  CompanyClientsSection,
+} from "./company-clients-section";
 
 const statusLabels:
   Record<string, string> = {
@@ -303,6 +306,20 @@ export default async function CompanyPage({
           </dl>
         </section>
       </div>
+
+      <CompanyClientsSection
+        organizationId={
+          organization.id
+        }
+        companyId={
+          company.id
+        }
+        canReadClients={
+          currentPermissions.has(
+            "clients.read",
+          )
+        }
+      />
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">
