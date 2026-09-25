@@ -1,10 +1,13 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import {
   and,
   eq,
   ilike,
   inArray,
+  ne,
 } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -131,12 +134,17 @@ export async function addMember(
     );
   }
 
-  const [newMember] =
-    await db
+  const newMemberId =
+    randomUUID();
+
+  await db.batch([
+    db
       .insert(
         organizationMembers,
       )
       .values({
+        id: newMemberId,
+
         organizationId:
           organization.id,
 
@@ -151,42 +159,18 @@ export async function addMember(
 
         status:
           "active",
-      })
-      .returning({
-        id: organizationMembers.id,
-      });
+      }),
 
-  try {
-    await db
+    db
       .insert(memberRoles)
       .values({
         memberId:
-          newMember.id,
+          newMemberId,
 
         roleId:
           selectedRole.id,
-      });
-  } catch (error) {
-    await db
-      .delete(
-        organizationMembers,
-      )
-      .where(
-        and(
-          eq(
-            organizationMembers.id,
-            newMember.id,
-          ),
-
-          eq(
-            organizationMembers.organizationId,
-            organization.id,
-          ),
-        ),
-      );
-
-    throw error;
-  }
+      }),
+  ]);
 
   revalidatePath(
     "/crm/team",
@@ -241,6 +225,7 @@ export async function updateMemberStatus(
     await db
       .select({
         id: organizationMembers.id,
+
         status:
           organizationMembers.status,
       })
@@ -368,6 +353,7 @@ export async function updateMemberStatus(
     )
     .set({
       status,
+
       updatedAt:
         new Date(),
     })
@@ -438,6 +424,9 @@ export async function updateMemberRoles(
     await db
       .select({
         id: organizationMembers.id,
+
+        status:
+          organizationMembers.status,
       })
       .from(organizationMembers)
       .where(
@@ -468,6 +457,7 @@ export async function updateMemberRoles(
   const validRoles = await db
     .select({
       id: roles.id,
+      name: roles.name,
     })
     .from(roles)
     .where(
@@ -493,29 +483,137 @@ export async function updateMemberRoles(
     );
   }
 
-  await db
-    .delete(memberRoles)
-    .where(
-      eq(
-        memberRoles.memberId,
-        targetMember.id,
-      ),
+  const [currentOwnerRole] =
+    await db
+      .select({
+        id: roles.id,
+      })
+      .from(memberRoles)
+      .innerJoin(
+        roles,
+        eq(
+          memberRoles.roleId,
+          roles.id,
+        ),
+      )
+      .where(
+        and(
+          eq(
+            memberRoles.memberId,
+            targetMember.id,
+          ),
+
+          eq(
+            roles.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            roles.name,
+            "Owner",
+          ),
+        ),
+      )
+      .limit(1);
+
+  const willRemainOwner =
+    validRoles.some(
+      (role) =>
+        role.name === "Owner",
     );
 
-  await db
-    .insert(memberRoles)
-    .values(
-      validRoles.map(
-        (role) => ({
+  if (
+    targetMember.status ===
+      "active" &&
+    currentOwnerRole &&
+    !willRemainOwner
+  ) {
+    const otherActiveOwners =
+      await db
+        .selectDistinct({
           memberId:
-            targetMember.id,
+            organizationMembers.id,
+        })
+        .from(
+          organizationMembers,
+        )
+        .innerJoin(
+          memberRoles,
+          eq(
+            memberRoles.memberId,
+            organizationMembers.id,
+          ),
+        )
+        .innerJoin(
+          roles,
+          eq(
+            memberRoles.roleId,
+            roles.id,
+          ),
+        )
+        .where(
+          and(
+            eq(
+              organizationMembers.organizationId,
+              organization.id,
+            ),
 
-          roleId:
-            role.id,
-        }),
+            eq(
+              organizationMembers.status,
+              "active",
+            ),
+
+            ne(
+              organizationMembers.id,
+              targetMember.id,
+            ),
+
+            eq(
+              roles.organizationId,
+              organization.id,
+            ),
+
+            eq(
+              roles.name,
+              "Owner",
+            ),
+          ),
+        );
+
+    if (
+      otherActiveOwners.length === 0
+    ) {
+      redirect(
+        "/crm/team?error=last-owner",
+      );
+    }
+  }
+
+  await db.batch([
+    db
+      .delete(memberRoles)
+      .where(
+        eq(
+          memberRoles.memberId,
+          targetMember.id,
+        ),
       ),
-    )
-    .onConflictDoNothing();
+
+    db
+      .insert(memberRoles)
+      .values(
+        validRoles.map(
+          (role) => ({
+            memberId:
+              targetMember.id,
+
+            roleId:
+              role.id,
+          }),
+        ),
+      )
+      .onConflictDoNothing(),
+  ]);
 
   revalidatePath(
     "/crm/team",
