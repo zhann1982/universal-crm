@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { clients } from "@/db/schema";
 import { getCurrentOrganization } from "@/lib/current-organization";
 
+import Link from "next/link";
+
 export default async function ClientsPage() {
   const organization = await getCurrentOrganization();
 
@@ -35,12 +37,12 @@ export default async function ClientsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
+        <Link
+          href="/crm/clients/new"
           className="rounded-lg bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
         >
           + Новый клиент
-        </button>
+        </Link>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
