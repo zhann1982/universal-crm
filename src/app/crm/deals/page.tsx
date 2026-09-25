@@ -23,6 +23,10 @@ import {
   requirePermission,
 } from "@/lib/auth/permissions";
 
+import {
+  KanbanBoard,
+} from "./kanban-board";
+
 type SearchParams = {
   [key: string]:
     | string
@@ -32,13 +36,6 @@ type SearchParams = {
 
 const pipelineIdSchema =
   z.string().uuid();
-
-const stageTypeLabels:
-  Record<string, string> = {
-    open: "Открыта",
-    won: "Выиграна",
-    lost: "Проиграна",
-  };
 
 export default async function DealsPage({
   searchParams,
@@ -109,15 +106,24 @@ export default async function DealsPage({
   ) {
     return (
       <div>
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">
-            Сделки
-          </h1>
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">
+              Сделки
+            </h1>
 
-          <p className="mt-2 text-slate-500">
-            Воронки продаж пока
-            не настроены.
-          </p>
+            <p className="mt-2 text-slate-500">
+              Воронки продаж пока
+              не настроены.
+            </p>
+          </div>
+
+          <Link
+            href="/crm/deals/archive"
+            className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium transition hover:bg-slate-50"
+          >
+            Архив
+          </Link>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-10 text-center shadow-sm">
@@ -240,17 +246,11 @@ export default async function DealsPage({
         expectedCloseAt:
           deals.expectedCloseAt,
 
-        createdAt:
-          deals.createdAt,
-
         companyId:
           deals.companyId,
 
         companyName:
           companies.name,
-
-        ownerMemberId:
-          deals.ownerMemberId,
 
         ownerDisplayName:
           organizationMembers.displayName,
@@ -315,35 +315,12 @@ export default async function DealsPage({
         ),
       );
 
-  const dealMap =
-    new Map<
-      string,
-      typeof dealList
-    >();
-
-  for (const stage of stages) {
-    dealMap.set(
-      stage.id,
-      [],
-    );
-  }
-
-  for (const deal of dealList) {
-    const stageDeals =
-      dealMap.get(
-        deal.stageId,
-      );
-
-    if (stageDeals) {
-      stageDeals.push(
-        deal,
-      );
-    }
-  }
-
   const totalAmount =
     dealList.reduce(
-      (sum, deal) => {
+      (
+        sum,
+        deal,
+      ) => {
         if (!deal.amount) {
           return sum;
         }
@@ -362,6 +339,43 @@ export default async function DealsPage({
       0,
     );
 
+  const kanbanDeals =
+    dealList.map(
+      (deal) => ({
+        id:
+          deal.id,
+
+        title:
+          deal.title,
+
+        amount:
+          deal.amount,
+
+        currency:
+          deal.currency,
+
+        stageId:
+          deal.stageId,
+
+        expectedCloseAt:
+          deal.expectedCloseAt
+            ? deal.expectedCloseAt.toISOString()
+            : null,
+
+        companyId:
+          deal.companyId,
+
+        companyName:
+          deal.companyName,
+
+        ownerDisplayName:
+          deal.ownerDisplayName,
+
+        ownerEmail:
+          deal.ownerEmail,
+      }),
+    );
+
   return (
     <div>
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
@@ -376,16 +390,25 @@ export default async function DealsPage({
           </p>
         </div>
 
-        {permissions.has(
-          "deals.create",
-        ) && (
+        <div className="flex flex-wrap gap-3">
           <Link
-            href={`/crm/deals/new?pipeline=${selectedPipeline.id}`}
-            className="rounded-lg bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+            href="/crm/deals/archive"
+            className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium transition hover:bg-slate-50"
           >
-            + Новая сделка
+            Архив
           </Link>
-        )}
+
+          {permissions.has(
+            "deals.create",
+          ) && (
+            <Link
+              href={`/crm/deals/new?pipeline=${selectedPipeline.id}`}
+              className="rounded-lg bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              + Новая сделка
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -423,6 +446,7 @@ export default async function DealsPage({
                     {
                       pipeline.name
                     }
+
                     {pipeline.isDefault
                       ? " — основная"
                       : ""}
@@ -484,176 +508,19 @@ export default async function DealsPage({
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto pb-6">
-          <div className="flex min-w-max items-start gap-4">
-            {stages.map(
-              (stage) => {
-                const stageDeals =
-                  dealMap.get(
-                    stage.id,
-                  ) ?? [];
-
-                const stageAmount =
-                  stageDeals.reduce(
-                    (
-                      sum,
-                      deal,
-                    ) => {
-                      if (
-                        !deal.amount
-                      ) {
-                        return sum;
-                      }
-
-                      const value =
-                        Number(
-                          deal.amount,
-                        );
-
-                      return Number.isFinite(
-                        value,
-                      )
-                        ? sum +
-                            value
-                        : sum;
-                    },
-                    0,
-                  );
-
-                return (
-                  <section
-                    key={
-                      stage.id
-                    }
-                    className="w-80 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm"
-                  >
-                    <div className="border-b border-slate-200 bg-white p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h2 className="font-semibold">
-                            {
-                              stage.name
-                            }
-                          </h2>
-
-                          <div className="mt-1 text-xs text-slate-500">
-                            {stageTypeLabels[
-                              stage.type
-                            ] ??
-                              stage.type}
-                            {" · "}
-                            {
-                              stage.probability
-                            }
-                            %
-                          </div>
-                        </div>
-
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium">
-                          {
-                            stageDeals.length
-                          }
-                        </span>
-                      </div>
-
-                      {stageAmount >
-                        0 && (
-                        <div className="mt-3 text-sm font-medium text-slate-700">
-                          {formatAmount(
-                            stageAmount,
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-3 p-3">
-                      {stageDeals.length ===
-                      0 ? (
-                        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-400">
-                          Сделок нет
-                        </div>
-                      ) : (
-                        stageDeals.map(
-                          (
-                            deal,
-                          ) => (
-                            <article
-                              key={
-                                deal.id
-                              }
-                              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-                            >
-                              <div className="font-medium leading-5">
-                                <Link
-                                  href={`/crm/deals/${deal.id}`}
-                                  className="transition hover:text-blue-600 hover:underline"
-                                >
-                                  {deal.title}
-                                </Link>
-                              </div>
-
-                              <div className="mt-3 text-lg font-semibold">
-                                {deal.amount
-                                  ? formatDealAmount(
-                                      deal.amount,
-                                      deal.currency,
-                                    )
-                                  : "Сумма не указана"}
-                              </div>
-
-                              {deal.companyName && (
-                                <div className="mt-3">
-                                  {deal.companyId ? (
-                                    <Link
-                                      href={`/crm/companies/${deal.companyId}`}
-                                      className="text-sm text-slate-600 transition hover:text-blue-600 hover:underline"
-                                    >
-                                      {
-                                        deal.companyName
-                                      }
-                                    </Link>
-                                  ) : (
-                                    <span className="text-sm text-slate-600">
-                                      {
-                                        deal.companyName
-                                      }
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                                <div>
-                                  Ответственный:{" "}
-                                  <span className="text-slate-700">
-                                    {deal.ownerDisplayName ||
-                                      deal.ownerEmail ||
-                                      "Не назначен"}
-                                  </span>
-                                </div>
-
-                                <div>
-                                  Закрытие:{" "}
-                                  <span className="text-slate-700">
-                                    {deal.expectedCloseAt
-                                      ? deal.expectedCloseAt.toLocaleDateString(
-                                          "ru-RU",
-                                        )
-                                      : "Не указано"}
-                                  </span>
-                                </div>
-                              </div>
-                            </article>
-                          ),
-                        )
-                      )}
-                    </div>
-                  </section>
-                );
-              },
-            )}
-          </div>
-        </div>
+        <KanbanBoard
+          stages={
+            stages
+          }
+          deals={
+            kanbanDeals
+          }
+          canUpdate={
+            permissions.has(
+              "deals.update",
+            )
+          }
+        />
       )}
     </div>
   );
@@ -688,33 +555,4 @@ function formatAmount(
       maximumFractionDigits: 2,
     },
   ).format(value);
-}
-
-function formatDealAmount(
-  amount: string,
-  currency:
-    | string
-    | null,
-) {
-  const value =
-    Number(amount);
-
-  if (
-    !Number.isFinite(value)
-  ) {
-    return amount;
-  }
-
-  const formatted =
-    new Intl.NumberFormat(
-      "ru-RU",
-      {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      },
-    ).format(value);
-
-  return currency
-    ? `${formatted} ${currency}`
-    : formatted;
 }

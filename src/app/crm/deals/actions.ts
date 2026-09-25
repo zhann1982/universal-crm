@@ -1140,3 +1140,224 @@ export async function updateDeal(
     `/crm/deals/${existingDeal.id}`,
   );
 }
+
+export async function archiveDeal(
+  dealId: string,
+) {
+  const {
+    organization,
+  } = await requirePermission(
+    "deals.archive",
+  );
+
+  const idResult =
+    dealIdSchema.safeParse(
+      dealId,
+    );
+
+  if (!idResult.success) {
+    redirect(
+      "/crm/deals",
+    );
+  }
+
+  const [deal] =
+    await db
+      .select({
+        id:
+          deals.id,
+
+        pipelineId:
+          deals.pipelineId,
+      })
+      .from(deals)
+      .where(
+        and(
+          eq(
+            deals.id,
+            idResult.data,
+          ),
+
+          eq(
+            deals.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            deals.isArchived,
+            false,
+          ),
+
+          isNull(
+            deals.deletedAt,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!deal) {
+    redirect(
+      "/crm/deals",
+    );
+  }
+
+  await db
+    .update(deals)
+    .set({
+      isArchived: true,
+
+      updatedAt:
+        new Date(),
+    })
+    .where(
+      and(
+        eq(
+          deals.id,
+          deal.id,
+        ),
+
+        eq(
+          deals.organizationId,
+          organization.id,
+        ),
+
+        eq(
+          deals.isArchived,
+          false,
+        ),
+
+        isNull(
+          deals.deletedAt,
+        ),
+      ),
+    );
+
+  revalidatePath(
+    "/crm",
+  );
+
+  revalidatePath(
+    "/crm/deals",
+  );
+
+  revalidatePath(
+    "/crm/deals/archive",
+  );
+
+  revalidatePath(
+    `/crm/deals/${deal.id}`,
+  );
+
+  redirect(
+    `/crm/deals?pipeline=${deal.pipelineId}`,
+  );
+}
+
+export async function restoreDeal(
+  dealId: string,
+) {
+  const {
+    organization,
+  } = await requirePermission(
+    "deals.archive",
+  );
+
+  const idResult =
+    dealIdSchema.safeParse(
+      dealId,
+    );
+
+  if (!idResult.success) {
+    redirect(
+      "/crm/deals/archive",
+    );
+  }
+
+  const [deal] =
+    await db
+      .select({
+        id:
+          deals.id,
+      })
+      .from(deals)
+      .where(
+        and(
+          eq(
+            deals.id,
+            idResult.data,
+          ),
+
+          eq(
+            deals.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            deals.isArchived,
+            true,
+          ),
+
+          isNull(
+            deals.deletedAt,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!deal) {
+    redirect(
+      "/crm/deals/archive",
+    );
+  }
+
+  await db
+    .update(deals)
+    .set({
+      isArchived: false,
+
+      updatedAt:
+        new Date(),
+    })
+    .where(
+      and(
+        eq(
+          deals.id,
+          deal.id,
+        ),
+
+        eq(
+          deals.organizationId,
+          organization.id,
+        ),
+
+        eq(
+          deals.isArchived,
+          true,
+        ),
+
+        isNull(
+          deals.deletedAt,
+        ),
+      ),
+    );
+
+  revalidatePath(
+    "/crm",
+  );
+
+  revalidatePath(
+    "/crm/deals",
+  );
+
+  revalidatePath(
+    "/crm/deals/archive",
+  );
+
+  revalidatePath(
+    `/crm/deals/${deal.id}`,
+  );
+
+  redirect(
+    `/crm/deals/${deal.id}`,
+  );
+}

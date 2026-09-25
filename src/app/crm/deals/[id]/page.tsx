@@ -25,6 +25,12 @@ import {
 import {
   moveDealToStage,
 } from "../actions";
+import {
+  ArchiveDealButton,
+} from "./archive-deal-button";
+import {
+  RestoreDealButton,
+} from "./restore-deal-button";
 
 const stageTypeLabels:
   Record<string, string> = {
@@ -118,10 +124,16 @@ export default async function DealPage({
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
         <Link
-          href={`/crm/deals?pipeline=${deal.pipelineId}`}
+          href={
+            deal.isArchived
+              ? "/crm/deals/archive"
+              : `/crm/deals?pipeline=${deal.pipelineId}`
+          }
           className="text-sm text-slate-500 transition hover:text-slate-900"
         >
-          ← Назад к воронке
+          {deal.isArchived
+            ? "← Назад в архив"
+            : "← Назад к воронке"}
         </Link>
 
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
@@ -143,6 +155,12 @@ export default async function DealPage({
                 ] ??
                   deal.stageType}
               </span>
+
+              {deal.isArchived && (
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                  В архиве
+                </span>
+              )}
             </div>
 
             <p className="mt-2 text-sm text-slate-500">
@@ -153,19 +171,53 @@ export default async function DealPage({
             </p>
           </div>
 
-          {permissions.has(
-            "deals.update",
-          ) &&
-            !deal.isArchived && (
-              <Link
-                href={`/crm/deals/${deal.id}/edit`}
-                className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
-              >
-                Редактировать
-              </Link>
-            )}
+          <div className="flex flex-wrap gap-3">
+            {permissions.has(
+              "deals.update",
+            ) &&
+              !deal.isArchived && (
+                <Link
+                  href={`/crm/deals/${deal.id}/edit`}
+                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
+                >
+                  Редактировать
+                </Link>
+              )}
+
+            {permissions.has(
+              "deals.archive",
+            ) &&
+              !deal.isArchived && (
+                <ArchiveDealButton
+                  dealId={
+                    deal.id
+                  }
+                />
+              )}
+
+            {permissions.has(
+              "deals.archive",
+            ) &&
+              deal.isArchived && (
+                <RestoreDealButton
+                  dealId={
+                    deal.id
+                  }
+                />
+              )}
+          </div>
         </div>
       </div>
+
+      {deal.isArchived && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          Эта сделка находится
+          в архиве. Редактирование
+          и изменение этапа
+          недоступны до
+          восстановления.
+        </div>
+      )}
 
       {permissions.has(
         "deals.update",
@@ -360,7 +412,7 @@ export default async function DealPage({
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">
-          Заметки
+          Описание / заметка
         </h2>
 
         {deal.notes ? (
@@ -369,7 +421,8 @@ export default async function DealPage({
           </p>
         ) : (
           <p className="mt-4 text-sm text-slate-400">
-            Заметок пока нет.
+            Описание пока не
+            указано.
           </p>
         )}
       </section>
