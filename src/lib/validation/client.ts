@@ -48,6 +48,30 @@ export const createClientSchema = z.object({
 export const updateClientSchema =
   createClientSchema;
 
+export const clientListQuerySchema = z.object({
+  q: z
+    .string()
+    .trim()
+    .max(120)
+    .catch(""),
+
+  status: z
+    .enum([
+      "all",
+      "active",
+      "lead",
+      "inactive",
+    ])
+    .catch("all"),
+
+  view: z
+    .enum([
+      "active",
+      "archive",
+    ])
+    .catch("active"),
+});
+
 export type ClientFormInput = z.infer<
   typeof createClientSchema
 >;
@@ -67,3 +91,7 @@ export type CreateClientState =
 
 export type UpdateClientState =
   ClientFormState;
+
+export type ClientListQuery = z.infer<
+  typeof clientListQuerySchema
+>;
