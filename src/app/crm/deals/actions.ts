@@ -30,6 +30,9 @@ import {
   type UpdateDealState,
   type CreateDealState,
 } from "@/lib/validation/deal";
+import {
+  transitionDeal,
+} from "@/modules/deals/transition-deal";
 
 function getFormValues(
   formData: FormData,
@@ -479,158 +482,73 @@ export async function moveDealToStage(
     "deals.update",
   );
 
-  const dealIdResult =
-    dealIdSchema.safeParse(
-      dealId,
+  const stageId =
+    String(
+      formData.get(
+        "stageId",
+      ) ?? "",
     );
 
-  const stageIdResult =
-    dealIdSchema.safeParse(
-      String(
-        formData.get(
-          "stageId",
-        ) ?? "",
-      ),
+  let result:
+    Awaited<
+      ReturnType<
+        typeof transitionDeal
+      >
+    >;
+
+  try {
+    result =
+      await transitionDeal({
+        organizationId:
+          organization.id,
+
+        dealId,
+
+        targetStageId:
+          stageId,
+      });
+  } catch (error) {
+    console.error(
+      "Failed to transition deal:",
+      error instanceof Error
+        ? error.message
+        : "Unknown error",
     );
+
+    redirect(
+      `/crm/deals/${dealId}?error=stage-error`,
+    );
+  }
 
   if (
-    !dealIdResult.success ||
-    !stageIdResult.success
+    !result.success
   ) {
+    if (
+      result.code ===
+      "conflict"
+    ) {
+      redirect(
+        `/crm/deals/${dealId}?error=stage-conflict`,
+      );
+    }
+
+    if (
+      result.code ===
+        "deal-not-found" ||
+      result.code ===
+        "stage-not-found" ||
+      result.code ===
+        "invalid-stage-type"
+    ) {
+      redirect(
+        "/crm/forbidden",
+      );
+    }
+
     redirect(
       "/crm/deals",
     );
   }
-
-  const [deal] =
-    await db
-      .select({
-        id:
-          deals.id,
-
-        pipelineId:
-          deals.pipelineId,
-
-        stageId:
-          deals.stageId,
-
-        closedAt:
-          deals.closedAt,
-      })
-      .from(deals)
-      .where(
-        and(
-          eq(
-            deals.id,
-            dealIdResult.data,
-          ),
-
-          eq(
-            deals.organizationId,
-            organization.id,
-          ),
-
-          eq(
-            deals.isArchived,
-            false,
-          ),
-
-          isNull(
-            deals.deletedAt,
-          ),
-        ),
-      )
-      .limit(1);
-
-  if (!deal) {
-    redirect(
-      "/crm/forbidden",
-    );
-  }
-
-  const [targetStage] =
-    await db
-      .select({
-        id:
-          pipelineStages.id,
-
-        type:
-          pipelineStages.type,
-      })
-      .from(
-        pipelineStages,
-      )
-      .where(
-        and(
-          eq(
-            pipelineStages.id,
-            stageIdResult.data,
-          ),
-
-          eq(
-            pipelineStages.organizationId,
-            organization.id,
-          ),
-
-          eq(
-            pipelineStages.pipelineId,
-            deal.pipelineId,
-          ),
-        ),
-      )
-      .limit(1);
-
-  if (!targetStage) {
-    redirect(
-      "/crm/forbidden",
-    );
-  }
-
-  const targetIsClosed =
-    targetStage.type ===
-      "won" ||
-    targetStage.type ===
-      "lost";
-
-  const closedAt =
-    targetIsClosed
-      ? deal.closedAt ??
-        new Date()
-      : null;
-
-  await db
-    .update(deals)
-    .set({
-      stageId:
-        targetStage.id,
-
-      closedAt,
-
-      updatedAt:
-        new Date(),
-    })
-    .where(
-      and(
-        eq(
-          deals.id,
-          deal.id,
-        ),
-
-        eq(
-          deals.organizationId,
-          organization.id,
-        ),
-
-        eq(
-          deals.isArchived,
-          false,
-        ),
-
-        isNull(
-          deals.deletedAt,
-        ),
-      ),
-    );
 
   revalidatePath(
     "/crm",
@@ -641,11 +559,11 @@ export async function moveDealToStage(
   );
 
   revalidatePath(
-    `/crm/deals/${deal.id}`,
+    `/crm/deals/${result.dealId}`,
   );
 
   redirect(
-    `/crm/deals/${deal.id}`,
+    `/crm/deals/${result.dealId}`,
   );
 }
 

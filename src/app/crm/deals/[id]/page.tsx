@@ -39,12 +39,23 @@ const stageTypeLabels:
     lost: "Проиграна",
   };
 
+type SearchParams = {
+  error?:
+    | string
+    | string[]
+    | undefined;
+};
+
 export default async function DealPage({
   params,
+  searchParams,
 }: {
   params: Promise<{
     id: string;
   }>;
+
+  searchParams:
+    Promise<SearchParams>;
 }) {
   const {
     organization,
@@ -55,6 +66,16 @@ export default async function DealPage({
 
   const { id } =
     await params;
+
+  const query =
+    await searchParams;
+
+  const error =
+    Array.isArray(
+      query.error,
+    )
+      ? query.error[0]
+      : query.error;
 
   const idResult =
     dealIdSchema.safeParse(
@@ -140,7 +161,9 @@ export default async function DealPage({
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-bold">
-                {deal.title}
+                {
+                  deal.title
+                }
               </h1>
 
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium">
@@ -208,6 +231,27 @@ export default async function DealPage({
           </div>
         </div>
       </div>
+
+      {error ===
+        "stage-conflict" && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          Сделка была изменена
+          другим действием до
+          завершения смены этапа.
+          Страница уже показывает
+          актуальное состояние.
+          При необходимости повторите
+          операцию.
+        </div>
+      )}
+
+      {error ===
+        "stage-error" && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+          Не удалось изменить этап
+          сделки. Повторите попытку.
+        </div>
+      )}
 
       {deal.isArchived && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
@@ -370,16 +414,20 @@ export default async function DealPage({
 
             <InfoItem
               label="Создана"
-              value={deal.createdAt.toLocaleString(
-                "ru-RU",
-              )}
+              value={
+                deal.createdAt.toLocaleString(
+                  "ru-RU",
+                )
+              }
             />
 
             <InfoItem
               label="Обновлена"
-              value={deal.updatedAt.toLocaleString(
-                "ru-RU",
-              )}
+              value={
+                deal.updatedAt.toLocaleString(
+                  "ru-RU",
+                )
+              }
             />
           </dl>
         </section>
@@ -417,7 +465,9 @@ export default async function DealPage({
 
         {deal.notes ? (
           <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-            {deal.notes}
+            {
+              deal.notes
+            }
           </p>
         ) : (
           <p className="mt-4 text-sm text-slate-400">

@@ -182,6 +182,18 @@ export function KanbanBoard({
             result.message,
           );
 
+          /*
+           * Серверное состояние
+           * сделки могло измениться
+           * другим пользователем
+           * или другим действием.
+           *
+           * Перечитываем Server
+           * Component и получаем
+           * актуальные Stage/Deal.
+           */
+          router.refresh();
+
           return;
         }
 
