@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --env-file=.env.local --import tsx src/db/seed.ts",
-    "db:link-owner": "node --env-file=.env.local --import tsx src/db/link-dev-owner.ts"
+    "db:link-owner": "node --env-file=.env.local --import tsx src/db/link-dev-owner.ts",
+    "test": "node --import tsx --test src/lib/auth/email-identity.test.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.6",
@@ -32,6 +33,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

@@ -520,6 +520,9 @@ function getErrorMessage(
     case "user-not-found":
       return "Пользователь с таким email ещё не зарегистрирован.";
 
+    case "user-ambiguous":
+      return "Найдено несколько учётных записей с одинаковым email после нормализации. Добавление сотрудника остановлено.";  
+
     case "member-exists":
       return "Этот пользователь уже состоит в организации.";
 

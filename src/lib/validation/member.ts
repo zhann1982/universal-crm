@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import {
+  canonicalizeEmail,
+} from "@/lib/auth/email-identity";
+
 export const memberIdSchema =
   z.string().uuid();
 
@@ -18,7 +22,10 @@ export const addMemberSchema =
       .string()
       .trim()
       .email()
-      .max(320),
+      .max(320)
+      .transform(
+        canonicalizeEmail,
+      ),
 
     roleId:
       roleIdSchema,
@@ -26,10 +33,13 @@ export const addMemberSchema =
 
 export const updateMemberRolesSchema =
   z.object({
-    memberId: memberIdSchema,
+    memberId:
+      memberIdSchema,
 
     roleIds: z
-      .array(roleIdSchema)
+      .array(
+        roleIdSchema,
+      )
       .min(
         1,
         "У сотрудника должна быть хотя бы одна роль",

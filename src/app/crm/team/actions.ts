@@ -5,7 +5,6 @@ import { randomUUID } from "node:crypto";
 import {
   and,
   eq,
-  ilike,
   inArray,
   ne,
 } from "drizzle-orm";
@@ -14,8 +13,8 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import {
-  user as authUsers,
-} from "@/db/auth-schema";
+  findAuthUserByEmail,
+} from "@/lib/auth/find-auth-user-by-email";
 import {
   memberRoles,
   organizationMembers,
@@ -59,26 +58,31 @@ export async function addMember(
     roleId,
   } = result.data;
 
-  const [authUser] = await db
-    .select({
-      id: authUsers.id,
-      name: authUsers.name,
-      email: authUsers.email,
-    })
-    .from(authUsers)
-    .where(
-      ilike(
-        authUsers.email,
-        email,
-      ),
-    )
-    .limit(1);
+const userLookup =
+  await findAuthUserByEmail(
+    email,
+  );
 
-  if (!authUser) {
-    redirect(
-      "/crm/team?error=user-not-found",
-    );
-  }
+if (
+  userLookup.status ===
+  "not-found"
+) {
+  redirect(
+    "/crm/team?error=user-not-found",
+  );
+}
+
+if (
+  userLookup.status ===
+  "ambiguous"
+) {
+  redirect(
+    "/crm/team?error=user-ambiguous",
+  );
+}
+
+const authUser =
+  userLookup.user;
 
   const [existingMember] =
     await db

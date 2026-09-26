@@ -1,10 +1,12 @@
 import {
   and,
   eq,
-  ilike,
 } from "drizzle-orm";
 
-import { user } from "./auth-schema";
+import {
+  findAuthUserByEmail,
+} from "../lib/auth/find-auth-user-by-email";
+
 import { db } from "./index";
 import {
   memberRoles,
@@ -23,33 +25,45 @@ async function main() {
     );
   }
 
-  const [authUser] = await db
-    .select()
-    .from(user)
-    .where(
-      ilike(
-        user.email,
-        email,
-      ),
-    )
-    .limit(1);
+  const userLookup =
+    await findAuthUserByEmail(
+      email,
+    );
 
-  if (!authUser) {
+  if (
+    userLookup.status ===
+    "not-found"
+  ) {
     throw new Error(
-      `Better Auth user not found: ${email}`,
+      `Better Auth user not found: ${userLookup.canonicalEmail}`,
     );
   }
 
-  const [organization] = await db
-    .select()
-    .from(organizations)
-    .where(
-      eq(
-        organizations.slug,
-        "development",
-      ),
-    )
-    .limit(1);
+  if (
+    userLookup.status ===
+    "ambiguous"
+  ) {
+    throw new Error(
+      `Multiple Better Auth users match canonical email: ${userLookup.canonicalEmail}`,
+    );
+  }
+
+  const authUser =
+    userLookup.user;
+
+  const [organization] =
+    await db
+      .select()
+      .from(
+        organizations,
+      )
+      .where(
+        eq(
+          organizations.slug,
+          "development",
+        ),
+      )
+      .limit(1);
 
   if (!organization) {
     throw new Error(
@@ -57,23 +71,24 @@ async function main() {
     );
   }
 
-  const [ownerRole] = await db
-    .select()
-    .from(roles)
-    .where(
-      and(
-        eq(
-          roles.organizationId,
-          organization.id,
-        ),
+  const [ownerRole] =
+    await db
+      .select()
+      .from(roles)
+      .where(
+        and(
+          eq(
+            roles.organizationId,
+            organization.id,
+          ),
 
-        eq(
-          roles.name,
-          "Owner",
+          eq(
+            roles.name,
+            "Owner",
+          ),
         ),
-      ),
-    )
-    .limit(1);
+      )
+      .limit(1);
 
   if (!ownerRole) {
     throw new Error(
@@ -81,75 +96,80 @@ async function main() {
     );
   }
 
-  let [realMember] = await db
-    .select()
-    .from(organizationMembers)
-    .where(
-      and(
-        eq(
-          organizationMembers.organizationId,
-          organization.id,
-        ),
-
-        eq(
-          organizationMembers.userId,
-          authUser.id,
-        ),
-      ),
-    )
-    .limit(1);
-
-  if (!realMember) {
-    [realMember] = await db
-      .insert(
+  let [realMember] =
+    await db
+      .select()
+      .from(
         organizationMembers,
       )
-      .values({
-        organizationId:
-          organization.id,
+      .where(
+        and(
+          eq(
+            organizationMembers.organizationId,
+            organization.id,
+          ),
 
-        userId:
-          authUser.id,
+          eq(
+            organizationMembers.userId,
+            authUser.id,
+          ),
+        ),
+      )
+      .limit(1);
 
-        displayName:
-          authUser.name,
+  if (!realMember) {
+    [realMember] =
+      await db
+        .insert(
+          organizationMembers,
+        )
+        .values({
+          organizationId:
+            organization.id,
 
-        email:
-          authUser.email,
+          userId:
+            authUser.id,
 
-        status:
-          "active",
-      })
-      .returning();
+          displayName:
+            authUser.name,
+
+          email:
+            authUser.email,
+
+          status:
+            "active",
+        })
+        .returning();
 
     console.log(
       "Created authenticated organization member.",
     );
   } else {
-    [realMember] = await db
-      .update(
-        organizationMembers,
-      )
-      .set({
-        displayName:
-          authUser.name,
+    [realMember] =
+      await db
+        .update(
+          organizationMembers,
+        )
+        .set({
+          displayName:
+            authUser.name,
 
-        email:
-          authUser.email,
+          email:
+            authUser.email,
 
-        status:
-          "active",
+          status:
+            "active",
 
-        updatedAt:
-          new Date(),
-      })
-      .where(
-        eq(
-          organizationMembers.id,
-          realMember.id,
-        ),
-      )
-      .returning();
+          updatedAt:
+            new Date(),
+        })
+        .where(
+          eq(
+            organizationMembers.id,
+            realMember.id,
+          ),
+        )
+        .returning();
 
     console.log(
       "Authenticated organization member already exists.",
@@ -157,7 +177,9 @@ async function main() {
   }
 
   await db
-    .insert(memberRoles)
+    .insert(
+      memberRoles,
+    )
     .values({
       memberId:
         realMember.id,
@@ -217,6 +239,7 @@ async function main() {
   }
 
   console.log("");
+
   console.log(
     "Owner account linked successfully.",
   );
@@ -243,15 +266,19 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error(
-      "Failed to link development owner:",
-    );
+  .catch(
+    (error) => {
+      console.error(
+        "Failed to link development owner:",
+      );
 
-    console.error(error);
+      console.error(
+        error,
+      );
 
-    process.exit(1);
-  })
+      process.exit(1);
+    },
+  )
   .finally(() => {
     process.exit(0);
   });
