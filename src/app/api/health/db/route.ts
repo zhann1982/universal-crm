@@ -1,57 +1,70 @@
-import { count } from "drizzle-orm";
+import {
+  sql,
+} from "drizzle-orm";
 
 import { db } from "@/db";
-import {
-  clients,
-  organizationMembers,
-  organizations,
-  permissions,
-  roles,
-} from "@/db/schema";
+
+export const dynamic =
+  "force-dynamic";
 
 export async function GET() {
   try {
-    const [organizationsResult] = await db
-      .select({ count: count() })
-      .from(organizations);
+    /*
+     * Публичный health endpoint
+     * проверяет только возможность
+     * выполнить лёгкий запрос к БД.
+     *
+     * Никакие CRM-счётчики,
+     * tenant-данные или внутренние
+     * сведения здесь не возвращаются.
+     */
+    await db.execute(
+      sql`select 1`,
+    );
 
-    const [membersResult] = await db
-      .select({ count: count() })
-      .from(organizationMembers);
-
-    const [rolesResult] = await db
-      .select({ count: count() })
-      .from(roles);
-
-    const [permissionsResult] = await db
-      .select({ count: count() })
-      .from(permissions);
-
-    const [clientsResult] = await db
-      .select({ count: count() })
-      .from(clients);
-
-    return Response.json({
-      ok: true,
-      database: "connected",
-      counts: {
-        organizations: organizationsResult.count,
-        members: membersResult.count,
-        roles: rolesResult.count,
-        permissions: permissionsResult.count,
-        clients: clientsResult.count,
+    return Response.json(
+      {
+        ok: true,
+        database:
+          "connected",
       },
-    });
+      {
+        status: 200,
+
+        headers: {
+          "Cache-Control":
+            "no-store, max-age=0",
+        },
+      },
+    );
   } catch (error) {
-    console.error("Database health check failed:", error);
+    /*
+     * Ошибка остаётся только
+     * в серверном журнале.
+     *
+     * Клиенту не отдаём текст
+     * SQL/DB ошибки.
+     */
+    console.error(
+      "Database health check failed:",
+      error instanceof Error
+        ? error.message
+        : "Unknown database error",
+    );
 
     return Response.json(
       {
         ok: false,
-        database: "error",
+        database:
+          "unavailable",
       },
       {
-        status: 500,
+        status: 503,
+
+        headers: {
+          "Cache-Control":
+            "no-store, max-age=0",
+        },
       },
     );
   }

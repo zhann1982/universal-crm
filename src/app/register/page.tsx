@@ -1,32 +1,52 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import {
+  useRouter,
+} from "next/navigation";
+import {
+  useState,
+} from "react";
 
-import { authClient } from "@/lib/auth/auth-client";
-import { useRouter } from "next/navigation";
+import {
+  authClient,
+} from "@/lib/auth/auth-client";
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const [name, setName] =
-    useState("");
+  const router =
+    useRouter();
 
-  const [email, setEmail] =
-    useState("");
+  const [
+    name,
+    setName,
+  ] = useState("");
 
-  const [password, setPassword] =
-    useState("");
+  const [
+    email,
+    setEmail,
+  ] = useState("");
+
+  const [
+    password,
+    setPassword,
+  ] = useState("");
 
   const [
     confirmPassword,
     setConfirmPassword,
   ] = useState("");
 
-  const [error, setError] =
-    useState<string | null>(null);
+  const [
+    error,
+    setError,
+  ] = useState<
+    string | null
+  >(null);
 
-  const [isPending, setIsPending] =
-    useState(false);
+  const [
+    isPending,
+    setIsPending,
+  ] = useState(false);
 
   async function handleSubmit(
     event:
@@ -72,11 +92,22 @@ export default function RegisterPage() {
         error:
           signUpError,
       } =
-        await authClient.signUp.email({
-          name: name.trim(),
-          email: email.trim(),
-          password,
-        });
+        await authClient
+          .signUp
+          .email({
+            name:
+              name.trim(),
+
+            email:
+              email
+                .trim()
+                .toLowerCase(),
+
+            password,
+
+            callbackURL:
+              "/verify-email?verified=1",
+          });
 
       if (signUpError) {
         setError(
@@ -87,7 +118,10 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/auth-test");
+      router.push(
+        "/verify-email",
+      );
+
       router.refresh();
     } catch (cause) {
       console.error(
@@ -99,7 +133,9 @@ export default function RegisterPage() {
         "Произошла ошибка регистрации.",
       );
     } finally {
-      setIsPending(false);
+      setIsPending(
+        false,
+      );
     }
   }
 
@@ -116,13 +152,16 @@ export default function RegisterPage() {
           </h1>
 
           <p className="mt-2 text-sm text-slate-500">
-            Создайте тестовый аккаунт
-            Better Auth.
+            Создайте аккаунт и
+            подтвердите email перед
+            доступом к CRM.
           </p>
         </div>
 
         <form
-          onSubmit={handleSubmit}
+          onSubmit={
+            handleSubmit
+          }
           className="mt-8 space-y-5"
         >
           <div>
@@ -139,9 +178,12 @@ export default function RegisterPage() {
               required
               autoComplete="name"
               value={name}
-              onChange={(event) =>
+              onChange={(
+                event,
+              ) =>
                 setName(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-500"
@@ -162,9 +204,12 @@ export default function RegisterPage() {
               required
               autoComplete="email"
               value={email}
-              onChange={(event) =>
+              onChange={(
+                event,
+              ) =>
                 setEmail(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-500"
@@ -185,10 +230,15 @@ export default function RegisterPage() {
               required
               minLength={8}
               autoComplete="new-password"
-              value={password}
-              onChange={(event) =>
+              value={
+                password
+              }
+              onChange={(
+                event,
+              ) =>
                 setPassword(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-500"
@@ -209,10 +259,15 @@ export default function RegisterPage() {
               required
               minLength={8}
               autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) =>
+              value={
+                confirmPassword
+              }
+              onChange={(
+                event,
+              ) =>
                 setConfirmPassword(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-500"
@@ -227,7 +282,9 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={isPending}
+            disabled={
+              isPending
+            }
             className="w-full rounded-lg bg-slate-950 px-5 py-3 font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending

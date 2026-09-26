@@ -51,6 +51,14 @@ async function main() {
   const authUser =
     userLookup.user;
 
+  if (
+    !authUser.emailVerified
+  ) {
+    throw new Error(
+      `Better Auth user email is not verified: ${authUser.email}`,
+    );
+  }  
+
   const [organization] =
     await db
       .select()

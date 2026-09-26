@@ -84,6 +84,14 @@ if (
 const authUser =
   userLookup.user;
 
+  if (
+    !authUser.emailVerified
+  ) {
+    redirect(
+      "/crm/team?error=user-unverified",
+    );
+  }
+
   const [existingMember] =
     await db
       .select({
