@@ -6,12 +6,15 @@ const optionalUuid = z
   .refine(
     (value) =>
       value === "" ||
-      z.string().uuid().safeParse(value)
-        .success,
+      z.string().uuid().safeParse(
+        value,
+      ).success,
     "Некорректный идентификатор",
   )
   .transform((value) =>
-    value === "" ? null : value,
+    value === ""
+      ? null
+      : value,
   );
 
 const amountSchema = z
@@ -31,7 +34,9 @@ const amountSchema = z
     "Укажите корректную сумму, максимум 2 знака после запятой",
   )
   .transform((value) =>
-    value === "" ? null : value,
+    value === ""
+      ? null
+      : value,
   );
 
 const currencySchema = z
@@ -41,11 +46,15 @@ const currencySchema = z
   .refine(
     (value) =>
       value === "" ||
-      /^[A-Z]{3}$/.test(value),
+      /^[A-Z]{3}$/.test(
+        value,
+      ),
     "Используйте трёхбуквенный код валюты, например KZT",
   )
   .transform((value) =>
-    value === "" ? null : value,
+    value === ""
+      ? null
+      : value,
   );
 
 const optionalDate = z
@@ -74,82 +83,104 @@ const optionalDate = z
     "Некорректная дата",
   )
   .transform((value) =>
-    value === "" ? null : value,
+    value === ""
+      ? null
+      : value,
   );
 
 export const dealIdSchema =
   z.string().uuid();
 
-export const createDealSchema = z
-  .object({
-    title: z
-      .string()
-      .trim()
-      .min(
-        1,
-        "Укажите название сделки",
-      )
-      .max(
-        240,
-        "Название слишком длинное",
-      ),
+/*
+ * Используется для optimistic locking.
+ *
+ * Каждая Deal начинает с version = 1.
+ * Каждая успешная мутация должна
+ * увеличивать version.
+ */
+export const dealVersionSchema =
+  z.coerce
+    .number()
+    .int()
+    .min(
+      1,
+      "Некорректная версия сделки",
+    );
 
-    pipelineId:
-      z.string().uuid(
-        "Выберите воронку",
-      ),
+export const createDealSchema =
+  z
+    .object({
+      title: z
+        .string()
+        .trim()
+        .min(
+          1,
+          "Укажите название сделки",
+        )
+        .max(
+          240,
+          "Название слишком длинное",
+        ),
 
-    stageId:
-      z.string().uuid(
-        "Выберите этап",
-      ),
+      pipelineId:
+        z.string().uuid(
+          "Выберите воронку",
+        ),
 
-    amount:
-      amountSchema,
+      stageId:
+        z.string().uuid(
+          "Выберите этап",
+        ),
 
-    currency:
-      currencySchema,
+      amount:
+        amountSchema,
 
-    companyId:
-      optionalUuid,
+      currency:
+        currencySchema,
 
-    ownerMemberId:
-      optionalUuid,
+      companyId:
+        optionalUuid,
 
-    expectedCloseAt:
-      optionalDate,
+      ownerMemberId:
+        optionalUuid,
 
-    notes: z
-      .string()
-      .trim()
-      .max(
-        5000,
-        "Максимум 5000 символов",
-      )
-      .transform((value) =>
-        value === ""
-          ? null
-          : value,
-      ),
-  })
-  .superRefine(
-    (data, ctx) => {
-      if (
-        data.amount &&
-        !data.currency
-      ) {
-        ctx.addIssue({
-          code:
-            "custom",
-          path: [
-            "currency",
-          ],
-          message:
-            "Для суммы укажите валюту",
-        });
-      }
-    },
-  );
+      expectedCloseAt:
+        optionalDate,
+
+      notes: z
+        .string()
+        .trim()
+        .max(
+          5000,
+          "Максимум 5000 символов",
+        )
+        .transform(
+          (value) =>
+            value === ""
+              ? null
+              : value,
+        ),
+    })
+    .superRefine(
+      (data, ctx) => {
+        if (
+          data.amount &&
+          !data.currency
+        ) {
+          ctx.addIssue({
+            code:
+              "custom",
+
+            path: [
+              "currency",
+            ],
+
+            message:
+              "Для суммы укажите валюту",
+          });
+        }
+      },
+    );
 
 export type DealFormInput =
   z.infer<

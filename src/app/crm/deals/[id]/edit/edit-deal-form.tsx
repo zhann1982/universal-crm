@@ -70,6 +70,7 @@ type InitialValues = {
 
 export function EditDealForm({
   dealId,
+  initialVersion,
   pipelines,
   stages,
   companies,
@@ -77,6 +78,8 @@ export function EditDealForm({
   initialValues,
 }: {
   dealId: string;
+
+  initialVersion: number;
 
   pipelines:
     PipelineOption[];
@@ -152,6 +155,14 @@ export function EditDealForm({
       action={formAction}
       className="space-y-8"
     >
+      <input
+        type="hidden"
+        name="version"
+        value={
+          initialVersion
+        }
+      />
+
       {state.message && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {state.message}

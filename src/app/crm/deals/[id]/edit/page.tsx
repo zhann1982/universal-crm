@@ -168,6 +168,7 @@ export default async function EditDealPage({
   let companyList: Array<{
     id: string;
     name: string;
+
     taxId:
       | string
       | null;
@@ -358,6 +359,9 @@ export default async function EditDealPage({
         dealId={
           deal.id
         }
+        initialVersion={
+          deal.version
+        }
         pipelines={
           pipelineList
         }
@@ -400,7 +404,10 @@ export default async function EditDealPage({
             deal.expectedCloseAt
               ? deal.expectedCloseAt
                   .toISOString()
-                  .slice(0, 10)
+                  .slice(
+                    0,
+                    10,
+                  )
               : "",
 
           notes:

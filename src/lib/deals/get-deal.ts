@@ -85,6 +85,13 @@ export async function getDealById(
         isArchived:
           deals.isArchived,
 
+        /*
+         * Используется для
+         * optimistic locking.
+         */
+        version:
+          deals.version,
+
         createdAt:
           deals.createdAt,
 
