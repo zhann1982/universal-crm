@@ -323,7 +323,8 @@ export async function updateCompany(
   if (!result.success) {
     return {
       errors:
-        result.error.flatten()
+        result.error
+          .flatten()
           .fieldErrors,
 
       values,
@@ -336,7 +337,77 @@ export async function updateCompany(
   const data =
     result.data;
 
+  /*
+   * Сначала читаем текущее
+   * состояние Company.
+   *
+   * Это нужно в том числе,
+   * чтобы понять, действительно
+   * ли пользователь меняет owner.
+   */
+  const [existingCompany] =
+    await db
+      .select({
+        id:
+          companies.id,
+
+        ownerMemberId:
+          companies.ownerMemberId,
+      })
+      .from(
+        companies,
+      )
+      .where(
+        and(
+          eq(
+            companies.id,
+            idResult.data,
+          ),
+
+          eq(
+            companies.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            companies.isArchived,
+            false,
+          ),
+
+          isNull(
+            companies.deletedAt,
+          ),
+        ),
+      )
+      .limit(1);
+
+  if (!existingCompany) {
+    return {
+      values,
+
+      message:
+        "Компания не найдена или недоступна для редактирования.",
+    };
+  }
+
+  /*
+   * F08.
+   *
+   * Если ответственный НЕ меняется,
+   * разрешаем сохранить компанию,
+   * даже если текущий owner уже
+   * стал неактивным.
+   *
+   * Но назначить нового
+   * неактивного сотрудника
+   * по-прежнему нельзя.
+   */
+  const ownerChanged =
+    data.ownerMemberId !==
+    existingCompany.ownerMemberId;
+
   if (
+    ownerChanged &&
     !(await isValidOwner(
       organization.id,
       data.ownerMemberId,
@@ -356,13 +427,18 @@ export async function updateCompany(
     };
   }
 
-  if (data.taxId) {
+  if (
+    data.taxId
+  ) {
     const [duplicate] =
       await db
         .select({
-          id: companies.id,
+          id:
+            companies.id,
         })
-        .from(companies)
+        .from(
+          companies,
+        )
         .where(
           and(
             eq(
@@ -402,7 +478,9 @@ export async function updateCompany(
   try {
     const updated =
       await db
-        .update(companies)
+        .update(
+          companies,
+        )
         .set({
           ownerMemberId:
             data.ownerMemberId,
@@ -444,7 +522,7 @@ export async function updateCompany(
           and(
             eq(
               companies.id,
-              idResult.data,
+              existingCompany.id,
             ),
 
             eq(
@@ -491,18 +569,20 @@ export async function updateCompany(
     };
   }
 
-  revalidatePath("/crm");
+  revalidatePath(
+    "/crm",
+  );
 
   revalidatePath(
     "/crm/companies",
   );
 
   revalidatePath(
-    `/crm/companies/${idResult.data}`,
+    `/crm/companies/${existingCompany.id}`,
   );
 
   redirect(
-    `/crm/companies/${idResult.data}`,
+    `/crm/companies/${existingCompany.id}`,
   );
 }
 
