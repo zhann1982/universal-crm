@@ -4,6 +4,7 @@ import {
   and,
   eq,
   isNull,
+  sql,
 } from "drizzle-orm";
 import {
   revalidatePath,
@@ -26,9 +27,10 @@ import {
 import {
   createDealSchema,
   dealIdSchema,
+  dealVersionSchema,
   updateDealSchema,
-  type UpdateDealState,
   type CreateDealState,
+  type UpdateDealState,
 } from "@/lib/validation/deal";
 import {
   transitionDeal,
@@ -39,8 +41,9 @@ function getFormValues(
 ) {
   return {
     title: String(
-      formData.get("title") ??
-        "",
+      formData.get(
+        "title",
+      ) ?? "",
     ),
 
     pipelineId: String(
@@ -50,23 +53,27 @@ function getFormValues(
     ),
 
     stageId: String(
-      formData.get("stageId") ??
-        "",
+      formData.get(
+        "stageId",
+      ) ?? "",
     ),
 
     amount: String(
-      formData.get("amount") ??
-        "",
+      formData.get(
+        "amount",
+      ) ?? "",
     ),
 
     currency: String(
-      formData.get("currency") ??
-        "",
+      formData.get(
+        "currency",
+      ) ?? "",
     ),
 
     companyId: String(
-      formData.get("companyId") ??
-        "",
+      formData.get(
+        "companyId",
+      ) ?? "",
     ),
 
     ownerMemberId: String(
@@ -82,8 +89,9 @@ function getFormValues(
     ),
 
     notes: String(
-      formData.get("notes") ??
-        "",
+      formData.get(
+        "notes",
+      ) ?? "",
     ),
   };
 }
@@ -127,7 +135,8 @@ export async function createDeal(
       values,
 
       errors:
-        result.error.flatten()
+        result.error
+          .flatten()
           .fieldErrors,
 
       message:
@@ -148,7 +157,9 @@ export async function createDeal(
         id:
           pipelines.id,
       })
-      .from(pipelines)
+      .from(
+        pipelines,
+      )
       .where(
         and(
           eq(
@@ -186,10 +197,6 @@ export async function createDeal(
 
   /*
    * Stage
-   *
-   * Здесь принципиально проверяем,
-   * что stage относится именно
-   * к выбранной pipeline.
    */
 
   const [stage] =
@@ -271,7 +278,9 @@ export async function createDeal(
           id:
             companies.id,
         })
-        .from(companies)
+        .from(
+          companies,
+        )
         .where(
           and(
             eq(
@@ -319,11 +328,6 @@ export async function createDeal(
   if (
     data.ownerMemberId
   ) {
-    /*
-     * Пользователь без members.read
-     * может назначить сделку только
-     * самому себе.
-     */
     if (
       !permissions.has(
         "members.read",
@@ -404,8 +408,10 @@ export async function createDeal(
   }
 
   const isClosed =
-    stage.type === "won" ||
-    stage.type === "lost";
+    stage.type ===
+      "won" ||
+    stage.type ===
+      "lost";
 
   try {
     await db
@@ -607,6 +613,32 @@ export async function updateDeal(
       formData,
     );
 
+  /*
+   * Версия Deal, которую
+   * пользователь открыл
+   * в форме редактирования.
+   */
+  const versionResult =
+    dealVersionSchema.safeParse(
+      formData.get(
+        "version",
+      ),
+    );
+
+  if (
+    !versionResult.success
+  ) {
+    return {
+      values,
+
+      message:
+        "Не удалось определить версию сделки. Обновите страницу.",
+    };
+  }
+
+  const expectedVersion =
+    versionResult.data;
+
   const result =
     updateDealSchema.safeParse(
       values,
@@ -617,7 +649,8 @@ export async function updateDeal(
       values,
 
       errors:
-        result.error.flatten()
+        result.error
+          .flatten()
           .fieldErrors,
 
       message:
@@ -634,6 +667,12 @@ export async function updateDeal(
         id:
           deals.id,
 
+        /*
+         * Текущая версия в БД.
+         */
+        version:
+          deals.version,
+
         pipelineId:
           deals.pipelineId,
 
@@ -649,7 +688,9 @@ export async function updateDeal(
         closedAt:
           deals.closedAt,
       })
-      .from(deals)
+      .from(
+        deals,
+      )
       .where(
         and(
           eq(
@@ -681,6 +722,26 @@ export async function updateDeal(
   }
 
   /*
+   * Первая проверка optimistic
+   * locking.
+   *
+   * Если Deal была изменена
+   * ещё до начала обработки
+   * формы, прекращаем работу.
+   */
+  if (
+    existingDeal.version !==
+    expectedVersion
+  ) {
+    return {
+      values,
+
+      message:
+        "Сделка была изменена после открытия формы. Обновите страницу, проверьте актуальные данные и повторите изменения.",
+    };
+  }
+
+  /*
    * Pipeline
    */
 
@@ -690,7 +751,9 @@ export async function updateDeal(
         id:
           pipelines.id,
       })
-      .from(pipelines)
+      .from(
+        pipelines,
+      )
       .where(
         and(
           eq(
@@ -782,7 +845,9 @@ export async function updateDeal(
    * Company
    */
 
-  if (data.companyId) {
+  if (
+    data.companyId
+  ) {
     const companyChanged =
       data.companyId !==
       existingDeal.companyId;
@@ -823,7 +888,9 @@ export async function updateDeal(
       ),
     ];
 
-    if (companyChanged) {
+    if (
+      companyChanged
+    ) {
       conditions.push(
         eq(
           companies.isArchived,
@@ -838,7 +905,9 @@ export async function updateDeal(
           id:
             companies.id,
         })
-        .from(companies)
+        .from(
+          companies,
+        )
         .where(
           and(
             ...conditions,
@@ -907,7 +976,9 @@ export async function updateDeal(
       ),
     ];
 
-    if (ownerChanged) {
+    if (
+      ownerChanged
+    ) {
       conditions.push(
         eq(
           organizationMembers.status,
@@ -962,8 +1033,10 @@ export async function updateDeal(
   }
 
   const targetIsClosed =
-    stage.type === "won" ||
-    stage.type === "lost";
+    stage.type ===
+      "won" ||
+    stage.type ===
+      "lost";
 
   const closedAt =
     targetIsClosed
@@ -972,62 +1045,106 @@ export async function updateDeal(
       : null;
 
   try {
-    await db
-      .update(deals)
-      .set({
-        pipelineId:
-          pipeline.id,
+    /*
+     * Вторая и главная проверка
+     * optimistic locking.
+     *
+     * Даже если другая операция
+     * произошла после SELECT выше,
+     * UPDATE разрешён только при
+     * прежней version.
+     */
+    const updated =
+      await db
+        .update(
+          deals,
+        )
+        .set({
+          pipelineId:
+            pipeline.id,
 
-        stageId:
-          stage.id,
+          stageId:
+            stage.id,
 
-        title:
-          data.title,
+          title:
+            data.title,
 
-        amount:
-          data.amount,
+          amount:
+            data.amount,
 
-        currency:
-          data.currency,
+          currency:
+            data.currency,
 
-        companyId:
-          data.companyId,
+          companyId:
+            data.companyId,
 
-        ownerMemberId:
-          data.ownerMemberId,
+          ownerMemberId:
+            data.ownerMemberId,
 
-        expectedCloseAt,
+          expectedCloseAt,
 
-        closedAt,
+          closedAt,
 
-        notes:
-          data.notes,
+          notes:
+            data.notes,
 
-        updatedAt:
-          new Date(),
-      })
-      .where(
-        and(
-          eq(
+          version:
+            sql`${deals.version} + 1`,
+
+          updatedAt:
+            new Date(),
+        })
+        .where(
+          and(
+            eq(
+              deals.id,
+              existingDeal.id,
+            ),
+
+            eq(
+              deals.organizationId,
+              organization.id,
+            ),
+
+            eq(
+              deals.version,
+              expectedVersion,
+            ),
+
+            eq(
+              deals.isArchived,
+              false,
+            ),
+
+            isNull(
+              deals.deletedAt,
+            ),
+          ),
+        )
+        .returning({
+          id:
             deals.id,
-            existingDeal.id,
-          ),
 
-          eq(
-            deals.organizationId,
-            organization.id,
-          ),
+          version:
+            deals.version,
+        });
 
-          eq(
-            deals.isArchived,
-            false,
-          ),
+    /*
+     * 0 строк означает, что Deal
+     * между SELECT и UPDATE уже
+     * изменилась, была архивирована
+     * или стала недоступна.
+     */
+    if (
+      updated.length === 0
+    ) {
+      return {
+        values,
 
-          isNull(
-            deals.deletedAt,
-          ),
-        ),
-      );
+        message:
+          "Сделка была изменена другим действием. Ваши изменения не сохранены. Обновите страницу и повторите попытку.",
+      };
+    }
   } catch (error) {
     console.error(
       "Failed to update deal:",
@@ -1088,7 +1205,9 @@ export async function archiveDeal(
         pipelineId:
           deals.pipelineId,
       })
-      .from(deals)
+      .from(
+        deals,
+      )
       .where(
         and(
           eq(
@@ -1120,9 +1239,19 @@ export async function archiveDeal(
   }
 
   await db
-    .update(deals)
+    .update(
+      deals,
+    )
     .set({
-      isArchived: true,
+      isArchived:
+        true,
+
+      /*
+       * Любая мутация Deal
+       * меняет version.
+       */
+      version:
+        sql`${deals.version} + 1`,
 
       updatedAt:
         new Date(),
@@ -1197,7 +1326,9 @@ export async function restoreDeal(
         id:
           deals.id,
       })
-      .from(deals)
+      .from(
+        deals,
+      )
       .where(
         and(
           eq(
@@ -1229,9 +1360,15 @@ export async function restoreDeal(
   }
 
   await db
-    .update(deals)
+    .update(
+      deals,
+    )
     .set({
-      isArchived: false,
+      isArchived:
+        false,
+
+      version:
+        sql`${deals.version} + 1`,
 
       updatedAt:
         new Date(),

@@ -69,26 +69,30 @@ export async function transitionDeal({
   ) {
     return {
       success: false,
+
       code:
         "invalid-input",
+
       message:
         "Некорректный идентификатор сделки или этапа.",
     };
   }
 
   /*
-   * Читаем текущее состояние.
+   * Читаем текущее состояние Deal.
    *
-   * pipelineId + stageId ниже
-   * будут использоваться как
-   * ожидаемое исходное состояние
-   * в условном UPDATE.
+   * version, pipelineId и stageId
+   * становятся ожидаемым исходным
+   * состоянием для условного UPDATE.
    */
   const [deal] =
     await db
       .select({
         id:
           deals.id,
+
+        version:
+          deals.version,
 
         pipelineId:
           deals.pipelineId,
@@ -99,7 +103,9 @@ export async function transitionDeal({
         closedAt:
           deals.closedAt,
       })
-      .from(deals)
+      .from(
+        deals,
+      )
       .where(
         and(
           eq(
@@ -127,8 +133,10 @@ export async function transitionDeal({
   if (!deal) {
     return {
       success: false,
+
       code:
         "deal-not-found",
+
       message:
         "Сделка не найдена или недоступна.",
     };
@@ -178,8 +186,10 @@ export async function transitionDeal({
   if (!targetStage) {
     return {
       success: false,
+
       code:
         "stage-not-found",
+
       message:
         "Этап недоступен или относится к другой воронке.",
     };
@@ -195,18 +205,21 @@ export async function transitionDeal({
   ) {
     return {
       success: false,
+
       code:
         "invalid-stage-type",
+
       message:
         "У этапа указан неизвестный тип.",
     };
   }
 
   /*
-   * Нечего менять.
+   * Сделка уже находится
+   * на выбранном этапе.
    *
-   * Но Stage мы всё равно уже
-   * провалидировали выше.
+   * Реальной мутации нет,
+   * поэтому version не меняем.
    */
   if (
     deal.stageId ===
@@ -239,23 +252,35 @@ export async function transitionDeal({
       : null;
 
   /*
-   * КЛЮЧЕВАЯ ЧАСТЬ F04.
+   * Optimistic locking +
+   * защита Pipeline/Stage.
    *
-   * Мы обновляем Deal только если
-   * между SELECT и UPDATE никто
-   * не изменил её Pipeline или Stage.
+   * UPDATE пройдёт только если
+   * после SELECT никто не изменил:
    *
-   * Если другой запрос уже изменил
-   * состояние, UPDATE изменит 0 строк.
+   * - version
+   * - pipelineId
+   * - stageId
+   * - lifecycle state
    */
   const updated =
     await db
-      .update(deals)
+      .update(
+        deals,
+      )
       .set({
         stageId:
           targetStage.id,
 
         closedAt,
+
+        /*
+         * Каждая успешная
+         * мутация Deal должна
+         * увеличивать version.
+         */
+        version:
+          deal.version + 1,
 
         updatedAt:
           new Date(),
@@ -270,6 +295,11 @@ export async function transitionDeal({
           eq(
             deals.organizationId,
             organizationId,
+          ),
+
+          eq(
+            deals.version,
+            deal.version,
           ),
 
           eq(
@@ -301,15 +331,25 @@ export async function transitionDeal({
 
         stageId:
           deals.stageId,
+
+        version:
+          deals.version,
       });
 
+  /*
+   * Если UPDATE изменил 0 строк,
+   * значит состояние Deal успело
+   * измениться параллельно.
+   */
   if (
     updated.length === 0
   ) {
     return {
       success: false,
+
       code:
         "conflict",
+
       message:
         "Сделка уже была изменена другим действием. Обновите данные и повторите попытку.",
     };
