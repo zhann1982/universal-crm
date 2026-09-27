@@ -49,6 +49,7 @@ export default async function CompanyPage({
 }) {
   const {
     organization,
+    member,
     permissions:
       currentPermissions,
   } = await requirePermission(
@@ -76,18 +77,23 @@ export default async function CompanyPage({
     notFound();
   }
 
-  let owner:
-    | {
-        displayName:
-          | string
-          | null;
-      }
-    | undefined;
+  let ownerDisplayName:
+    | string
+    | null = null;
 
   if (
-    company.ownerMemberId
+    company.ownerMemberId ===
+    member.id
   ) {
-    [owner] =
+    ownerDisplayName =
+      member.displayName;
+  } else if (
+    company.ownerMemberId &&
+    currentPermissions.has(
+      "members.read",
+    )
+  ) {
+    const [owner] =
       await db
         .select({
           displayName:
@@ -110,6 +116,10 @@ export default async function CompanyPage({
           ),
         )
         .limit(1);
+
+    ownerDisplayName =
+      owner?.displayName ??
+      null;
   }
 
   return (
@@ -279,7 +289,7 @@ export default async function CompanyPage({
               label="Ответственный"
               value={
                 company.ownerMemberId
-                  ? owner?.displayName ||
+                  ? ownerDisplayName ||
                     "Сотрудник"
                   : null
               }

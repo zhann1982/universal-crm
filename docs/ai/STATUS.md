@@ -2,34 +2,13 @@
 
 Last updated: 2026-09-27
 
-Verified repository snapshot:
+## Source-of-truth note
 
-main
-c7e35b758ecfbd5421b9c83a800ff0ff2c238c3d
+This file describes the current locally verified development state.
 
-Original technical audit date:
+GitHub `main` may temporarily lag local changes until the latest stabilization work is pushed.
 
-2026-09-26
-
-## Status meaning
-
-This file is the single source of truth for current implementation status.
-
-Use these terms carefully:
-
-Implemented
-→ code exists in the repository
-
-Manually working
-→ behavior has been manually exercised during development
-
-Automatically verified
-→ covered by a repeatable automated check/test
-
-Production-ready
-→ do not assume unless explicitly stated
-
-The current application is not yet production-ready.
+The application is not yet production-ready.
 
 ---
 
@@ -43,68 +22,25 @@ STABILIZATION BEFORE MORE LARGE FEATURES
 
 The modular-monolith architecture remains appropriate.
 
-No rewrite, microservice split, Redis, queue, separate backend or AI backend is
-currently required.
+---
 
-The main current objective is to finish the remaining security, lifecycle,
-permission, validation and concurrency issues discovered during the
-2026-09-26 audit.
+# Verification
+
+Repeated local checks during stabilization:
+
+- `npm test`
+- `npx tsc --noEmit --incremental false`
+- `npm run lint`
+
+Recent F05 permission scenarios were also manually checked in the browser and reported working.
+
+A fresh complete production build after all latest local changes has not yet been recorded.
+
+No GitHub Actions CI workflow exists yet.
 
 ---
 
-# Stack
-
-- Next.js 16.3.6
-- React 19
-- TypeScript
-- Tailwind CSS 4
-- PostgreSQL
-- Neon
-- Drizzle ORM
-- drizzle-kit
-- Zod 4
-- Better Auth 1.7.x
-- npm
-- tsx
-
-Architecture:
-
-- Next.js App Router
-- modular monolith
-- Server Components by default
-- Server Actions for mutations
-- PostgreSQL primary datastore
-- Neon serverless database access
-- server-side authorization
-- organization-based multi-tenancy
-
----
-
-# Verification status
-
-The original 2026-09-26 audit successfully ran:
-
-- npm ci
-- ESLint
-- next typegen
-- TypeScript check
-
-The audited production build compiled and typechecked but stopped during route
-data collection because DATABASE_URL was unavailable in the audit environment.
-
-Therefore a complete production build was not verified by that audit.
-
-During the stabilization work after the audit, TypeScript and ESLint checks were
-repeatedly run locally after individual changes and reported working.
-
-A fresh complete production build has not yet been recorded after the latest
-stabilization commits.
-
-No GitHub Actions CI workflow currently exists.
-
----
-
-# Authentication
+# Authentication / identity
 
 Implemented:
 
@@ -114,63 +50,39 @@ Implemented:
 - logout
 - session cookies
 - server-side session resolution
-- email verification tokens
+- email verification
 - verification page
-- resend verification flow
+- resend verification
+- exact canonical email identity lookup
 
-Development verification delivery:
-
-- Better Auth generates verification URLs
-- in non-production the verification URL is printed to the server terminal
-- production email delivery is intentionally not configured yet
-
-Current CRM rule:
+Current CRM gate:
 
 authenticated User
 + verified email
 + active Organization
 + active Membership
-→ may proceed to CRM authorization
++ Permission
+→ business access
 
-Better Auth login itself currently does not require verified email.
+F01:
 
-Instead CRM access is blocked in server authorization for unverified Users.
+FIXED
 
-This is intentional during development so existing development accounts can log
-in and complete verification.
+F02:
 
-Production gap:
+PARTIALLY FIXED / DEVELOPMENT-SAFE INTERMEDIATE STATE
 
-- real email delivery is not configured
-- full invitation acceptance workflow is not implemented
-- Better Auth `requireEmailVerification` is not enabled globally
+Still missing for production:
 
----
-
-# Email identity lookup
-
-Implemented:
-
-- canonical trim/lowercase
-- exact equality lookup
-- no LIKE / ILIKE identity matching
-- ambiguous normalized matches are rejected
-- emailVerified is returned by the identity lookup
-- Team add-member uses the shared exact lookup
-- development Owner linker uses the shared exact lookup
-
-Regression test exists for:
-
-- trim/lowercase
-- `_` treated literally
-- `%` treated literally
-- case-insensitive canonical equality
-
-Audit finding F01 is considered fixed.
+- real email delivery
+- invitation token
+- expiration
+- authenticated acceptance
+- production onboarding policy
 
 ---
 
-# Membership / RBAC
+# Organization / RBAC
 
 Implemented:
 
@@ -178,57 +90,26 @@ Implemented:
 - active/inactive Member state
 - multiple Roles per Member
 - Permissions
-- permission checks
 - Team listing
-- adding registered Users to an Organization
+- adding registered Users
 - role assignment/update
 - Member activation/deactivation
 - self-role protection
 - self-deactivation protection
+- inactive Organization access denial
 - application-level last-Owner protection
 
-Current add-member rule:
+F07:
 
-- User must exist
-- normalized identity lookup must be unique
-- User email must be verified before normal membership acquisition
+FIXED FOR CURRENT DEVELOPMENT TENANT MODEL
 
-Known limitation:
+F06:
 
-last-Owner protection is still application-level and is not concurrency-safe.
+OPEN
 
-Owner system identity still depends on the current Role model and needs a stable
-system key before production administration becomes more complex.
+Last-Owner protection is still not concurrency-safe.
 
----
-
-# Organization access
-
-Current development Organization selection is still fixed to:
-
-slug = development
-
-This remains a temporary development limitation.
-
-Implemented:
-
-organizations.isActive is now part of CRM access.
-
-If:
-
-organizations.isActive = false
-
-CRM business access redirects to:
-
-/no-access?reason=organization-inactive
-
-The Organization data is preserved and access returns after reactivation.
-
-This behavior has been manually tested.
-
-Audit finding F07 is considered fixed for the current fixed-Organization model.
-
-Future multi-Organization selection must validate active Membership server-side.
+Owner system identity still needs a stable `systemKey` or equivalent.
 
 ---
 
@@ -247,21 +128,6 @@ Implemented:
 - pagination
 - tenant scoping
 - RBAC
-
-Lifecycle:
-
-active
-→ archived
-→ restored
-
-Normal workflow does not physically delete Clients.
-
-Known audit issue:
-
-F11 remains open.
-
-The UI prevents some relationship mutation for archived Clients, but the
-Client ↔ Company mutation Server Action still needs an explicit lifecycle guard.
 
 ---
 
@@ -283,17 +149,17 @@ Implemented:
 - tenant scoping
 - RBAC
 
-Responsible Member rule has been changed:
+Responsible Member rule:
 
-- an unchanged inactive current owner may remain assigned
-- assigning a new owner requires an active Member
+- existing owner may remain unchanged even if inactive
+- newly assigned owner must be active
+- without `members.read`, assignment is limited to self or no owner
+- Member email is not included in normal assignment DTOs
+- hidden foreign Member names use neutral `Сотрудник`
 
-This resolves the code path described by audit finding F08.
+F08:
 
-The implementation is committed.
-
-A dedicated manual regression scenario for F08 should still be recorded before
-marking it fully manually verified.
+IMPLEMENTED
 
 ---
 
@@ -301,21 +167,22 @@ marking it fully manually verified.
 
 Implemented:
 
-- many-to-many relationship
-- link
+- many-to-many link
 - unlink
 - reverse display
+- tenant validation
+- archived Client lifecycle guard inside Server Action
 
-Table:
+Archived Client:
 
-client_companies
+→ cannot link Company
+→ cannot unlink Company
 
-Known issue:
+F11:
 
-F11 remains open.
+CODE FIXED
 
-Archived Client immutability is not yet consistently enforced inside the Server
-Action itself.
+A dedicated stale-UI regression test remains desirable.
 
 ---
 
@@ -328,26 +195,19 @@ Implemented in database:
 - Stage type
 - Stage probability
 - Stage color
-- Pipeline selection in Deal UI
 
-Seed creates a default Pipeline and standard Stages.
+Implemented in Deal UI:
 
-Stage types:
-
-- open
-- won
-- lost
+- Pipeline selection
+- Stage selection
+- Kanban
 
 Not implemented:
 
 - Pipeline management UI
 - Stage management UI
 
-Database constraints do not yet fully guarantee all Organization / Pipeline /
-Stage consistency.
-
-Application validation currently provides stronger protection than the database
-schema for several of these relationships.
+Database relationship constraints still need strengthening.
 
 ---
 
@@ -363,171 +223,139 @@ Implemented:
 - Company assignment
 - responsible Member assignment
 - expected close date
-- description/notes
+- notes/description
 - archive
 - restore
 - archive view
 - Kanban
-- HTML drag-and-drop
+- drag-and-drop
 - manual Stage selector
-- server-side Stage validation
-- closedAt handling
+- closedAt rules
 - currency-separated totals
 - tenant scoping
 - RBAC
 
-## Shared Stage transition
+Shared transition module:
 
-Implemented:
+`src/modules/deals/transition-deal.ts`
 
-src/modules/deals/transition-deal.ts
+F04:
 
-Both manual Stage movement and Kanban movement use the shared transition
-operation.
+FIXED AT APPLICATION LEVEL
 
-The operation validates:
-
-- Deal UUID
-- Stage UUID
-- Organization
-- active Deal lifecycle
-- current Pipeline
-- target Stage belongs to current Pipeline
-- Stage type
-- expected current Stage
-- expected current version
-
-It returns an explicit conflict if the conditional UPDATE changes zero rows.
-
-Audit finding F04 is considered fixed at the application level.
-
-A stronger database-level Pipeline/Stage invariant is still planned.
+Database-level composite invariant remains future work.
 
 ---
 
 # Deal optimistic locking
 
-Implemented migration:
+Implemented:
 
-drizzle/0005_fearless_sheva_callister.sql
+- `version integer not null default 1`
+- expected version in edit flow
+- conditional full Deal update
+- conditional Stage transition
+- version increment on edit
+- version increment on Stage transition
+- version increment on archive
+- version increment on restore
+- explicit conflict behavior for primary stale mutation paths
 
-Deal now has:
+Manual scenarios already verified:
 
-version integer not null default 1
+- two-tab stale edit
+- Kanban invalidates stale edit form
+- normal sequential edits
 
-Deal edit form carries the version that was originally loaded.
+F10:
 
-Full Deal update performs:
+FIXED AT CURRENT APPLICATION LEVEL
 
-WHERE
-- Deal id matches
-- Organization matches
-- Deal is active
-- deletedAt is null
-- version matches expected version
+Nuance:
 
-Successful update:
-
-version = version + 1
-
-Zero updated rows:
-
-→ explicit conflict
-→ stale edit is not silently saved
-
-Stage transition also:
-
-- reads current version
-- checks current version
-- increments version
-
-Archive and restore also increment Deal version.
-
-Manually verified scenarios:
-
-1. same Deal opened in two edit tabs
-   → first save succeeds
-   → stale second save is rejected
-
-2. Deal edit form remains open while Kanban changes Stage
-   → Kanban increments version
-   → stale form save is rejected
-
-3. normal sequential edits
-   → both succeed
-
-This closes the primary lost-update behavior from F10.
-
-Remaining F10 follow-up:
-
-archive/restore mutations still need an explicit policy for concurrent
-archive/restore and affected-row handling.
-
-They currently increment version but do not yet provide the same explicit
-conflict result contract as the main edit and Stage transition operations.
+archive/restore currently read current version at mutation time, so strict page-rendered stale-button intent protection is not identical to edit-form optimistic locking.
 
 ---
 
-# Deal state
+# Deal expectedCloseAt
 
-Deal state is derived from:
+Current meaning:
 
-pipeline_stages.type
+date-only calendar value
 
-No separate Deal won/lost status exists.
+Storage:
 
-Rules:
+PostgreSQL `date`
 
-open
-→ closedAt = null
+Application:
 
-won/lost
-→ closedAt is set
-
-Moving a Deal back to open clears closedAt.
-
-The shared Stage transition owns this rule for Stage movement.
-
-Full Deal editing still contains related closedAt logic and is a candidate for
-further consolidation into a Deal business module.
-
----
-
-# Money
+`YYYY-MM-DD`
 
 Implemented:
 
-- PostgreSQL numeric(14,2)
-- separate currency field
-- Deal currency formatting
-- Kanban totals grouped by currency
+- strict ISO calendar validation
+- leap-year handling
+- impossible dates rejected
+- empty value becomes null
+- display avoids JS Date timezone conversion
+- migration to date semantics
 
-Different currencies are not combined into one total.
+F09:
 
-Known policy gaps:
+FIXED
 
-- database-level amount/currency consistency is incomplete
-- financial database constraints are not yet finalized
+Decision:
+
+D044
 
 ---
 
-# Health endpoint
+# Related-data permission policy
 
-Public route:
+Implemented policy:
 
-/api/health/db
+Responsible Member assignment:
 
-Implemented behavior:
+with `members.read`
+→ any active Organization Member
 
-- lightweight `SELECT 1`
-- no tenant counters
-- no CRM record counts
-- generic success response
-- generic failure response
-- no raw database error returned to client
-- no-store cache policy
+without `members.read`
+→ self or no owner
 
-Audit finding F03 is considered fixed.
+Existing owner may remain unchanged even if inactive.
+
+Member email is excluded from normal owner-selection DTOs.
+
+Responsible Member display:
+
+with `members.read`
+→ real display name
+
+without `members.read`, self
+→ own display name
+
+without `members.read`, another Member
+→ `Сотрудник`
+
+Related entity visibility:
+
+- Company data in Deal views requires `companies.read`
+- linked Client data in Company views requires `clients.read`
+- Dashboard aggregates require corresponding module `.read`
+
+Queries are gated before related data is serialized where relevant.
+
+Deal edit without `companies.read` preserves the existing relationship using a neutral label `Текущая компания`.
+
+Representative Manager/Viewer-style browser checks passed.
+
+F05:
+
+FIXED / MANUALLY VERIFIED
+
+Decision:
+
+D045
 
 ---
 
@@ -535,367 +363,55 @@ Audit finding F03 is considered fixed.
 
 Implemented:
 
-basic CRM Dashboard.
+basic CRM Dashboard
 
-Known permission issue:
+Current aggregate policy:
 
-F05 remains open.
-
-Dashboard aggregate visibility and other related reference data need a single
-explicit permission policy.
-
----
-
-# Collaborative Notes
-
-Not implemented.
-
-Existing Client / Company / Deal `notes` fields are descriptive text only.
-
-They are not collaborative Notes.
-
-Future collaborative Notes require separate records.
+- Client count requires `clients.read`
+- Member count requires `members.read`
+- Role count requires `roles.read`
+- Organization card remains visible in normal CRM context
 
 ---
 
-# Tasks
+# Health
 
-Not implemented.
+Public route:
 
-Tasks remain the planned first major product module after stabilization.
+`/api/health/db`
 
----
+Behavior:
 
-# Activity Timeline / Audit History
+- lightweight `SELECT 1`
+- no CRM counters
+- generic success/failure
+- no raw DB error to anonymous client
+- no-store
 
-Not implemented.
-
-This remains important before advanced analytics, automation and AI.
-
----
-
-# Direct Deal contacts
-
-Not implemented.
-
-Current Deal may reference a Company but does not directly reference multiple
-Client contacts.
-
-Likely future model:
-
-deal_clients
-
----
-
-# Custom Fields
-
-Not implemented.
-
----
-
-# Saved Views
-
-Not implemented.
-
----
-
-# Automation
-
-Not implemented.
-
----
-
-# AI
-
-Not implemented.
-
-This is intentional.
-
-AI should only be added after:
-
-- tenant boundaries
-- RBAC
-- business operations
-- lifecycle policy
-- concurrency
-- validation
-- activity history
-
-are sufficiently stable.
-
----
-
-# Audit stabilization status
-
-Original audit findings:
-
-## F01 — exact email identity
-
-Status:
+F03:
 
 FIXED
-
-Implemented canonical exact lookup and regression test.
-
----
-
-## F02 — verified identity before membership
-
-Status:
-
-PARTIALLY FIXED / DEVELOPMENT-SAFE INTERMEDIATE STATE
-
-Implemented:
-
-- email verification
-- CRM access requires verified email
-- Team membership flow rejects unverified account
-- development Owner linking rejects unverified account
-
-Still required for production:
-
-- real mail provider
-- invitation token
-- expiry
-- authenticated acceptance
-- production onboarding policy
-
----
-
-## F03 — public health information exposure
-
-Status:
-
-FIXED
-
-Public health now performs only minimal DB readiness.
-
----
-
-## F04 — Deal Stage/Pipeline race
-
-Status:
-
-FIXED AT APPLICATION LEVEL
-
-Shared Stage transition now uses conditional state/version validation.
-
-Database-level composite invariant is still future work.
-
----
-
-## F05 — related-data permission inconsistency
-
-Status:
-
-OPEN
-
-Needs explicit policy for:
-
-- assignment directory
-- Member names
-- Member emails
-- Company data shown in Deals
-- Dashboard aggregates
-
----
-
-## F06 — last Owner race
-
-Status:
-
-OPEN
-
-Current application pre-check is not concurrency-safe.
-
----
-
-## F07 — inactive Organization access
-
-Status:
-
-FIXED FOR CURRENT DEVELOPMENT TENANT MODEL
-
-Inactive Organization blocks CRM access.
-
-Manually tested.
-
----
-
-## F08 — inactive Company owner blocks unrelated edits
-
-Status:
-
-IMPLEMENTED
-
-Current inactive owner may remain unchanged.
-
-Newly assigned owner must be active.
-
-Dedicated manual regression test still desirable.
-
----
-
-## F09 — impossible calendar dates
-
-Status:
-
-OPEN
-
-Current Deal date validation still relies on Date.parse.
-
-Examples still requiring rejection:
-
-- 2026-02-29
-- 2026-02-31
-- 2026-04-31
-
-Date-only vs timestamp semantics are not yet finalized.
-
----
-
-## F10 — lost Deal updates
-
-Status:
-
-PRIMARY EDIT/STAGE CONFLICT PATH FIXED
-
-Implemented:
-
-- Deal version column
-- expected version in edit form
-- conditional Deal UPDATE
-- explicit stale-edit conflict
-- Stage transition version check
-- version increment on edit/Stage/archive/restore
-
-Manually tested:
-
-- two-tab stale edit
-- Kanban vs stale form
-- normal sequential edit
-
-Remaining:
-
-- explicit archive/restore concurrency result policy
-- automated integration regression tests
-
----
-
-## F11 — archived Client relationship mutation
-
-Status:
-
-OPEN
-
-Server-side lifecycle guard still required.
-
----
-
-## F12 — unbounded loading
-
-Status:
-
-OPEN
-
-Examples:
-
-- all Deals for selected Kanban Pipeline
-- Deal archive loading
-- large form reference lists
-- Company selectors
-
-No measured production performance failure exists yet.
-
-This is a scale limitation to address before datasets become large.
-
----
-
-# Architectural debt
-
-## Tenant context
-
-The access path is improving:
-
-session
-→ verified User
-→ active Organization
-→ active Membership
-→ Permissions
-
-However current Organization selection remains fixed to the development
-Organization.
-
-Future multi-tenant switching requires a real active-Organization selection model.
-
----
-
-## Business logic distribution
-
-Important rules still exist across:
-
-- pages
-- Server Actions
-- helpers
-
-The first focused business module now exists:
-
-src/modules/deals/transition-deal.ts
-
-Direction:
-
-continue extracting only genuinely shared business operations.
-
-Do not introduce a generic repository framework.
-
----
-
-## Database invariants
-
-Application rules are still stronger than PostgreSQL constraints in several
-areas.
-
-Priority future constraints:
-
-- Stage Organization + Pipeline
-- Deal Organization + Pipeline + Stage
-- Member + Role tenant consistency
-- Client + Company tenant consistency
-- Stage probability 0..100
-- Stage type values
-- amount/currency consistency
-- default Pipeline uniqueness if confirmed as policy
-
----
-
-## Role model
-
-Remaining weaknesses:
-
-- Owner identity still needs a stable system key
-- last-Owner protection is not concurrency-safe
-- ownership transfer policy is not finalized
 
 ---
 
 # Testing
 
-Implemented:
+Automated coverage currently includes:
 
-- Node test runner
-- tsx devDependency
-- `npm test` script
-- email identity regression test
+- canonical email lookup behavior
+- `_` and `%` literal email identity behavior
+- strict Deal calendar date validation
 
-Still missing:
+Still needed:
 
-- database integration test environment
-- cross-tenant regression tests
+- cross-tenant regression suite
 - inactive Organization automated test
-- Deal conflict integration test
-- impossible-date regression test
-- archived relationship regression test
-- RBAC regression suite
+- archived Client relationship test
+- owner-assignment RBAC tests
+- related-data visibility tests
+- Deal conflict integration tests
+- last Owner concurrency test
+- PostgreSQL invariant tests
 - E2E critical workflow suite
 
 ---
@@ -906,46 +422,71 @@ Not implemented.
 
 Target:
 
-npm ci
-→ next typegen
-→ TypeScript
-→ lint
-→ tests
-→ build
-
-CI must not use production secrets or production database.
+`npm ci`
+→ `next typegen`
+→ `npx tsc --noEmit --incremental false`
+→ `npm run lint`
+→ `npm test`
+→ `npm run build`
 
 ---
 
-# Operational gaps
+# Audit stabilization summary
 
-Still not production-ready:
+F01 — FIXED
 
-- real production email delivery
-- invitation acceptance flow
-- production password recovery verification
-- CI
-- test database/environment
-- backup restore verification
-- structured operational events
-- production observability
-- complete deployment/runbook documentation
+F02 — PARTIALLY FIXED / DEVELOPMENT-SAFE INTERMEDIATE STATE
+
+F03 — FIXED
+
+F04 — FIXED AT APPLICATION LEVEL
+
+F05 — FIXED / MANUALLY VERIFIED
+
+F06 — OPEN
+
+F07 — FIXED FOR CURRENT DEVELOPMENT TENANT MODEL
+
+F08 — IMPLEMENTED
+
+F09 — FIXED
+
+F10 — FIXED AT CURRENT APPLICATION LEVEL
+
+F11 — CODE FIXED
+
+F12 — OPEN
+
+---
+
+# Major features not yet implemented
+
+- Tasks
+- Collaborative Notes
+- Activity Timeline
+- Pipeline/Stage management UI
+- direct Deal contacts
+- Custom Fields
+- Saved Views
+- Automation
+- AI
 
 ---
 
 # Current recommended direction
 
-Do not start another large product module yet.
+Do not start another large module yet.
 
-Next stabilization priorities:
+Priority:
 
-1. finish Deal archive/restore conflict semantics
-2. fix archived Client relationship mutation
-3. fix strict calendar-date validation
-4. define related-data permission policy
-5. add regression tests and CI
+1. F06 — stable Owner identity + concurrency-safe last-Owner invariant
+2. F02 — production invitation / membership acquisition
+3. regression tests for completed stabilization work
+4. GitHub Actions CI
+5. stronger PostgreSQL invariants
+6. F12 scaling work as datasets grow
 
-After that:
+After sufficient stabilization:
 
 Tasks
 → Collaborative Notes

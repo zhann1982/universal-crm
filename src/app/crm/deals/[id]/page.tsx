@@ -59,6 +59,7 @@ export default async function DealPage({
 }) {
   const {
     organization,
+    member,
     permissions,
   } = await requirePermission(
     "deals.read",
@@ -422,8 +423,14 @@ export default async function DealPage({
               label="Ответственный"
               value={
                 deal.ownerMemberId
-                  ? deal.ownerDisplayName ||
-                    "Сотрудник"
+                  ? permissions.has(
+                      "members.read",
+                    ) ||
+                    deal.ownerMemberId ===
+                      member.id
+                    ? deal.ownerDisplayName ||
+                      "Сотрудник"
+                    : "Сотрудник"
                   : null
               }
             />

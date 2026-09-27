@@ -246,23 +246,22 @@ export default async function EditDealPage({
             companies.name,
           ),
         );
-  } else if (
-    deal.companyId &&
-    deal.companyName
-  ) {
-    companyList = [
-      {
-        id:
-          deal.companyId,
+    } else if (
+      deal.companyId
+    ) {
+      companyList = [
+        {
+          id:
+            deal.companyId,
 
-        name:
-          deal.companyName,
+          name:
+            "Текущая компания",
 
-        taxId:
-          null,
-      },
-    ];
-  }
+          taxId:
+            null,
+        },
+      ];
+    }
 
   /*
    * F05 — owner picker.
