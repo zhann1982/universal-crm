@@ -55,9 +55,6 @@ export async function getDealById(
         ownerDisplayName:
           organizationMembers.displayName,
 
-        ownerEmail:
-          organizationMembers.email,
-
         companyId:
           deals.companyId,
 

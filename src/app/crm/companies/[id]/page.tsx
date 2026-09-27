@@ -81,9 +81,6 @@ export default async function CompanyPage({
         displayName:
           | string
           | null;
-        email:
-          | string
-          | null;
       }
     | undefined;
 
@@ -95,9 +92,6 @@ export default async function CompanyPage({
         .select({
           displayName:
             organizationMembers.displayName,
-
-          email:
-            organizationMembers.email,
         })
         .from(
           organizationMembers,
@@ -284,9 +278,10 @@ export default async function CompanyPage({
             <InfoItem
               label="Ответственный"
               value={
-                owner
-                  ?.displayName ||
-                owner?.email
+                company.ownerMemberId
+                  ? owner?.displayName ||
+                    "Сотрудник"
+                  : null
               }
             />
 

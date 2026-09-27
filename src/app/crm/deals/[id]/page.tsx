@@ -421,8 +421,10 @@ export default async function DealPage({
             <InfoItem
               label="Ответственный"
               value={
-                deal.ownerDisplayName ||
-                deal.ownerEmail
+                deal.ownerMemberId
+                  ? deal.ownerDisplayName ||
+                    "Сотрудник"
+                  : null
               }
             />
 
