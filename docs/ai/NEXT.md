@@ -1,6 +1,6 @@
 # Universal CRM — Next Development Steps
 
-Last updated: 2026-09-27
+Last updated: 2026-09-28
 
 ## Current cycle
 
@@ -113,6 +113,7 @@ Priority tests:
 - impossible calendar dates
 - stale Deal edit version conflict
 - Kanban vs stale form
+- PostgreSQL/browser verification of page-version conflicts for Kanban and manual Stage changes (unit regression tests now exist)
 - Deal Stage/Pipeline validation
 - archive/restore lifecycle conflict
 - last Owner concurrency

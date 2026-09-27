@@ -1,6 +1,6 @@
 # Universal CRM — Current Status
 
-Last updated: 2026-09-27
+Last updated: 2026-09-28
 
 ## Source-of-truth note
 
@@ -255,6 +255,8 @@ Implemented:
 - expected version in edit flow
 - conditional full Deal update
 - conditional Stage transition
+- page-rendered expected version from Kanban and manual Stage selector
+- stale Stage requests rejected before no-op handling
 - version increment on edit
 - version increment on Stage transition
 - version increment on archive
@@ -272,6 +274,11 @@ F10:
 FIXED AT CURRENT APPLICATION LEVEL
 
 Nuance:
+
+Stage transitions now require the version observed on the page. Unit regression
+tests execute the shared transition operation with mocked database boundaries,
+including a stale no-op and zero affected rows after a concurrent write. These
+are not PostgreSQL integration or browser tests.
 
 archive/restore currently read current version at mutation time, so strict page-rendered stale-button intent protection is not identical to edit-form optimistic locking.
 

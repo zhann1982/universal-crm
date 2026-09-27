@@ -236,6 +236,8 @@ export default async function DealsPage({
         id:
           deals.id,
 
+        version: deals.version,
+
         title:
           deals.title,
 
@@ -340,6 +342,8 @@ export default async function DealsPage({
       (deal) => ({
         id:
           deal.id,
+
+        version: deal.version,
 
         title:
           deal.title,

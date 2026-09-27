@@ -299,6 +299,7 @@ export default async function DealPage({
               }
               className="mt-5 flex flex-wrap items-end gap-3"
             >
+              <input type="hidden" name="version" value={deal.version} />
               <div className="min-w-64 flex-1">
                 <label
                   htmlFor="stageId"

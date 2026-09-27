@@ -23,6 +23,7 @@ export type MoveDealOnBoardResult =
 export async function moveDealOnBoard(
   dealId: string,
   stageId: string,
+  expectedVersion: number,
 ): Promise<MoveDealOnBoardResult> {
   const {
     organization,
@@ -37,6 +38,7 @@ export async function moveDealOnBoard(
           organization.id,
 
         dealId,
+        expectedVersion,
 
         targetStageId:
           stageId,

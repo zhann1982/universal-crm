@@ -478,6 +478,11 @@ export async function moveDealToStage(
     "deals.update",
   );
 
+  const versionResult = dealVersionSchema.safeParse(formData.get("version"));
+  if (!versionResult.success) {
+    redirect(`/crm/deals/${dealId}?error=stage-conflict`);
+  }
+
   const stageId =
     String(
       formData.get(
@@ -499,6 +504,7 @@ export async function moveDealToStage(
           organization.id,
 
         dealId,
+        expectedVersion: versionResult.data,
 
         targetStageId:
           stageId,

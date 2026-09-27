@@ -33,6 +33,7 @@ type StageItem = {
 
 type DealItem = {
   id: string;
+  version: number;
   title: string;
 
   amount:
@@ -169,6 +170,7 @@ export function KanbanBoard({
           await moveDealOnBoard(
             dealId,
             targetStageId,
+            deal.version,
           );
 
         if (

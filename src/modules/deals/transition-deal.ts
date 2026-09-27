@@ -46,12 +46,14 @@ type TransitionDealInput = {
   organizationId: string;
   dealId: string;
   targetStageId: string;
+  expectedVersion: number;
 };
 
 export async function transitionDeal({
   organizationId,
   dealId,
   targetStageId,
+  expectedVersion,
 }: TransitionDealInput): Promise<TransitionDealResult> {
   const dealIdResult =
     idSchema.safeParse(
@@ -63,9 +65,12 @@ export async function transitionDeal({
       targetStageId,
     );
 
+  const versionResult = z.number().int().positive().safeParse(expectedVersion);
+
   if (
     !dealIdResult.success ||
-    !stageIdResult.success
+    !stageIdResult.success ||
+    !versionResult.success
   ) {
     return {
       success: false,
@@ -74,7 +79,7 @@ export async function transitionDeal({
         "invalid-input",
 
       message:
-        "Некорректный идентификатор сделки или этапа.",
+        "Некорректный идентификатор сделки, этапа или версия сделки.",
     };
   }
 
@@ -139,6 +144,15 @@ export async function transitionDeal({
 
       message:
         "Сделка не найдена или недоступна.",
+    };
+  }
+
+  // Проверяем версию с экрана до проверки этапа и обработки no-op.
+  if (deal.version !== versionResult.data) {
+    return {
+      success: false,
+      code: "conflict",
+      message: "Сделка уже была изменена другим действием. Обновите данные и повторите попытку.",
     };
   }
 
@@ -299,7 +313,7 @@ export async function transitionDeal({
 
           eq(
             deals.version,
-            deal.version,
+            versionResult.data,
           ),
 
           eq(
