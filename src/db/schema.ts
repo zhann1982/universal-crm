@@ -229,6 +229,13 @@ export const roles =
         },
       ).notNull(),
 
+      systemKey: varchar(
+        "system_key",
+        {
+          length: 80,
+        },
+      ),
+
       description:
         text("description"),
 
@@ -262,6 +269,13 @@ export const roles =
       ).on(
         table.organizationId,
         table.name,
+      ),
+
+      uniqueIndex(
+        "roles_org_system_key_unique",
+      ).on(
+        table.organizationId,
+        table.systemKey,
       ),
 
       index(

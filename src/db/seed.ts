@@ -185,6 +185,7 @@ async function main() {
   const roleDefinitions = [
     {
       name: "Owner",
+      systemKey: "owner",
       description:
         "Полный доступ к организации",
 
@@ -196,6 +197,7 @@ async function main() {
 
     {
       name: "Admin",
+      systemKey: "admin",
       description:
         "Администрирование CRM",
 
@@ -207,6 +209,7 @@ async function main() {
 
     {
       name: "Manager",
+      systemKey: "manager",
       description:
         "Работа с клиентами",
 
@@ -232,6 +235,7 @@ async function main() {
 
     {
       name: "Viewer",
+      systemKey: "viewer",
       description:
         "Только просмотр",
 
@@ -262,12 +266,74 @@ async function main() {
           ),
 
           eq(
-            roles.name,
-            roleDefinition.name,
+            roles.systemKey,
+            roleDefinition.systemKey,
           ),
         ),
       )
       .limit(1);
+
+    /*
+     * Совместимость с ролями,
+     * созданными до появления systemKey.
+     */
+    if (!role) {
+      const [legacyRole] =
+        await db
+          .select()
+          .from(roles)
+          .where(
+            and(
+              eq(
+                roles.organizationId,
+                organization.id,
+              ),
+
+              eq(
+                roles.name,
+                roleDefinition.name,
+              ),
+            ),
+          )
+          .limit(1);
+
+      if (legacyRole) {
+        if (
+          legacyRole.systemKey &&
+          legacyRole.systemKey !==
+            roleDefinition.systemKey
+        ) {
+          throw new Error(
+            `Role ${legacyRole.name} already has another systemKey: ${legacyRole.systemKey}`,
+          );
+        }
+
+        [role] = await db
+          .update(roles)
+          .set({
+            systemKey:
+              roleDefinition.systemKey,
+
+            isSystem: true,
+
+            updatedAt:
+              new Date(),
+          })
+          .where(
+            eq(
+              roles.id,
+              legacyRole.id,
+            ),
+          )
+          .returning();
+
+        console.log(
+          "Updated system role:",
+          role.name,
+          role.systemKey,
+        );
+      }
+    }
 
     if (!role) {
       [role] = await db
@@ -278,6 +344,9 @@ async function main() {
 
           name:
             roleDefinition.name,
+
+          systemKey:
+            roleDefinition.systemKey,
 
           description:
             roleDefinition.description,
@@ -293,7 +362,7 @@ async function main() {
     }
 
     roleMap.set(
-      role.name,
+      roleDefinition.systemKey,
       role.id,
     );
 
@@ -526,7 +595,7 @@ async function main() {
   }
 
   const ownerRoleId =
-    roleMap.get("Owner");
+    roleMap.get("owner");
 
   if (!ownerRoleId) {
     throw new Error(
@@ -560,8 +629,8 @@ async function main() {
       email:
         "manager@local.dev",
 
-      roleName:
-        "Manager",
+      roleSystemKey:
+        "manager",
     },
 
     {
@@ -574,8 +643,8 @@ async function main() {
       email:
         "viewer@local.dev",
 
-      roleName:
-        "Viewer",
+      roleSystemKey:
+        "viewer",
     },
   ] as const;
 
@@ -638,12 +707,12 @@ async function main() {
 
     const roleId =
       roleMap.get(
-        definition.roleName,
+        definition.roleSystemKey,
       );
 
     if (!roleId) {
       throw new Error(
-        `Role not found: ${definition.roleName}`,
+        `Role not found: ${definition.roleSystemKey}`,
       );
     }
 

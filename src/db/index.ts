@@ -13,7 +13,16 @@ if (!databaseUrl) {
   );
 }
 
-const sql = neon(databaseUrl);
+/*
+ * Raw Neon HTTP query function.
+ *
+ * Exported intentionally for the small number of cases where we need
+ * a non-interactive PostgreSQL transaction through sql.transaction(...).
+ *
+ * Normal application queries should continue to use `db`.
+ */
+export const sql =
+  neon(databaseUrl);
 
 const schema = {
   ...crmSchema,

@@ -5,27 +5,346 @@ import { randomUUID } from "node:crypto";
 import {
   and,
   eq,
-  inArray,
-  ne,
 } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { db } from "@/db";
 import {
-  findAuthUserByEmail,
-} from "@/lib/auth/find-auth-user-by-email";
+  db,
+  sql,
+} from "@/db";
 import {
   memberRoles,
   organizationMembers,
   roles,
 } from "@/db/schema";
+import {
+  findAuthUserByEmail,
+} from "@/lib/auth/find-auth-user-by-email";
 import { requirePermission } from "@/lib/auth/permissions";
 import {
   addMemberSchema,
   updateMemberRolesSchema,
   updateMemberStatusSchema,
 } from "@/lib/validation/member";
+
+type StatusGuardRow = {
+  member_exists: boolean;
+  allowed: boolean;
+  updated: boolean;
+};
+
+type RolesGuardRow = {
+  member_exists: boolean;
+  roles_valid: boolean;
+  blocked_last_owner: boolean;
+  allowed: boolean;
+};
+
+async function updateMemberStatusWithOwnerGuard(input: {
+  organizationId: string;
+  memberId: string;
+  status: "active" | "inactive";
+}) {
+  const {
+    organizationId,
+    memberId,
+    status,
+  } = input;
+
+  const transactionResult =
+    await sql.transaction(
+      (txn) => [
+        /*
+         * Все операции, способные уменьшить число активных Owners,
+         * сериализуются одним advisory lock на организацию.
+         *
+         * Второй параллельный запрос дождётся завершения первого,
+         * а затем увидит уже зафиксированное состояние.
+         */
+        txn`
+          SELECT pg_advisory_xact_lock(
+            hashtext('universal-crm-owner-guard'),
+            hashtext(${organizationId})
+          )
+        `,
+
+        txn`
+          WITH target AS MATERIALIZED (
+            SELECT
+              om.id,
+              om.status,
+
+              EXISTS (
+                SELECT 1
+                FROM member_roles mr
+                INNER JOIN roles r
+                  ON r.id = mr.role_id
+                WHERE
+                  mr.member_id = om.id
+                  AND r.organization_id = ${organizationId}::uuid
+                  AND r.system_key = 'owner'
+              ) AS is_owner
+
+            FROM organization_members om
+            WHERE
+              om.id = ${memberId}::uuid
+              AND om.organization_id = ${organizationId}::uuid
+          ),
+
+          decision AS MATERIALIZED (
+            SELECT
+              target.id,
+
+              NOT (
+                ${status}::text = 'inactive'
+                AND target.status = 'active'
+                AND target.is_owner
+
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM organization_members other_member
+                  INNER JOIN member_roles other_member_role
+                    ON other_member_role.member_id = other_member.id
+                  INNER JOIN roles other_role
+                    ON other_role.id = other_member_role.role_id
+                  WHERE
+                    other_member.organization_id = ${organizationId}::uuid
+                    AND other_member.status = 'active'
+                    AND other_member.id <> target.id
+                    AND other_role.organization_id = ${organizationId}::uuid
+                    AND other_role.system_key = 'owner'
+                )
+              ) AS allowed
+
+            FROM target
+          ),
+
+          updated AS (
+            UPDATE organization_members om
+            SET
+              status = ${status},
+              updated_at = now()
+            FROM decision
+            WHERE
+              om.id = decision.id
+              AND decision.allowed
+            RETURNING om.id
+          )
+
+          SELECT
+            EXISTS(
+              SELECT 1
+              FROM target
+            ) AS member_exists,
+
+            COALESCE(
+              (
+                SELECT allowed
+                FROM decision
+                LIMIT 1
+              ),
+              false
+            ) AS allowed,
+
+            EXISTS(
+              SELECT 1
+              FROM updated
+            ) AS updated
+        `,
+      ],
+    );
+
+  const rows =
+    transactionResult[1] as
+      StatusGuardRow[];
+
+  return rows[0];
+}
+
+async function replaceMemberRolesWithOwnerGuard(input: {
+  organizationId: string;
+  memberId: string;
+  roleIds: string[];
+}) {
+  const {
+    organizationId,
+    memberId,
+    roleIds,
+  } = input;
+
+  const requestedRolesJson =
+    JSON.stringify(roleIds);
+
+  const transactionResult =
+    await sql.transaction(
+      (txn) => [
+        txn`
+          SELECT pg_advisory_xact_lock(
+            hashtext('universal-crm-owner-guard'),
+            hashtext(${organizationId})
+          )
+        `,
+
+        txn`
+          WITH target AS MATERIALIZED (
+            SELECT
+              om.id,
+              om.status
+            FROM organization_members om
+            WHERE
+              om.id = ${memberId}::uuid
+              AND om.organization_id = ${organizationId}::uuid
+          ),
+
+          requested_input AS MATERIALIZED (
+            SELECT DISTINCT
+              value::uuid AS id
+            FROM jsonb_array_elements_text(
+              ${requestedRolesJson}::jsonb
+            )
+          ),
+
+          valid_roles AS MATERIALIZED (
+            SELECT
+              r.id,
+              r.system_key
+            FROM roles r
+            INNER JOIN requested_input requested
+              ON requested.id = r.id
+            WHERE
+              r.organization_id = ${organizationId}::uuid
+          ),
+
+          facts AS MATERIALIZED (
+            SELECT
+              EXISTS(
+                SELECT 1
+                FROM target
+              ) AS member_exists,
+
+              (
+                SELECT count(*)
+                FROM requested_input
+              ) = (
+                SELECT count(*)
+                FROM valid_roles
+              ) AS roles_valid,
+
+              COALESCE(
+                (
+                  SELECT target.status
+                  FROM target
+                  LIMIT 1
+                ),
+                ''
+              ) AS target_status,
+
+              EXISTS(
+                SELECT 1
+                FROM member_roles mr
+                INNER JOIN roles current_role
+                  ON current_role.id = mr.role_id
+                WHERE
+                  mr.member_id = ${memberId}::uuid
+                  AND current_role.organization_id = ${organizationId}::uuid
+                  AND current_role.system_key = 'owner'
+              ) AS current_owner,
+
+              EXISTS(
+                SELECT 1
+                FROM valid_roles
+                WHERE system_key = 'owner'
+              ) AS will_remain_owner,
+
+              EXISTS(
+                SELECT 1
+                FROM organization_members other_member
+                INNER JOIN member_roles other_member_role
+                  ON other_member_role.member_id = other_member.id
+                INNER JOIN roles other_role
+                  ON other_role.id = other_member_role.role_id
+                WHERE
+                  other_member.organization_id = ${organizationId}::uuid
+                  AND other_member.status = 'active'
+                  AND other_member.id <> ${memberId}::uuid
+                  AND other_role.organization_id = ${organizationId}::uuid
+                  AND other_role.system_key = 'owner'
+              ) AS other_active_owner
+          ),
+
+          decision AS MATERIALIZED (
+            SELECT
+              facts.*,
+
+              (
+                facts.member_exists
+                AND facts.roles_valid
+
+                AND NOT (
+                  facts.target_status = 'active'
+                  AND facts.current_owner
+                  AND NOT facts.will_remain_owner
+                  AND NOT facts.other_active_owner
+                )
+              ) AS allowed
+
+            FROM facts
+          ),
+
+          deleted AS (
+            DELETE FROM member_roles mr
+            USING decision
+            WHERE
+              mr.member_id = ${memberId}::uuid
+              AND decision.allowed
+            RETURNING mr.member_id
+          ),
+
+          delete_done AS MATERIALIZED (
+            SELECT count(*) AS deleted_count
+            FROM deleted
+          ),
+
+          inserted AS (
+            INSERT INTO member_roles (
+              member_id,
+              role_id
+            )
+            SELECT
+              ${memberId}::uuid,
+              valid_roles.id
+            FROM valid_roles
+            CROSS JOIN decision
+            CROSS JOIN delete_done
+            WHERE decision.allowed
+            RETURNING member_id
+          )
+
+          SELECT
+            decision.member_exists,
+            decision.roles_valid,
+
+            (
+              decision.target_status = 'active'
+              AND decision.current_owner
+              AND NOT decision.will_remain_owner
+              AND NOT decision.other_active_owner
+            ) AS blocked_last_owner,
+
+            decision.allowed
+
+          FROM decision
+        `,
+      ],
+    );
+
+  const rows =
+    transactionResult[1] as
+      RolesGuardRow[];
+
+  return rows[0];
+}
 
 export async function addMember(
   formData: FormData,
@@ -58,31 +377,31 @@ export async function addMember(
     roleId,
   } = result.data;
 
-const userLookup =
-  await findAuthUserByEmail(
-    email,
-  );
+  const userLookup =
+    await findAuthUserByEmail(
+      email,
+    );
 
-if (
-  userLookup.status ===
-  "not-found"
-) {
-  redirect(
-    "/crm/team?error=user-not-found",
-  );
-}
+  if (
+    userLookup.status ===
+    "not-found"
+  ) {
+    redirect(
+      "/crm/team?error=user-not-found",
+    );
+  }
 
-if (
-  userLookup.status ===
-  "ambiguous"
-) {
-  redirect(
-    "/crm/team?error=user-ambiguous",
-  );
-}
+  if (
+    userLookup.status ===
+    "ambiguous"
+  ) {
+    redirect(
+      "/crm/team?error=user-ambiguous",
+    );
+  }
 
-const authUser =
-  userLookup.user;
+  const authUser =
+    userLookup.user;
 
   if (
     !authUser.emailVerified
@@ -233,155 +552,35 @@ export async function updateMemberStatus(
     );
   }
 
-  const [targetMember] =
-    await db
-      .select({
-        id: organizationMembers.id,
+  const mutation =
+    await updateMemberStatusWithOwnerGuard({
+      organizationId:
+        organization.id,
 
-        status:
-          organizationMembers.status,
-      })
-      .from(organizationMembers)
-      .where(
-        and(
-          eq(
-            organizationMembers.id,
-            memberId,
-          ),
+      memberId,
+      status,
+    });
 
-          eq(
-            organizationMembers.organizationId,
-            organization.id,
-          ),
-        ),
-      )
-      .limit(1);
-
-  if (!targetMember) {
+  if (
+    !mutation ||
+    !mutation.member_exists
+  ) {
     redirect(
       "/crm/team?error=member",
     );
   }
 
-  if (
-    status === "inactive" &&
-    targetMember.status === "active"
-  ) {
-    const [targetOwnerRole] =
-      await db
-        .select({
-          roleId:
-            memberRoles.roleId,
-        })
-        .from(memberRoles)
-        .innerJoin(
-          roles,
-          eq(
-            memberRoles.roleId,
-            roles.id,
-          ),
-        )
-        .where(
-          and(
-            eq(
-              memberRoles.memberId,
-              targetMember.id,
-            ),
-
-            eq(
-              roles.organizationId,
-              organization.id,
-            ),
-
-            eq(
-              roles.name,
-              "Owner",
-            ),
-          ),
-        )
-        .limit(1);
-
-    if (targetOwnerRole) {
-      const activeOwners =
-        await db
-          .selectDistinct({
-            memberId:
-              organizationMembers.id,
-          })
-          .from(
-            organizationMembers,
-          )
-          .innerJoin(
-            memberRoles,
-            eq(
-              memberRoles.memberId,
-              organizationMembers.id,
-            ),
-          )
-          .innerJoin(
-            roles,
-            eq(
-              memberRoles.roleId,
-              roles.id,
-            ),
-          )
-          .where(
-            and(
-              eq(
-                organizationMembers.organizationId,
-                organization.id,
-              ),
-
-              eq(
-                organizationMembers.status,
-                "active",
-              ),
-
-              eq(
-                roles.organizationId,
-                organization.id,
-              ),
-
-              eq(
-                roles.name,
-                "Owner",
-              ),
-            ),
-          );
-
-      if (
-        activeOwners.length <= 1
-      ) {
-        redirect(
-          "/crm/team?error=last-owner",
-        );
-      }
-    }
+  if (!mutation.allowed) {
+    redirect(
+      "/crm/team?error=last-owner",
+    );
   }
 
-  await db
-    .update(
-      organizationMembers,
-    )
-    .set({
-      status,
-
-      updatedAt:
-        new Date(),
-    })
-    .where(
-      and(
-        eq(
-          organizationMembers.id,
-          targetMember.id,
-        ),
-
-        eq(
-          organizationMembers.organizationId,
-          organization.id,
-        ),
-      ),
+  if (!mutation.updated) {
+    throw new Error(
+      "Member status update did not affect the expected row.",
     );
+  }
 
   revalidatePath(
     "/crm/team",
@@ -432,200 +631,44 @@ export async function updateMemberRoles(
     );
   }
 
-  const [targetMember] =
-    await db
-      .select({
-        id: organizationMembers.id,
+  const uniqueRoleIds = [
+    ...new Set(roleIds),
+  ];
 
-        status:
-          organizationMembers.status,
-      })
-      .from(organizationMembers)
-      .where(
-        and(
-          eq(
-            organizationMembers.id,
-            memberId,
-          ),
+  const mutation =
+    await replaceMemberRolesWithOwnerGuard({
+      organizationId:
+        organization.id,
 
-          eq(
-            organizationMembers.organizationId,
-            organization.id,
-          ),
-        ),
-      )
-      .limit(1);
+      memberId,
 
-  if (!targetMember) {
+      roleIds:
+        uniqueRoleIds,
+    });
+
+  if (
+    !mutation ||
+    !mutation.member_exists
+  ) {
     redirect(
       "/crm/team?error=member",
     );
   }
 
-  const uniqueRoleIds = [
-    ...new Set(roleIds),
-  ];
-
-  const validRoles = await db
-    .select({
-      id: roles.id,
-      name: roles.name,
-    })
-    .from(roles)
-    .where(
-      and(
-        eq(
-          roles.organizationId,
-          organization.id,
-        ),
-
-        inArray(
-          roles.id,
-          uniqueRoleIds,
-        ),
-      ),
-    );
-
-  if (
-    validRoles.length !==
-    uniqueRoleIds.length
-  ) {
+  if (!mutation.roles_valid) {
     redirect(
       "/crm/team?error=role",
     );
   }
 
-  const [currentOwnerRole] =
-    await db
-      .select({
-        id: roles.id,
-      })
-      .from(memberRoles)
-      .innerJoin(
-        roles,
-        eq(
-          memberRoles.roleId,
-          roles.id,
-        ),
-      )
-      .where(
-        and(
-          eq(
-            memberRoles.memberId,
-            targetMember.id,
-          ),
-
-          eq(
-            roles.organizationId,
-            organization.id,
-          ),
-
-          eq(
-            roles.name,
-            "Owner",
-          ),
-        ),
-      )
-      .limit(1);
-
-  const willRemainOwner =
-    validRoles.some(
-      (role) =>
-        role.name === "Owner",
-    );
-
   if (
-    targetMember.status ===
-      "active" &&
-    currentOwnerRole &&
-    !willRemainOwner
+    mutation.blocked_last_owner ||
+    !mutation.allowed
   ) {
-    const otherActiveOwners =
-      await db
-        .selectDistinct({
-          memberId:
-            organizationMembers.id,
-        })
-        .from(
-          organizationMembers,
-        )
-        .innerJoin(
-          memberRoles,
-          eq(
-            memberRoles.memberId,
-            organizationMembers.id,
-          ),
-        )
-        .innerJoin(
-          roles,
-          eq(
-            memberRoles.roleId,
-            roles.id,
-          ),
-        )
-        .where(
-          and(
-            eq(
-              organizationMembers.organizationId,
-              organization.id,
-            ),
-
-            eq(
-              organizationMembers.status,
-              "active",
-            ),
-
-            ne(
-              organizationMembers.id,
-              targetMember.id,
-            ),
-
-            eq(
-              roles.organizationId,
-              organization.id,
-            ),
-
-            eq(
-              roles.name,
-              "Owner",
-            ),
-          ),
-        );
-
-    if (
-      otherActiveOwners.length === 0
-    ) {
-      redirect(
-        "/crm/team?error=last-owner",
-      );
-    }
+    redirect(
+      "/crm/team?error=last-owner",
+    );
   }
-
-  await db.batch([
-    db
-      .delete(memberRoles)
-      .where(
-        eq(
-          memberRoles.memberId,
-          targetMember.id,
-        ),
-      ),
-
-    db
-      .insert(memberRoles)
-      .values(
-        validRoles.map(
-          (role) => ({
-            memberId:
-              targetMember.id,
-
-            roleId:
-              role.id,
-          }),
-        ),
-      )
-      .onConflictDoNothing(),
-  ]);
 
   revalidatePath(
     "/crm/team",
