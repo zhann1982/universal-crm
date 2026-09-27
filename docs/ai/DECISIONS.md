@@ -1,6 +1,18 @@
 # Universal CRM — Architecture Decisions
 
-Last updated: 2026-09-26
+Last updated: 2026-09-27
+
+## Decision ID rule
+
+Decision IDs are permanent.
+
+Existing IDs must never be renumbered or reused.
+
+If a new decision is added, use the next unused number.
+
+Changing the status or wording of an existing decision does not change its ID.
+
+---
 
 ## D001 — Multi-tenancy from the beginning
 
@@ -120,6 +132,7 @@ Better Auth handles:
 - account identity
 - password authentication
 - sessions
+- email verification tokens
 
 The CRM does not maintain a parallel password/session system.
 
@@ -137,10 +150,12 @@ CRM authorization answers:
 
 Which Organization does the User belong to and what may they do?
 
-Security chain:
+Current security chain:
 
 User
-→ Membership
+→ verified identity
+→ active Organization
+→ active Membership
 → Roles
 → Permissions
 → business operation
@@ -178,7 +193,7 @@ reference Members.
 
 Status: accepted
 
-Current development uses a fixed Organization.
+Current development still uses a fixed Organization.
 
 Future Organization switching must validate real active Membership server-side.
 
@@ -308,7 +323,7 @@ A valid UUID is not authorization.
 Every submitted relationship must be checked against:
 
 - authenticated tenant
-- permissions
+- Permissions
 - lifecycle state
 - relationship invariants
 
@@ -342,12 +357,13 @@ Cross-Pipeline movement is an explicit Deal edit/business operation.
 ## D024 — Owner protection needs a stronger identity and atomic invariant
 
 Status: accepted as current limitation
-Target: proposed
+
+Target: planned
 
 Current behavior:
 
 - last active Owner is protected by application pre-check
-- Owner is identified by Role name
+- Owner is still identified through the current Role model
 
 Target:
 
@@ -364,11 +380,12 @@ critical administrative invariant.
 
 ## D025 — Tenant context should become the single entry point for business operations
 
-Status: proposed
+Status: accepted direction
 
 Target flow:
 
 session
+→ verified User
 → active Organization
 → active Membership
 → Permissions
@@ -387,7 +404,7 @@ entry points.
 
 ## D026 — Important business logic moves into small domain modules
 
-Status: proposed
+Status: accepted direction
 
 Keep the modular monolith.
 
@@ -396,60 +413,66 @@ Introduce focused modules such as:
 modules/deals
 modules/companies
 modules/team
+modules/clients
 
-Server Actions become thin adapters.
+Server Actions should become thin adapters where practical.
 
 Do not create a generic repository framework.
 
 Reason:
 
-current business rules are duplicated between pages, actions and helpers.
+important business rules should not diverge between pages, Actions and future
+entry points.
 
 ---
 
 ## D027 — Deal Stage transition becomes one business operation
 
-Status: proposed
+Status: accepted and implemented
 
-One operation should serve:
+Current implementation:
 
-- manual Stage change
-- Kanban
-- automation
-- API
-- AI
+src/modules/deals/transition-deal.ts
+
+The shared transition operation serves current Stage movement workflows and is
+the required path for future automation/API/AI Stage movement.
 
 It owns:
 
-- permission check
-- tenant check
-- Pipeline/Stage validation
+- input validation
+- tenant validation
+- active Deal lifecycle
+- current Pipeline
+- target Stage validation
 - closedAt rule
-- concurrency rule
-- future Activity event
+- optimistic concurrency rule
 
 Reason:
 
-separate current implementations can diverge and have already shown different
-concurrency guarantees.
+separate implementations can diverge and create invalid Pipeline/Stage state.
 
 ---
 
 ## D028 — Optimistic locking for mutable collaborative records
 
-Status: proposed
+Status: accepted and implemented for Deal
 
-Start with Deal.
+Deal uses:
 
-Preferred model:
-
-version integer
+version integer not null default 1
 
 Mutation includes expected version.
 
-Successful write increments version.
+Successful mutation increments version.
 
 Zero affected rows means conflict.
+
+Current version-changing Deal mutations include:
+
+- full edit
+- Stage transition
+- archive
+- restore
 
 Reason:
 
@@ -457,11 +480,14 @@ multiple Users may edit, archive or move the same record concurrently.
 
 Silent last-write-wins is not acceptable for important CRM state.
 
+Future mutable collaborative records should evaluate whether they also require
+version-based optimistic locking.
+
 ---
 
 ## D029 — Important tenant invariants also belong in PostgreSQL
 
-Status: proposed
+Status: accepted direction
 
 Application validation remains required.
 
@@ -484,33 +510,39 @@ application code alone cannot protect every race or future entry point.
 
 ## D030 — Exact email comparison for identity workflows
 
-Status: proposed
+Status: accepted and implemented
 
-Identity lookup by email must use canonicalized exact equality.
+Identity lookup by email uses canonicalized exact equality.
 
-LIKE/ILIKE pattern semantics are not acceptable.
+LIKE/ILIKE pattern semantics are not allowed for identity matching.
 
-Production Membership creation should also require verified identity or a secure
-invitation acceptance flow.
+Current canonicalization:
 
-Reason:
+- trim
+- lowercase
 
-identity matching is security-sensitive.
+Ambiguous canonical matches are rejected.
+
+Characters such as `_` and `%` are literal.
+
+Production Membership creation still requires stronger invitation semantics.
 
 ---
 
 ## D031 — Organization activity is part of tenant access
 
-Status: proposed
+Status: accepted and implemented for current tenant model
 
-organizations.isActive must have defined security meaning.
+organizations.isActive has security meaning.
 
-Target:
+Current rule:
 
 inactive Organization
 → no CRM business access
 
-The check belongs in central tenant context.
+The check is part of current Organization resolution.
+
+Future Organization switching must preserve the same rule.
 
 ---
 
@@ -531,7 +563,7 @@ as product design requires.
 
 Reason:
 
-current Company, Deal and Dashboard policies are inconsistent.
+current Company, Deal and Dashboard policies remain inconsistent.
 
 ---
 
@@ -543,7 +575,8 @@ If expectedCloseAt represents a calendar day, prefer PostgreSQL date.
 
 Do not rely on Date.parse overflow behavior or artificial noon UTC.
 
-If a timestamp is required instead, define Organization timezone explicitly.
+If an exact timestamp is required instead, define Organization timezone
+semantics explicitly.
 
 ---
 
@@ -571,7 +604,7 @@ Activity:
 
 structured business event
 
-Future Note fields include:
+Future Note fields may include:
 
 - author
 - createdAt
@@ -579,7 +612,7 @@ Future Note fields include:
 - lastEditedBy
 - deletedAt
 
-Future Activity includes business events such as:
+Future Activity includes events such as:
 
 - Stage changed
 - owner changed
@@ -588,8 +621,7 @@ Future Activity includes business events such as:
 
 Reason:
 
-free-form collaboration and immutable structured history have different
-requirements.
+free-form collaboration and structured history have different requirements.
 
 ---
 
@@ -613,15 +645,15 @@ Current state alone cannot reconstruct historical transitions reliably.
 
 ## D037 — Tasks are the next major product module after stabilization
 
-Status: proposed
+Status: accepted direction
 
-After security/concurrency stabilization, prioritize Tasks before adding broad
+After security/concurrency stabilization, prioritize Tasks before broad
 configuration features.
 
 Reason:
 
-Tasks and next actions turn the CRM from a record catalog into a daily operational
-tool.
+Tasks and next actions turn the CRM from a record catalog into a daily
+operational tool.
 
 ---
 
@@ -647,7 +679,7 @@ Contacts do not need to be restricted to the Deal's selected Company.
 
 ## D039 — Scale with incremental loading, not premature infrastructure
 
-Status: proposed
+Status: accepted direction
 
 As datasets grow, prefer:
 
@@ -665,15 +697,92 @@ Do not solve ordinary query/DOM scaling with microservices or Redis by default.
 
 Status: accepted direction
 
-Future AI mutations must call the same domain operations used by human workflows.
+Future AI mutations must call the same domain operations used by human
+workflows.
 
 AI must respect:
 
+- Better Auth
+- verified identity
 - tenant context
 - RBAC
 - validation
 - optimistic locking
 - database invariants
+- lifecycle policy
 - Activity logging
 
 Start AI with read-only/read-mostly use cases.
+
+---
+
+## D041 — Verified email is required for normal CRM access
+
+Status: accepted and implemented
+
+A valid Better Auth Session alone is not sufficient for CRM access.
+
+Normal CRM access requires:
+
+session.user.emailVerified = true
+
+Development login may still succeed before verification.
+
+The CRM authorization layer redirects unverified Users to the verification
+workflow.
+
+Reason:
+
+registration with an email address is not proof that the User controls that
+identity.
+
+Production email delivery and invitation acceptance are still separate future
+requirements.
+
+---
+
+## D042 — Existing inactive responsible Member may remain unchanged
+
+Status: accepted and implemented for Company and Deal editing patterns
+
+An existing relationship to a responsible Member may remain when that Member
+later becomes inactive.
+
+Changing unrelated fields must not require replacing the responsible Member.
+
+However:
+
+assigning a new responsible Member
+→ target Member must be active
+
+Reason:
+
+historical/business relationships should not make the entire record impossible
+to edit merely because a staff Member was later deactivated.
+
+---
+
+## D043 — Deal version changes on every real Deal mutation
+
+Status: accepted
+
+Deal.version represents collaborative state freshness.
+
+Every successful mutation that changes Deal business state must increment
+version.
+
+Current examples:
+
+- full edit
+- Stage transition
+- archive
+- restore
+
+A no-op Stage transition does not increment version.
+
+Future Deal mutation paths must preserve this invariant.
+
+Reason:
+
+if one mutation path fails to increment version, stale forms may incorrectly
+remain valid and overwrite newer state.
