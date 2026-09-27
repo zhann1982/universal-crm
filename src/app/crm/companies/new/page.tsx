@@ -1,6 +1,6 @@
 import {
-  asc,
   and,
+  asc,
   eq,
 } from "drizzle-orm";
 import Link from "next/link";
@@ -20,43 +20,79 @@ import {
 export default async function NewCompanyPage() {
   const {
     organization,
+    member,
+    permissions,
   } = await requirePermission(
     "companies.create",
   );
 
-  const members =
-    await db
-      .select({
+  /*
+   * F05.
+   *
+   * Пользователь с members.read
+   * может выбирать любого
+   * активного сотрудника.
+   *
+   * Пользователь без members.read
+   * получает только самого себя.
+   *
+   * Email сотрудников для
+   * owner-picker не загружается.
+   */
+  let members: Array<{
+    id: string;
+
+    displayName:
+      | string
+      | null;
+  }>;
+
+  if (
+    permissions.has(
+      "members.read",
+    )
+  ) {
+    members =
+      await db
+        .select({
+          id:
+            organizationMembers.id,
+
+          displayName:
+            organizationMembers.displayName,
+        })
+        .from(
+          organizationMembers,
+        )
+        .where(
+          and(
+            eq(
+              organizationMembers.organizationId,
+              organization.id,
+            ),
+
+            eq(
+              organizationMembers.status,
+              "active",
+            ),
+          ),
+        )
+        .orderBy(
+          asc(
+            organizationMembers.displayName,
+          ),
+        );
+  } else {
+    members = [
+      {
         id:
-          organizationMembers.id,
+          member.id,
 
         displayName:
-          organizationMembers.displayName,
-
-        email:
-          organizationMembers.email,
-      })
-      .from(
-        organizationMembers,
-      )
-      .where(
-        and(
-          eq(
-            organizationMembers.organizationId,
-            organization.id,
-          ),
-
-          eq(
-            organizationMembers.status,
-            "active",
-          ),
-        ),
-      )
-      .orderBy(
-        asc(
-          organizationMembers.displayName,
-        ),
-      );
+          member.displayName,
+      },
+    ];
+  }
 
   return (
     <div className="mx-auto max-w-5xl">

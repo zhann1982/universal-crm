@@ -1,4 +1,8 @@
-import { and, count, eq } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+} from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -6,65 +10,132 @@ import {
   organizationMembers,
   roles,
 } from "@/db/schema";
-import { getCurrentOrganization } from "@/lib/current-organization";
+import {
+  getCurrentAccessContext,
+} from "@/lib/auth/permissions";
+
+type DashboardCard = {
+  title: string;
+  value:
+    | string
+    | number;
+};
 
 export default async function CrmDashboardPage() {
-  const organization = await getCurrentOrganization();
+  const {
+    organization,
+    permissions,
+  } =
+    await getCurrentAccessContext();
 
-  const [clientsResult] = await db
-    .select({
-      count: count(),
-    })
-    .from(clients)
-    .where(
-      and(
-        eq(clients.organizationId, organization.id),
-        eq(clients.isArchived, false),
-      ),
-    );
+  const cards:
+    DashboardCard[] = [];
 
-  const [membersResult] = await db
-    .select({
-      count: count(),
-    })
-    .from(organizationMembers)
-    .where(
-      eq(
-        organizationMembers.organizationId,
-        organization.id,
-      ),
-    );
+  /*
+   * F05.
+   *
+   * Dashboard не должен
+   * раскрывать агрегированные
+   * данные модуля, если у
+   * пользователя нет read-доступа
+   * к этому модулю.
+   */
 
-  const [rolesResult] = await db
-    .select({
-      count: count(),
-    })
-    .from(roles)
-    .where(
-      eq(
-        roles.organizationId,
-        organization.id,
-      ),
-    );
+  if (
+    permissions.has(
+      "clients.read",
+    )
+  ) {
+    const [clientsResult] =
+      await db
+        .select({
+          count: count(),
+        })
+        .from(clients)
+        .where(
+          and(
+            eq(
+              clients.organizationId,
+              organization.id,
+            ),
 
-  const cards = [
-    {
+            eq(
+              clients.isArchived,
+              false,
+            ),
+          ),
+        );
+
+    cards.push({
       title: "Клиенты",
-      value: clientsResult.count,
-    },
-    {
+      value:
+        clientsResult.count,
+    });
+  }
+
+  if (
+    permissions.has(
+      "members.read",
+    )
+  ) {
+    const [membersResult] =
+      await db
+        .select({
+          count: count(),
+        })
+        .from(
+          organizationMembers,
+        )
+        .where(
+          eq(
+            organizationMembers.organizationId,
+            organization.id,
+          ),
+        );
+
+    cards.push({
       title: "Сотрудники",
-      value: membersResult.count,
-    },
-    {
+      value:
+        membersResult.count,
+    });
+  }
+
+  if (
+    permissions.has(
+      "roles.read",
+    )
+  ) {
+    const [rolesResult] =
+      await db
+        .select({
+          count: count(),
+        })
+        .from(roles)
+        .where(
+          eq(
+            roles.organizationId,
+            organization.id,
+          ),
+        );
+
+    cards.push({
       title: "Роли",
-      value: rolesResult.count,
-    },
-    {
-      title: "Организация",
-      value: organization.name,
-    },
-  ];
+      value:
+        rolesResult.count,
+    });
+  }
+
+  /*
+   * Название текущей Organization
+   * доступно любому участнику CRM:
+   * без Organization пользователь
+   * вообще не получает CRM access.
+   */
+  cards.push({
+    title: "Организация",
+    value:
+      organization.name,
+  });
 
   return (
     <div>
@@ -79,20 +150,28 @@ export default async function CrmDashboardPage() {
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card) => (
-          <div
-            key={card.title}
-            className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
-          >
-            <div className="text-sm text-slate-500">
-              {card.title}
-            </div>
+        {cards.map(
+          (card) => (
+            <div
+              key={
+                card.title
+              }
+              className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+              <div className="text-sm text-slate-500">
+                {
+                  card.title
+                }
+              </div>
 
-            <div className="mt-3 text-2xl font-bold">
-              {card.value}
+              <div className="mt-3 text-2xl font-bold">
+                {
+                  card.value
+                }
+              </div>
             </div>
-          </div>
-        ))}
+          ),
+        )}
       </div>
 
       <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6">

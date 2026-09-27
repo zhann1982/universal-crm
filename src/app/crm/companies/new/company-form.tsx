@@ -13,10 +13,8 @@ import type {
 
 type MemberOption = {
   id: string;
+
   displayName:
-    | string
-    | null;
-  email:
     | string
     | null;
 };
@@ -181,7 +179,6 @@ export function CompanyForm({
                     }
                   >
                     {member.displayName ||
-                      member.email ||
                       "Сотрудник"}
                   </option>
                 ),

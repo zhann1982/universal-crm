@@ -27,6 +27,16 @@ import {
   EditCompanyForm,
 } from "./edit-company-form";
 
+type MemberOption = {
+  id: string;
+
+  displayName:
+    | string
+    | null;
+
+  status: string;
+};
+
 export default async function EditCompanyPage({
   params,
 }: {
@@ -36,6 +46,8 @@ export default async function EditCompanyPage({
 }) {
   const {
     organization,
+    member,
+    permissions,
   } = await requirePermission(
     "companies.update",
   );
@@ -64,57 +76,143 @@ export default async function EditCompanyPage({
     notFound();
   }
 
-  const memberStatusCondition =
-    company.ownerMemberId
-      ? or(
-          eq(
+  let members:
+    MemberOption[] = [];
+
+  /*
+   * F05.
+   *
+   * С members.read можно видеть
+   * каталог активных сотрудников.
+   *
+   * Уже назначенный owner также
+   * остаётся доступным, даже если
+   * он стал неактивным.
+   *
+   * Email для owner-picker
+   * не загружается.
+   */
+  if (
+    permissions.has(
+      "members.read",
+    )
+  ) {
+    const memberStatusCondition =
+      company.ownerMemberId
+        ? or(
+            eq(
+              organizationMembers.status,
+              "active",
+            ),
+
+            eq(
+              organizationMembers.id,
+              company.ownerMemberId,
+            ),
+          )
+        : eq(
             organizationMembers.status,
             "active",
-          ),
+          );
 
-          eq(
+    members =
+      await db
+        .select({
+          id:
             organizationMembers.id,
-            company.ownerMemberId,
+
+          displayName:
+            organizationMembers.displayName,
+
+          status:
+            organizationMembers.status,
+        })
+        .from(
+          organizationMembers,
+        )
+        .where(
+          and(
+            eq(
+              organizationMembers.organizationId,
+              organization.id,
+            ),
+
+            memberStatusCondition,
           ),
         )
-      : eq(
-          organizationMembers.status,
-          "active",
-        );
-
-  const members =
-    await db
-      .select({
-        id:
-          organizationMembers.id,
-
-        displayName:
-          organizationMembers.displayName,
-
-        email:
-          organizationMembers.email,
-
-        status:
-          organizationMembers.status,
-      })
-      .from(
-        organizationMembers,
-      )
-      .where(
-        and(
-          eq(
-            organizationMembers.organizationId,
-            organization.id,
+        .orderBy(
+          asc(
+            organizationMembers.displayName,
           ),
+        );
+  } else {
+    /*
+     * Без members.read пользователь
+     * может назначить себя.
+     */
+    members.push({
+      id:
+        member.id,
 
-          memberStatusCondition,
-        ),
-      )
-      .orderBy(
-        asc(
-          organizationMembers.displayName,
-        ),
-      );
+      displayName:
+        member.displayName,
+
+      status:
+        member.status,
+    });
+
+    /*
+     * Если текущий owner Company —
+     * другой сотрудник, показываем
+     * только этого конкретного
+     * связанного Member.
+     *
+     * Это позволяет оставить
+     * существующего owner без
+     * изменения и сохраняет F08.
+     */
+    if (
+      company.ownerMemberId &&
+      company.ownerMemberId !==
+        member.id
+    ) {
+      const [currentOwner] =
+        await db
+          .select({
+            id:
+              organizationMembers.id,
+
+            displayName:
+              organizationMembers.displayName,
+
+            status:
+              organizationMembers.status,
+          })
+          .from(
+            organizationMembers,
+          )
+          .where(
+            and(
+              eq(
+                organizationMembers.id,
+                company.ownerMemberId,
+              ),
+
+              eq(
+                organizationMembers.organizationId,
+                organization.id,
+              ),
+            ),
+          )
+          .limit(1);
+
+      if (currentOwner) {
+        members.push(
+          currentOwner,
+        );
+      }
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl">

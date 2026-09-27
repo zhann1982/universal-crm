@@ -132,6 +132,8 @@ export async function createCompany(
 ): Promise<CreateCompanyState> {
   const {
     organization,
+    member,
+    permissions,
   } = await requirePermission(
     "companies.create",
   );
@@ -161,6 +163,39 @@ export async function createCompany(
 
   const data =
     result.data;
+
+    /*
+  * F05.
+  *
+  * Без members.read пользователь
+  * не может назначить ответственным
+  * произвольного сотрудника.
+  *
+  * Разрешены:
+  * - текущий пользователь
+  * - отсутствие ответственного
+  */
+  if (
+    data.ownerMemberId &&
+    !permissions.has(
+      "members.read",
+    ) &&
+    data.ownerMemberId !==
+      member.id
+  ) {
+    return {
+      values,
+
+      errors: {
+        ownerMemberId: [
+          "Нельзя назначить этого сотрудника.",
+        ],
+      },
+
+      message:
+        "Проверьте данные формы.",
+    };
+  }  
 
   if (
     !(await isValidOwner(
@@ -294,6 +329,8 @@ export async function updateCompany(
 ): Promise<UpdateCompanyState> {
   const {
     organization,
+    member,
+    permissions,
   } = await requirePermission(
     "companies.update",
   );
@@ -405,6 +442,40 @@ export async function updateCompany(
   const ownerChanged =
     data.ownerMemberId !==
     existingCompany.ownerMemberId;
+
+  /*
+  * F05.
+  *
+  * Если owner действительно меняется,
+  * пользователь без members.read
+  * может назначить только себя.
+  *
+  * Текущего чужого owner можно
+  * оставить без изменений — это
+  * сохраняет правило F08.
+  */
+  if (
+    ownerChanged &&
+    data.ownerMemberId &&
+    !permissions.has(
+      "members.read",
+    ) &&
+    data.ownerMemberId !==
+      member.id
+  ) {
+    return {
+      values,
+
+      errors: {
+        ownerMemberId: [
+          "Нельзя назначить этого сотрудника.",
+        ],
+      },
+
+      message:
+        "Проверьте данные формы.",
+    };
+  }
 
   if (
     ownerChanged &&

@@ -41,10 +41,6 @@ type MemberOption = {
   displayName:
     | string
     | null;
-
-  email:
-    | string
-    | null;
 };
 
 export function DealForm({
@@ -432,7 +428,6 @@ export function DealForm({
                     }
                   >
                     {member.displayName ||
-                      member.email ||
                       "Сотрудник"}
                   </option>
                 ),

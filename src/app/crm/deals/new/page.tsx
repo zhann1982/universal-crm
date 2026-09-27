@@ -162,6 +162,13 @@ export default async function NewDealPage({
         defaultPipeline.id,
     );
 
+  /*
+   * Company reference data.
+   *
+   * Пользователь получает список
+   * компаний только при наличии
+   * companies.read.
+   */
   const companyList =
     permissions.has(
       "companies.read",
@@ -202,12 +209,23 @@ export default async function NewDealPage({
           )
       : [];
 
+  /*
+   * F05.
+   *
+   * С members.read пользователь
+   * получает каталог активных
+   * сотрудников.
+   *
+   * Без members.read доступен
+   * только текущий пользователь.
+   *
+   * Email для owner-picker
+   * не загружается.
+   */
   let memberList: Array<{
     id: string;
+
     displayName:
-      | string
-      | null;
-    email:
       | string
       | null;
   }>;
@@ -225,9 +243,6 @@ export default async function NewDealPage({
 
           displayName:
             organizationMembers.displayName,
-
-          email:
-            organizationMembers.email,
         })
         .from(
           organizationMembers,
@@ -258,9 +273,6 @@ export default async function NewDealPage({
 
         displayName:
           member.displayName,
-
-        email:
-          member.email,
       },
     ];
   }

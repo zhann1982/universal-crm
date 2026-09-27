@@ -63,10 +63,6 @@ type MemberOption = {
     | string
     | null;
 
-  email:
-    | string
-    | null;
-
   status: string;
 };
 
@@ -274,8 +270,7 @@ export function EditCompanyForm({
                     }
                   >
                     {member.displayName ||
-                      member.email ||
-                      "Сотрудник"}
+                    "Сотрудник"}
                     {member.status !==
                     "active"
                       ? " (неактивен)"

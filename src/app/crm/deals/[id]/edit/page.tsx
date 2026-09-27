@@ -82,6 +82,13 @@ export default async function EditDealPage({
     notFound();
   }
 
+  /*
+   * Pipelines.
+   *
+   * Текущая Pipeline остаётся
+   * доступной даже если позже
+   * была архивирована.
+   */
   const pipelineList =
     await db
       .select({
@@ -165,8 +172,21 @@ export default async function EditDealPage({
           )
       : [];
 
+  /*
+   * Companies.
+   *
+   * С companies.read можно
+   * выбирать доступные компании.
+   *
+   * Без companies.read показываем
+   * только уже связанную Company,
+   * чтобы существующую связь
+   * можно было оставить без
+   * изменения.
+   */
   let companyList: Array<{
     id: string;
+
     name: string;
 
     taxId:
@@ -244,14 +264,23 @@ export default async function EditDealPage({
     ];
   }
 
+  /*
+   * F05 — owner picker.
+   *
+   * С members.read пользователь
+   * получает активных сотрудников.
+   *
+   * Уже назначенный owner также
+   * остаётся в списке, даже если
+   * стал неактивным.
+   *
+   * Email сотрудников в Deal
+   * owner-picker не передаётся.
+   */
   let memberList: Array<{
     id: string;
 
     displayName:
-      | string
-      | null;
-
-    email:
       | string
       | null;
   }> = [];
@@ -269,9 +298,6 @@ export default async function EditDealPage({
 
           displayName:
             organizationMembers.displayName,
-
-          email:
-            organizationMembers.email,
         })
         .from(
           organizationMembers,
@@ -307,17 +333,27 @@ export default async function EditDealPage({
           ),
         );
   } else {
+    /*
+     * Без members.read пользователь
+     * может назначить себя.
+     */
     memberList.push({
       id:
         member.id,
 
       displayName:
         member.displayName,
-
-      email:
-        member.email,
     });
 
+    /*
+     * Если текущий owner другой,
+     * показываем только уже
+     * связанного с Deal сотрудника.
+     *
+     * Это позволяет сохранить
+     * существующего owner, но
+     * не раскрывает каталог Team.
+     */
     if (
       deal.ownerMemberId &&
       deal.ownerMemberId !==
@@ -329,9 +365,6 @@ export default async function EditDealPage({
 
         displayName:
           deal.ownerDisplayName,
-
-        email:
-          deal.ownerEmail,
       });
     }
   }

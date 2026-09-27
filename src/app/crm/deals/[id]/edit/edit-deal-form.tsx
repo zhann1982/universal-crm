@@ -42,10 +42,6 @@ type MemberOption = {
   displayName:
     | string
     | null;
-
-  email:
-    | string
-    | null;
 };
 
 type InitialValues = {
@@ -436,7 +432,6 @@ export function EditDealForm({
                     }
                   >
                     {member.displayName ||
-                      member.email ||
                       "Сотрудник"}
                   </option>
                 ),
