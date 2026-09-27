@@ -60,10 +60,6 @@ type DealItem = {
   ownerDisplayName:
     | string
     | null;
-
-  ownerEmail:
-    | string
-    | null;
 };
 
 const stageTypeLabels:
@@ -557,7 +553,6 @@ export function KanbanBoard({
                                   Ответственный:{" "}
                                   <span className="text-slate-700">
                                     {deal.ownerDisplayName ||
-                                      deal.ownerEmail ||
                                       "Не назначен"}
                                   </span>
                                 </div>
@@ -566,10 +561,8 @@ export function KanbanBoard({
                                   Закрытие:{" "}
                                   <span className="text-slate-700">
                                     {deal.expectedCloseAt
-                                      ? new Date(
+                                      ? formatDateOnly(
                                           deal.expectedCloseAt,
-                                        ).toLocaleDateString(
-                                          "ru-RU",
                                         )
                                       : "Не указано"}
                                   </span>
@@ -589,4 +582,24 @@ export function KanbanBoard({
       </div>
     </div>
   );
+}
+
+function formatDateOnly(
+  value: string,
+) {
+  const [
+    year,
+    month,
+    day,
+  ] = value.split("-");
+
+  if (
+    !year ||
+    !month ||
+    !day
+  ) {
+    return value;
+  }
+
+  return `${day}.${month}.${year}`;
 }

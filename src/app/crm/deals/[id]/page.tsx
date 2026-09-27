@@ -449,30 +449,31 @@ export default async function DealPage({
         </section>
       </div>
 
-      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Компания
-        </h2>
+      {permissions.has(
+        "companies.read",
+      ) && (
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">
+            Компания
+          </h2>
 
-        {deal.companyId &&
-        deal.companyName ? (
-          <div className="mt-4">
-            <Link
-              href={`/crm/companies/${deal.companyId}`}
-              className="font-medium transition hover:text-blue-600 hover:underline"
-            >
-              {
-                deal.companyName
-              }
-            </Link>
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-slate-400">
-            Компания не
-            указана.
-          </p>
-        )}
-      </section>
+          {deal.companyId &&
+          deal.companyName ? (
+            <div className="mt-4">
+              <Link
+                href={`/crm/companies/${deal.companyId}`}
+                className="font-medium transition hover:text-blue-600 hover:underline"
+              >
+                {deal.companyName}
+              </Link>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-slate-400">
+              Компания не указана.
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">

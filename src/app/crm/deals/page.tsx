@@ -49,6 +49,7 @@ export default async function DealsPage({
 }) {
   const {
     organization,
+    member,
     permissions,
   } = await requirePermission(
     "deals.read",
@@ -256,11 +257,11 @@ export default async function DealsPage({
         companyName:
           companies.name,
 
+        ownerMemberId:
+          deals.ownerMemberId,
+
         ownerDisplayName:
           organizationMembers.displayName,
-
-        ownerEmail:
-          organizationMembers.email,
       })
       .from(deals)
       .leftJoin(
@@ -324,6 +325,16 @@ export default async function DealsPage({
       dealList,
     );
 
+  const canReadCompanies =
+    permissions.has(
+      "companies.read",
+    );
+
+  const canReadMembers =
+    permissions.has(
+      "members.read",
+    );
+
   const kanbanDeals =
     dealList.map(
       (deal) => ({
@@ -346,17 +357,24 @@ export default async function DealsPage({
           deal.expectedCloseAt,
 
         companyId:
-          deal.companyId,
+          canReadCompanies
+            ? deal.companyId
+            : null,
 
         companyName:
-          deal.companyName,
+          canReadCompanies
+            ? deal.companyName
+            : null,
 
         ownerDisplayName:
-          deal.ownerDisplayName,
-
-        ownerEmail:
-          deal.ownerEmail,
-      }),
+          canReadMembers ||
+          deal.ownerMemberId ===
+            member.id
+            ? deal.ownerDisplayName
+            : deal.ownerMemberId
+              ? "Сотрудник"
+              : null,
+              }),
     );
 
   return (
