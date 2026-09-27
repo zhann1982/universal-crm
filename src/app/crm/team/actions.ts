@@ -243,12 +243,12 @@ async function replaceMemberRolesWithOwnerGuard(input: {
               EXISTS(
                 SELECT 1
                 FROM member_roles mr
-                INNER JOIN roles current_role
-                  ON current_role.id = mr.role_id
+                INNER JOIN roles assigned_role
+                  ON assigned_role.id = mr.role_id
                 WHERE
                   mr.member_id = ${memberId}::uuid
-                  AND current_role.organization_id = ${organizationId}::uuid
-                  AND current_role.system_key = 'owner'
+                  AND assigned_role.organization_id = ${organizationId}::uuid
+                  AND assigned_role.system_key = 'owner'
               ) AS current_owner,
 
               EXISTS(
