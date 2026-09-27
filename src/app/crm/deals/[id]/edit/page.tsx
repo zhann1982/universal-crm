@@ -346,8 +346,8 @@ export default async function EditDealPage({
 
     /*
      * Если текущий owner другой,
-     * показываем только уже
-     * связанного с Deal сотрудника.
+     * сохраняем существующий ID,
+     * но скрываем имя сотрудника.
      *
      * Это позволяет сохранить
      * существующего owner, но
@@ -363,7 +363,7 @@ export default async function EditDealPage({
           deal.ownerMemberId,
 
         displayName:
-          deal.ownerDisplayName,
+          "Сотрудник",
       });
     }
   }

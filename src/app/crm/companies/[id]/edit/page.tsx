@@ -163,9 +163,9 @@ export default async function EditCompanyPage({
 
     /*
      * Если текущий owner Company —
-     * другой сотрудник, показываем
-     * только этого конкретного
-     * связанного Member.
+     * другой сотрудник, сохраняем
+     * его ID и статус, но не
+     * запрашиваем и не раскрываем имя.
      *
      * Это позволяет оставить
      * существующего owner без
@@ -181,9 +181,6 @@ export default async function EditCompanyPage({
           .select({
             id:
               organizationMembers.id,
-
-            displayName:
-              organizationMembers.displayName,
 
             status:
               organizationMembers.status,
@@ -207,9 +204,10 @@ export default async function EditCompanyPage({
           .limit(1);
 
       if (currentOwner) {
-        members.push(
-          currentOwner,
-        );
+        members.push({
+          ...currentOwner,
+          displayName: "Сотрудник",
+        });
       }
     }
   }
