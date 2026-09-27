@@ -217,12 +217,24 @@ export async function unlinkClientFromCompany(
     companyId,
   } = result.data;
 
+  /*
+   * Архивированный Client считается
+   * недоступным для изменения связей.
+   *
+   * Раньше unlink проверял только
+   * deletedAt и поэтому прямой вызов
+   * Server Action мог изменить связь
+   * архивированного Client.
+   */
   const [client] =
     await db
       .select({
-        id: clients.id,
+        id:
+          clients.id,
       })
-      .from(clients)
+      .from(
+        clients,
+      )
       .where(
         and(
           eq(
@@ -235,6 +247,11 @@ export async function unlinkClientFromCompany(
             organization.id,
           ),
 
+          eq(
+            clients.isArchived,
+            false,
+          ),
+
           isNull(
             clients.deletedAt,
           ),
@@ -242,12 +259,26 @@ export async function unlinkClientFromCompany(
       )
       .limit(1);
 
+  /*
+   * Для unlink сохраняем текущую
+   * семантику Company:
+   *
+   * существующую связь разрешено
+   * удалить даже если Company уже
+   * находится в архиве.
+   *
+   * F11 относится именно к
+   * immutable-состоянию Client.
+   */
   const [company] =
     await db
       .select({
-        id: companies.id,
+        id:
+          companies.id,
       })
-      .from(companies)
+      .from(
+        companies,
+      )
       .where(
         and(
           eq(
@@ -276,28 +307,51 @@ export async function unlinkClientFromCompany(
     );
   }
 
-  await db
-    .delete(
-      clientCompanies,
-    )
-    .where(
-      and(
-        eq(
-          clientCompanies.organizationId,
-          organization.id,
-        ),
+  const deleted =
+    await db
+      .delete(
+        clientCompanies,
+      )
+      .where(
+        and(
+          eq(
+            clientCompanies.organizationId,
+            organization.id,
+          ),
 
-        eq(
+          eq(
+            clientCompanies.clientId,
+            client.id,
+          ),
+
+          eq(
+            clientCompanies.companyId,
+            company.id,
+          ),
+        ),
+      )
+      .returning({
+        clientId:
           clientCompanies.clientId,
-          client.id,
-        ),
 
-        eq(
+        companyId:
           clientCompanies.companyId,
-          company.id,
-        ),
-      ),
+      });
+
+  /*
+   * Если связи уже нет, это безопасный
+   * idempotent результат.
+   *
+   * Никакие чужие или cross-tenant
+   * записи при этом не изменяются.
+   */
+  if (
+    deleted.length === 0
+  ) {
+    redirect(
+      `/crm/clients/${client.id}`,
     );
+  }
 
   revalidatePath(
     `/crm/clients/${client.id}`,

@@ -1204,6 +1204,9 @@ export async function archiveDeal(
 
         pipelineId:
           deals.pipelineId,
+
+        version:
+          deals.version,
       })
       .from(
         deals,
@@ -1238,46 +1241,79 @@ export async function archiveDeal(
     );
   }
 
-  await db
-    .update(
-      deals,
-    )
-    .set({
-      isArchived:
-        true,
+  /*
+   * Archive — тоже optimistic mutation.
+   *
+   * Сделку архивируем только если
+   * между SELECT и UPDATE её version
+   * осталась прежней.
+   */
+  const [archived] =
+    await db
+      .update(
+        deals,
+      )
+      .set({
+        isArchived:
+          true,
 
-      /*
-       * Любая мутация Deal
-       * меняет version.
-       */
-      version:
-        sql`${deals.version} + 1`,
+        version:
+          sql`${deals.version} + 1`,
 
-      updatedAt:
-        new Date(),
-    })
-    .where(
-      and(
-        eq(
+        updatedAt:
+          new Date(),
+      })
+      .where(
+        and(
+          eq(
+            deals.id,
+            deal.id,
+          ),
+
+          eq(
+            deals.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            deals.version,
+            deal.version,
+          ),
+
+          eq(
+            deals.isArchived,
+            false,
+          ),
+
+          isNull(
+            deals.deletedAt,
+          ),
+        ),
+      )
+      .returning({
+        id:
           deals.id,
-          deal.id,
-        ),
 
-        eq(
-          deals.organizationId,
-          organization.id,
-        ),
+        pipelineId:
+          deals.pipelineId,
 
-        eq(
-          deals.isArchived,
-          false,
-        ),
+        version:
+          deals.version,
+      });
 
-        isNull(
-          deals.deletedAt,
-        ),
-      ),
+  /*
+   * 0 rows:
+   *
+   * после SELECT Deal уже успела
+   * измениться или изменить lifecycle.
+   *
+   * Не сообщаем ложный успех.
+   */
+  if (!archived) {
+    redirect(
+      `/crm/deals/${deal.id}?error=lifecycle-conflict`,
     );
+  }
 
   revalidatePath(
     "/crm",
@@ -1292,11 +1328,11 @@ export async function archiveDeal(
   );
 
   revalidatePath(
-    `/crm/deals/${deal.id}`,
+    `/crm/deals/${archived.id}`,
   );
 
   redirect(
-    `/crm/deals?pipeline=${deal.pipelineId}`,
+    `/crm/deals?pipeline=${archived.pipelineId}`,
   );
 }
 
@@ -1325,6 +1361,9 @@ export async function restoreDeal(
       .select({
         id:
           deals.id,
+
+        version:
+          deals.version,
       })
       .from(
         deals,
@@ -1359,42 +1398,66 @@ export async function restoreDeal(
     );
   }
 
-  await db
-    .update(
-      deals,
-    )
-    .set({
-      isArchived:
-        false,
+  /*
+   * Restore выполняется только
+   * относительно той version,
+   * которую мы только что прочитали.
+   */
+  const [restored] =
+    await db
+      .update(
+        deals,
+      )
+      .set({
+        isArchived:
+          false,
 
-      version:
-        sql`${deals.version} + 1`,
+        version:
+          sql`${deals.version} + 1`,
 
-      updatedAt:
-        new Date(),
-    })
-    .where(
-      and(
-        eq(
+        updatedAt:
+          new Date(),
+      })
+      .where(
+        and(
+          eq(
+            deals.id,
+            deal.id,
+          ),
+
+          eq(
+            deals.organizationId,
+            organization.id,
+          ),
+
+          eq(
+            deals.version,
+            deal.version,
+          ),
+
+          eq(
+            deals.isArchived,
+            true,
+          ),
+
+          isNull(
+            deals.deletedAt,
+          ),
+        ),
+      )
+      .returning({
+        id:
           deals.id,
-          deal.id,
-        ),
 
-        eq(
-          deals.organizationId,
-          organization.id,
-        ),
+        version:
+          deals.version,
+      });
 
-        eq(
-          deals.isArchived,
-          true,
-        ),
-
-        isNull(
-          deals.deletedAt,
-        ),
-      ),
+  if (!restored) {
+    redirect(
+      `/crm/deals/${deal.id}?error=lifecycle-conflict`,
     );
+  }
 
   revalidatePath(
     "/crm",
@@ -1409,10 +1472,10 @@ export async function restoreDeal(
   );
 
   revalidatePath(
-    `/crm/deals/${deal.id}`,
+    `/crm/deals/${restored.id}`,
   );
 
   redirect(
-    `/crm/deals/${deal.id}`,
+    `/crm/deals/${restored.id}`,
   );
 }

@@ -246,6 +246,20 @@ export default async function DealPage({
       )}
 
       {error ===
+        "lifecycle-conflict" && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          Состояние сделки изменилось
+          другим действием до завершения
+          операции. Архивирование или
+          восстановление не было выполнено
+          поверх более нового состояния.
+          Проверьте актуальные данные
+          и при необходимости повторите
+          операцию.
+        </div>
+      )}
+
+      {error ===
         "stage-error" && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
           Не удалось изменить этап
