@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   index,
   pgTable,
   primaryKey,
@@ -1209,13 +1210,18 @@ export const deals =
         },
       ),
 
+      /*
+      * Это именно календарная дата,
+      * а не момент времени.
+      *
+      * Например:
+      * 2026-10-15
+      *
+      * Часовой пояс здесь не нужен.
+      */
       expectedCloseAt:
-        timestamp(
+        date(
           "expected_close_at",
-          {
-            withTimezone:
-              true,
-          },
         ),
 
       closedAt: timestamp(

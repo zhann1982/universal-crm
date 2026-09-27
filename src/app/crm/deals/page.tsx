@@ -343,9 +343,7 @@ export default async function DealsPage({
           deal.stageId,
 
         expectedCloseAt:
-          deal.expectedCloseAt
-            ? deal.expectedCloseAt.toISOString()
-            : null,
+          deal.expectedCloseAt,
 
         companyId:
           deal.companyId,

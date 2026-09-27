@@ -394,18 +394,8 @@ export async function createDeal(
     }
   }
 
-  let expectedCloseAt:
-    | Date
-    | null = null;
-
-  if (
-    data.expectedCloseAt
-  ) {
-    expectedCloseAt =
-      new Date(
-        `${data.expectedCloseAt}T12:00:00.000Z`,
-      );
-  }
+  const expectedCloseAt =
+    data.expectedCloseAt;
 
   const isClosed =
     stage.type ===
@@ -661,17 +651,27 @@ export async function updateDeal(
   const data =
     result.data;
 
+  /*
+   * Здесь намеренно читаем Deal
+   * независимо от archive-state.
+   *
+   * Благодаря этому можем отличить:
+   *
+   * - Deal не существует / чужой tenant
+   * - Deal была архивирована после
+   *   открытия формы
+   */
   const [existingDeal] =
     await db
       .select({
         id:
           deals.id,
 
-        /*
-         * Текущая версия в БД.
-         */
         version:
           deals.version,
+
+        isArchived:
+          deals.isArchived,
 
         pipelineId:
           deals.pipelineId,
@@ -703,11 +703,6 @@ export async function updateDeal(
             organization.id,
           ),
 
-          eq(
-            deals.isArchived,
-            false,
-          ),
-
           isNull(
             deals.deletedAt,
           ),
@@ -719,6 +714,24 @@ export async function updateDeal(
     redirect(
       "/crm/forbidden",
     );
+  }
+
+  /*
+   * Если Deal была архивирована
+   * после открытия формы,
+   * не считаем это forbidden.
+   *
+   * Это lifecycle conflict.
+   */
+  if (
+    existingDeal.isArchived
+  ) {
+    return {
+      values,
+
+      message:
+        "Сделка была архивирована после открытия формы. Изменения не сохранены. Вернитесь к актуальной версии сделки.",
+    };
   }
 
   /*
@@ -1019,18 +1032,8 @@ export async function updateDeal(
     }
   }
 
-  let expectedCloseAt:
-    | Date
-    | null = null;
-
-  if (
-    data.expectedCloseAt
-  ) {
-    expectedCloseAt =
-      new Date(
-        `${data.expectedCloseAt}T12:00:00.000Z`,
-      );
-  }
+  const expectedCloseAt =
+    data.expectedCloseAt;
 
   const targetIsClosed =
     stage.type ===
@@ -1053,6 +1056,9 @@ export async function updateDeal(
      * произошла после SELECT выше,
      * UPDATE разрешён только при
      * прежней version.
+     *
+     * isArchived=false здесь
+     * обязательно оставляем.
      */
     const updated =
       await db
@@ -1242,7 +1248,7 @@ export async function archiveDeal(
   }
 
   /*
-   * Archive — тоже optimistic mutation.
+   * Archive — optimistic mutation.
    *
    * Сделку архивируем только если
    * между SELECT и UPDATE её version

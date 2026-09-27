@@ -401,14 +401,8 @@ export default async function EditDealPage({
             "",
 
           expectedCloseAt:
-            deal.expectedCloseAt
-              ? deal.expectedCloseAt
-                  .toISOString()
-                  .slice(
-                    0,
-                    10,
-                  )
-              : "",
+            deal.expectedCloseAt ??
+            "",
 
           notes:
             deal.notes ??

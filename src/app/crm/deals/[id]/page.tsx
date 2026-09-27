@@ -392,8 +392,8 @@ export default async function DealPage({
               label="Ожидаемое закрытие"
               value={
                 deal.expectedCloseAt
-                  ? deal.expectedCloseAt.toLocaleDateString(
-                      "ru-RU",
+                  ? formatDateOnly(
+                      deal.expectedCloseAt,
                     )
                   : null
               }
@@ -492,6 +492,26 @@ export default async function DealPage({
       </section>
     </div>
   );
+}
+
+function formatDateOnly(
+  value: string,
+) {
+  const [
+    year,
+    month,
+    day,
+  ] = value.split("-");
+
+  if (
+    !year ||
+    !month ||
+    !day
+  ) {
+    return value;
+  }
+
+  return `${day}.${month}.${year}`;
 }
 
 function InfoItem({

@@ -57,29 +57,94 @@ const currencySchema = z
       : value,
   );
 
+/*
+ * Строгая проверка календарной
+ * даты в формате YYYY-MM-DD.
+ *
+ * В отличие от Date.parse(),
+ * функция не нормализует:
+ *
+ * 2026-02-31
+ * 2026-04-31
+ * 2026-02-29
+ *
+ * в соседний месяц.
+ */
+export function isStrictIsoCalendarDate(
+  value: string,
+) {
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+      value,
+    );
+
+  if (!match) {
+    return false;
+  }
+
+  const year =
+    Number(match[1]);
+
+  const month =
+    Number(match[2]);
+
+  const day =
+    Number(match[3]);
+
+  /*
+   * Для текущей CRM не принимаем
+   * условный ISO-год 0000.
+   */
+  if (
+    year < 1 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1
+  ) {
+    return false;
+  }
+
+  const isLeapYear =
+    year % 4 === 0 &&
+    (
+      year % 100 !== 0 ||
+      year % 400 === 0
+    );
+
+  const daysInMonth = [
+    31,
+    isLeapYear
+      ? 29
+      : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+
+  return (
+    day <=
+    daysInMonth[
+      month - 1
+    ]
+  );
+}
+
 const optionalDate = z
   .string()
   .trim()
   .refine(
-    (value) => {
-      if (value === "") {
-        return true;
-      }
-
-      if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(
-          value,
-        )
-      ) {
-        return false;
-      }
-
-      return !Number.isNaN(
-        Date.parse(
-          `${value}T12:00:00.000Z`,
-        ),
-      );
-    },
+    (value) =>
+      value === "" ||
+      isStrictIsoCalendarDate(
+        value,
+      ),
     "Некорректная дата",
   )
   .transform((value) =>
