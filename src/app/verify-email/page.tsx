@@ -9,6 +9,9 @@ import {
 import {
   auth,
 } from "@/lib/auth/auth";
+import {
+  getSafeNextPath,
+} from "@/lib/auth/safe-next-path";
 
 import {
   ResendVerificationButton,
@@ -24,6 +27,11 @@ type SearchParams = {
     | string
     | string[]
     | undefined;
+
+  next?:
+    | string
+    | string[]
+    | undefined;
 };
 
 export default async function VerifyEmailPage({
@@ -35,6 +43,17 @@ export default async function VerifyEmailPage({
   const params =
     await searchParams;
 
+  const nextPath =
+    getSafeNextPath(
+      params.next,
+      "/crm",
+    );
+
+  const currentVerifyPath =
+    `/verify-email?next=${encodeURIComponent(
+      nextPath,
+    )}`;
+
   const session =
     await auth.api.getSession({
       headers:
@@ -43,12 +62,15 @@ export default async function VerifyEmailPage({
 
   if (!session) {
     redirect(
-      "/login",
+      `/login?next=${encodeURIComponent(
+        currentVerifyPath,
+      )}`,
     );
   }
 
   const verified =
-    session.user.emailVerified;
+    session.user
+      .emailVerified;
 
   const verificationError =
     Array.isArray(
@@ -56,6 +78,16 @@ export default async function VerifyEmailPage({
     )
       ? params.error[0]
       : params.error;
+
+  const verificationCallbackURL =
+    `/verify-email?verified=1&next=${encodeURIComponent(
+      nextPath,
+    )}`;
+
+  const continueLabel =
+    nextPath === "/crm"
+      ? "Открыть CRM"
+      : "Продолжить";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
@@ -66,7 +98,7 @@ export default async function VerifyEmailPage({
 
         {verified ? (
           <>
-            <div className="mt-6 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700 inline-block">
+            <div className="mt-6 inline-block rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">
               Email подтверждён
             </div>
 
@@ -78,18 +110,33 @@ export default async function VerifyEmailPage({
               Владение адресом{" "}
               <strong>
                 {
-                  session.user.email
+                  session.user
+                    .email
                 }
               </strong>{" "}
               подтверждено.
             </p>
 
+            {nextPath !==
+              "/crm" && (
+              <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
+                Теперь можно
+                продолжить действие,
+                которое потребовало
+                подтверждения email.
+              </div>
+            )}
+
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/crm"
+                href={
+                  nextPath
+                }
                 className="rounded-lg bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
               >
-                Открыть CRM
+                {
+                  continueLabel
+                }
               </Link>
 
               <Link
@@ -112,8 +159,10 @@ export default async function VerifyEmailPage({
 
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Перед доступом к CRM
-              необходимо подтвердить,
-              что адрес принадлежит вам.
+              или принятием
+              приглашения необходимо
+              подтвердить, что адрес
+              принадлежит вам.
             </p>
 
             <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -123,7 +172,8 @@ export default async function VerifyEmailPage({
 
               <div className="mt-1 break-all text-sm font-medium text-slate-800">
                 {
-                  session.user.email
+                  session.user
+                    .email
                 }
               </div>
             </div>
@@ -132,18 +182,23 @@ export default async function VerifyEmailPage({
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 Ссылка подтверждения
                 недействительна или
-                истекла. Создайте новую.
+                истекла. Создайте
+                новую.
               </div>
             )}
 
             <ResendVerificationButton
               email={
-                session.user.email
+                session.user
+                  .email
               }
               developmentMode={
                 process.env
                   .NODE_ENV !==
                 "production"
+              }
+              callbackURL={
+                verificationCallbackURL
               }
             />
 
@@ -156,8 +211,9 @@ export default async function VerifyEmailPage({
                 </strong>{" "}
                 настоящее письмо пока
                 не отправляется.
-                Verification URL появится
-                в терминале, где запущен{" "}
+                Verification URL
+                появится в терминале,
+                где запущен{" "}
                 <code>
                   npm run dev
                 </code>

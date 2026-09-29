@@ -1,6 +1,6 @@
 # Universal CRM — Current Status
 
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 ## Source-of-truth note
 
@@ -33,11 +33,15 @@ Repeated local checks during stabilization:
 - `npx tsc --noEmit --incremental false`
 - `npm run lint`
 
-Recent F05 permission scenarios were manually checked in the browser and reported working.
+Latest complete local verification after F02 invitation stabilization:
 
-F06 Owner protection was also manually verified through the Team UI and verified with real PostgreSQL concurrency integration tests against Neon.
+- `npm test` — 30 tests passed
+- `npm run test:integration` — 7 tests passed
+- `npx tsc --noEmit --incremental false` — passed
+- `npm run lint` — passed
+- `npm run build` — passed
 
-A fresh complete production build after all latest local changes has not yet been recorded.
+Current PostgreSQL integration coverage includes both Owner invariants and invitation concurrency behavior.
 
 No GitHub Actions CI workflow exists yet.
 
@@ -73,15 +77,48 @@ FIXED
 
 F02:
 
-PARTIALLY FIXED / DEVELOPMENT-SAFE INTERMEDIATE STATE
+FIXED FOR CORE AUTHORIZATION / TRANSACTION FLOW
 
-Still missing for production:
+Implemented:
 
-- real email delivery
-- invitation token
-- expiration
-- authenticated acceptance
-- production onboarding policy
+- dedicated Organization invitation records
+- canonical intended email
+- cryptographically random opaque token
+- SHA-256 token-hash storage
+- invitation expiration
+- accepted / revoked lifecycle fields
+- inviter identity
+- one Role per invitation for the current Team UX
+- no Membership before invitation acceptance
+- authenticated Better Auth acceptance
+- verified-email requirement
+- exact canonical identity match
+- Organization activity revalidation
+- Role tenant revalidation during acceptance
+- duplicate Membership prevention
+- one-time acceptance
+- concurrency-safe invitation creation
+- concurrency-safe invitation acceptance
+- safe same-origin continuation through login/register/email verification
+- `/invite` acceptance page
+
+Concurrency uses PostgreSQL transaction advisory locks.
+
+Creation and acceptance share the canonical-email lock namespace so Membership acquisition cannot race with creation of another active invitation.
+
+Acceptance also protects reuse of the same token.
+
+Current development limitation:
+
+- production email delivery is not configured
+- invitation token/link is currently transferred manually during development
+- invitation administration UX for listing/revoking/resending invitations can be improved later
+
+These are operational/product follow-ups, not the original F02 authorization flaw.
+
+Decision:
+
+D047
 
 ---
 
@@ -430,12 +467,23 @@ Automated unit/regression coverage currently includes:
 - `_` and `%` literal email identity behavior
 - strict Deal calendar date validation
 - Deal Stage page-version conflict behavior
+- safe same-origin `next` redirect validation
+- invitation token generation and hashing
 
 PostgreSQL integration coverage currently includes:
 
 - concurrent Owner-role removal
 - concurrent Owner deactivation
 - last active Owner invariant after concurrent destructive requests
+- concurrent acceptance of the same invitation
+- concurrent acceptance of separate invitations for the same identity
+- invitation identity mismatch rejection
+- concurrent invitation creation for the same Organization/email
+- replacement after an expired invitation
+
+Current result:
+
+7 / 7 integration tests passing.
 
 Commands:
 
@@ -479,7 +527,7 @@ Do not run destructive integration tests against production data.
 
 F01 — FIXED
 
-F02 — PARTIALLY FIXED / DEVELOPMENT-SAFE INTERMEDIATE STATE
+F02 — FIXED FOR CORE AUTHORIZATION / TRANSACTION FLOW
 
 F03 — FIXED
 
@@ -523,11 +571,11 @@ Do not start another large module yet.
 
 Priority:
 
-1. F02 — production invitation / membership acquisition
-2. regression tests for completed stabilization work
-3. GitHub Actions CI
-4. stronger PostgreSQL invariants
-5. F12 scaling work as datasets grow
+1. broader regression tests for completed stabilization work
+2. GitHub Actions CI
+3. stronger PostgreSQL invariants
+4. F12 scaling work as datasets grow
+5. production invitation email delivery and invitation administration UX
 6. continue extracting genuinely shared business operations into focused modules
 
 After sufficient stabilization:

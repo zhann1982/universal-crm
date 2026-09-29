@@ -1,25 +1,75 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import {
+  Suspense,
+  useState,
+} from "react";
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 
-import { authClient } from "@/lib/auth/auth-client";
-import { useRouter } from "next/navigation";
+import {
+  authClient,
+} from "@/lib/auth/auth-client";
+import {
+  getSafeNextPath,
+} from "@/lib/auth/safe-next-path";
 
 export default function LoginPage() {
-  const router = useRouter();
-  
+  return (
+    <Suspense
+      fallback={
+        <AuthPageLoading />
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
+  const router =
+    useRouter();
+
+  const searchParams =
+    useSearchParams();
+
+  const nextPath =
+    getSafeNextPath(
+      searchParams.get(
+        "next",
+      ),
+      "/crm",
+    );
+
   const [email, setEmail] =
     useState("");
 
-  const [password, setPassword] =
-    useState("");
+  const [
+    password,
+    setPassword,
+  ] = useState("");
 
-  const [error, setError] =
-    useState<string | null>(null);
+  const [
+    error,
+    setError,
+  ] = useState<
+    string | null
+  >(null);
 
-  const [isPending, setIsPending] =
-    useState(false);
+  const [
+    isPending,
+    setIsPending,
+  ] = useState(false);
+
+  const registerHref =
+    nextPath === "/crm"
+      ? "/register"
+      : `/register?next=${encodeURIComponent(
+          nextPath,
+        )}`;
 
   async function handleSubmit(
     event:
@@ -35,10 +85,14 @@ export default function LoginPage() {
         error:
           signInError,
       } =
-        await authClient.signIn.email({
-          email: email.trim(),
-          password,
-        });
+        await authClient
+          .signIn
+          .email({
+            email:
+              email.trim(),
+
+            password,
+          });
 
       if (signInError) {
         setError(
@@ -49,9 +103,11 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/crm");
-      router.refresh();
+      router.push(
+        nextPath,
+      );
 
+      router.refresh();
     } catch (cause) {
       console.error(
         "Login failed:",
@@ -84,7 +140,9 @@ export default function LoginPage() {
         </div>
 
         <form
-          onSubmit={handleSubmit}
+          onSubmit={
+            handleSubmit
+          }
           className="mt-8 space-y-5"
         >
           <div>
@@ -101,9 +159,12 @@ export default function LoginPage() {
               required
               autoComplete="email"
               value={email}
-              onChange={(event) =>
+              onChange={(
+                event,
+              ) =>
                 setEmail(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-500"
@@ -124,9 +185,12 @@ export default function LoginPage() {
               required
               autoComplete="current-password"
               value={password}
-              onChange={(event) =>
+              onChange={(
+                event,
+              ) =>
                 setPassword(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-500"
@@ -141,7 +205,9 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={isPending}
+            disabled={
+              isPending
+            }
             className="w-full rounded-lg bg-slate-950 px-5 py-3 font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending
@@ -153,12 +219,24 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-sm text-slate-500">
           Нет аккаунта?{" "}
           <Link
-            href="/register"
+            href={
+              registerHref
+            }
             className="font-medium text-slate-950 hover:underline"
           >
             Зарегистрироваться
           </Link>
         </p>
+      </div>
+    </main>
+  );
+}
+
+function AuthPageLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+      <div className="text-sm text-slate-500">
+        Загрузка...
       </div>
     </main>
   );

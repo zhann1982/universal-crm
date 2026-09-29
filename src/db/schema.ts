@@ -468,6 +468,148 @@ export const memberRoles =
     ],
   );
 
+
+/*
+|--------------------------------------------------------------------------
+| Organization Invitations
+|--------------------------------------------------------------------------
+|
+| Приглашение пользователя в Organization.
+|
+| В базе хранится только hash токена.
+| Сам raw token существует только в ссылке приглашения.
+|
+*/
+
+export const organizationInvitations =
+  pgTable(
+    "organization_invitations",
+    {
+      id: uuid("id")
+        .defaultRandom()
+        .primaryKey(),
+
+      organizationId: uuid(
+        "organization_id",
+      )
+        .notNull()
+        .references(
+          () => organizations.id,
+          {
+            onDelete: "cascade",
+          },
+        ),
+
+      emailNormalized: varchar(
+        "email_normalized",
+        {
+          length: 320,
+        },
+      ).notNull(),
+
+      roleId: uuid(
+        "role_id",
+      )
+        .notNull()
+        .references(
+          () => roles.id,
+          {
+            onDelete: "restrict",
+          },
+        ),
+
+      tokenHash: varchar(
+        "token_hash",
+        {
+          length: 64,
+        },
+      ).notNull(),
+
+      invitedByMemberId: uuid(
+        "invited_by_member_id",
+      ).references(
+        () => organizationMembers.id,
+        {
+          onDelete: "set null",
+        },
+      ),
+
+      acceptedByUserId: varchar(
+        "accepted_by_user_id",
+        {
+          length: 255,
+        },
+      ),
+
+      expiresAt: timestamp(
+        "expires_at",
+        {
+          withTimezone: true,
+        },
+      ).notNull(),
+
+      acceptedAt: timestamp(
+        "accepted_at",
+        {
+          withTimezone: true,
+        },
+      ),
+
+      revokedAt: timestamp(
+        "revoked_at",
+        {
+          withTimezone: true,
+        },
+      ),
+
+      createdAt: timestamp(
+        "created_at",
+        {
+          withTimezone: true,
+        },
+      )
+        .defaultNow()
+        .notNull(),
+
+      updatedAt: timestamp(
+        "updated_at",
+        {
+          withTimezone: true,
+        },
+      )
+        .defaultNow()
+        .notNull(),
+    },
+    (table) => [
+      uniqueIndex(
+        "organization_invitations_token_hash_unique",
+      ).on(
+        table.tokenHash,
+      ),
+
+      index(
+        "organization_invitations_org_email_idx",
+      ).on(
+        table.organizationId,
+        table.emailNormalized,
+      ),
+
+      index(
+        "organization_invitations_org_created_at_idx",
+      ).on(
+        table.organizationId,
+        table.createdAt,
+      ),
+
+      index(
+        "organization_invitations_expires_at_idx",
+      ).on(
+        table.expiresAt,
+      ),
+    ],
+  );
+
+
 /*
 |--------------------------------------------------------------------------
 | Clients

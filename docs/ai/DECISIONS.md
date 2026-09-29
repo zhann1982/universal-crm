@@ -534,3 +534,81 @@ An explicit ownership-transfer UI may be added later for better administration U
 Reason:
 
 Role names are editable/display-oriented labels, while authorization requires stable machine identity. The last-Owner rule is a concurrency invariant and cannot be protected reliably by a separate read/check/write sequence.
+
+---
+
+## D047 — Organization Membership is acquired through verified one-time invitations
+
+Status: accepted and implemented for the core authorization flow
+
+Normal Team onboarding no longer creates Membership merely because an administrator knows an email address.
+
+Invitation model:
+
+- invitation belongs to one Organization
+- intended identity is stored as canonical normalized email
+- initial policy assigns one Role per invitation
+- raw invitation token is generated from cryptographically secure random bytes
+- only the SHA-256 token hash is stored in PostgreSQL
+- invitation has an expiration timestamp
+- invitation records acceptedAt / revokedAt lifecycle
+- Membership does not exist before successful acceptance
+
+Acceptance requires:
+
+authenticated Better Auth User
+→ verified email
+→ exact canonical identity match
+→ valid non-expired non-revoked invitation
+→ Organization still active
+→ Role still belongs to that Organization
+→ no existing Membership
+→ atomic Membership + Role creation
+→ invitation marked accepted
+
+Invitation acceptance never trusts browser-supplied userId, email or organizationId.
+
+The authenticated Better Auth Session is the authoritative User identity.
+
+Concurrency:
+
+Invitation creation and invitation acceptance use the shared canonical-email advisory-lock namespace:
+
+`universal-crm-invitation-email`
+
+Acceptance additionally serializes reuse of the same token.
+
+This prevents:
+
+- two concurrent create requests from producing multiple active invitations for the same Organization/email
+- two concurrent accept requests from accepting the same token twice
+- separate invitations for the same identity from creating duplicate Memberships
+- invitation creation racing past Membership acquisition
+
+The implementation uses focused raw Neon SQL transactions where concurrency ordering is required. Normal database access remains Drizzle-based.
+
+Redirect continuation:
+
+Authentication onboarding accepts only validated same-origin application paths through `getSafeNextPath`.
+
+External and protocol-relative redirect targets are rejected.
+
+Current development delivery:
+
+The raw invitation token can be surfaced manually because a production email provider is not yet configured.
+
+Real email delivery is an operational follow-up and does not change the authorization model.
+
+Verification:
+
+- invitation token unit tests
+- safe redirect unit tests
+- concurrent same-token acceptance integration test
+- concurrent invitations for the same identity integration test
+- wrong-email rejection integration test
+- concurrent invitation creation integration test
+- expired invitation replacement integration test
+
+Reason:
+
+Knowledge of an email address is not proof of ownership. CRM Membership is an authorization boundary and therefore requires authenticated, verified and transaction-safe acceptance of a credential bound to the intended identity.

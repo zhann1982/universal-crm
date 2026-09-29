@@ -1,198 +1,156 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-
 import {
-  and,
-  eq,
-} from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+  revalidatePath,
+} from "next/cache";
 import { redirect } from "next/navigation";
 
-import { db } from "@/db";
 import {
-  memberRoles,
-  organizationMembers,
-  roles,
-} from "@/db/schema";
+  requirePermission,
+} from "@/lib/auth/permissions";
 import {
-  findAuthUserByEmail,
-} from "@/lib/auth/find-auth-user-by-email";
-import { requirePermission } from "@/lib/auth/permissions";
-import {
-  addMemberSchema,
-  updateMemberRolesSchema,
-  updateMemberStatusSchema,
-} from "@/lib/validation/member";
+  createInvitation,
+} from "@/modules/invitations/create-invitation";
 import {
   replaceMemberRolesWithOwnerGuard,
   updateMemberStatusWithOwnerGuard,
 } from "@/modules/members/owner-guard";
 
-export async function addMember(
+export type InviteMemberState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "created";
+
+      invitationId: string;
+      email: string;
+      token: string;
+      expiresAt: string;
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
+export async function inviteMember(
+  previousState: InviteMemberState,
   formData: FormData,
-) {
+): Promise<InviteMemberState> {
+  void previousState;
+
   const {
     organization,
+    member: currentMember,
   } = await requirePermission(
     "members.manage",
   );
 
-  const result =
-    addMemberSchema.safeParse({
-      email: String(
-        formData.get("email") ?? "",
-      ),
+  const email = String(
+    formData.get("email") ?? "",
+  );
 
-      roleId: String(
-        formData.get("roleId") ?? "",
-      ),
-    });
+  const roleId = String(
+    formData.get("roleId") ?? "",
+  );
 
-  if (!result.success) {
-    redirect(
-      "/crm/team?error=add-invalid",
-    );
-  }
-
-  const {
-    email,
-    roleId,
-  } = result.data;
-
-  const userLookup =
-    await findAuthUserByEmail(
-      email,
-    );
-
-  if (
-    userLookup.status ===
-    "not-found"
-  ) {
-    redirect(
-      "/crm/team?error=user-not-found",
-    );
-  }
-
-  if (
-    userLookup.status ===
-    "ambiguous"
-  ) {
-    redirect(
-      "/crm/team?error=user-ambiguous",
-    );
-  }
-
-  const authUser =
-    userLookup.user;
-
-  if (
-    !authUser.emailVerified
-  ) {
-    redirect(
-      "/crm/team?error=user-unverified",
-    );
-  }
-
-  const [existingMember] =
-    await db
-      .select({
-        id: organizationMembers.id,
-      })
-      .from(organizationMembers)
-      .where(
-        and(
-          eq(
-            organizationMembers.organizationId,
-            organization.id,
-          ),
-
-          eq(
-            organizationMembers.userId,
-            authUser.id,
-          ),
-        ),
-      )
-      .limit(1);
-
-  if (existingMember) {
-    redirect(
-      "/crm/team?error=member-exists",
-    );
-  }
-
-  const [selectedRole] =
-    await db
-      .select({
-        id: roles.id,
-      })
-      .from(roles)
-      .where(
-        and(
-          eq(
-            roles.id,
-            roleId,
-          ),
-
-          eq(
-            roles.organizationId,
-            organization.id,
-          ),
-        ),
-      )
-      .limit(1);
-
-  if (!selectedRole) {
-    redirect(
-      "/crm/team?error=role",
-    );
-  }
-
-  const newMemberId =
-    randomUUID();
-
-  await db.batch([
-    db
-      .insert(
-        organizationMembers,
-      )
-      .values({
-        id: newMemberId,
-
+  try {
+    const result =
+      await createInvitation({
         organizationId:
           organization.id,
 
-        userId:
-          authUser.id,
+        invitedByMemberId:
+          currentMember.id,
 
-        displayName:
-          authUser.name,
+        email,
+        roleId,
+      });
 
-        email:
-          authUser.email,
+    switch (result.status) {
+      case "created": {
+        revalidatePath(
+          "/crm/team",
+        );
 
-        status:
-          "active",
-      }),
+        return {
+          status: "created",
 
-    db
-      .insert(memberRoles)
-      .values({
-        memberId:
-          newMemberId,
+          invitationId:
+            result.invitationId,
 
-        roleId:
-          selectedRole.id,
-      }),
-  ]);
+          email:
+            result.emailNormalized,
 
-  revalidatePath(
-    "/crm/team",
-  );
+          token:
+            result.token,
 
-  redirect(
-    "/crm/team?added=1",
-  );
+          expiresAt:
+            result.expiresAt.toISOString(),
+        };
+      }
+
+      case "invalid-input":
+        return {
+          status: "error",
+          message:
+            "Проверьте email и выбранную роль.",
+        };
+
+      case "inviter-invalid":
+        return {
+          status: "error",
+          message:
+            "Текущий сотрудник больше не может создавать приглашения.",
+        };
+
+      case "role-not-found":
+        return {
+          status: "error",
+          message:
+            "Выбранная роль недоступна в этой организации.",
+        };
+
+      case "identity-ambiguous":
+        return {
+          status: "error",
+          message:
+            "Найдено несколько учётных записей с одинаковым email после нормализации.",
+        };
+
+      case "member-exists":
+        return {
+          status: "error",
+          message:
+            "Этот пользователь уже состоит в организации.",
+        };
+
+      case "already-pending":
+        return {
+          status: "error",
+          message:
+            "Для этого email уже существует действующее приглашение.",
+        };
+
+      case "conflict":
+        return {
+          status: "error",
+          message:
+            "Приглашение изменилось во время обработки. Попробуйте ещё раз.",
+        };
+    }
+  } catch (error) {
+    console.error(
+      "Failed to create organization invitation.",
+      error,
+    );
+
+    return {
+      status: "error",
+      message:
+        "Не удалось создать приглашение.",
+    };
+  }
 }
 
 export async function updateMemberStatus(
@@ -205,27 +163,22 @@ export async function updateMemberStatus(
     "members.manage",
   );
 
-  const result =
-    updateMemberStatusSchema.safeParse({
-      memberId: String(
-        formData.get("memberId") ?? "",
-      ),
+  const memberId = String(
+    formData.get("memberId") ?? "",
+  );
 
-      status: String(
-        formData.get("status") ?? "",
-      ),
-    });
+  const status = String(
+    formData.get("status") ?? "",
+  );
 
-  if (!result.success) {
+  if (
+    status !== "active" &&
+    status !== "inactive"
+  ) {
     redirect(
       "/crm/team?error=status-invalid",
     );
   }
-
-  const {
-    memberId,
-    status,
-  } = result.data;
 
   if (
     memberId === currentMember.id
@@ -241,6 +194,7 @@ export async function updateMemberStatus(
         organization.id,
 
       memberId,
+
       status,
     });
 
@@ -284,27 +238,22 @@ export async function updateMemberRoles(
     "members.manage",
   );
 
-  const result =
-    updateMemberRolesSchema.safeParse({
-      memberId: String(
-        formData.get("memberId") ?? "",
-      ),
+  const memberId = String(
+    formData.get("memberId") ?? "",
+  );
 
-      roleIds: formData
-        .getAll("roleIds")
-        .map(String),
-    });
+  const roleIds = formData
+    .getAll("roleIds")
+    .map(String);
 
-  if (!result.success) {
+  if (
+    !memberId ||
+    roleIds.length === 0
+  ) {
     redirect(
       "/crm/team?error=invalid",
     );
   }
-
-  const {
-    memberId,
-    roleIds,
-  } = result.data;
 
   if (
     memberId === currentMember.id

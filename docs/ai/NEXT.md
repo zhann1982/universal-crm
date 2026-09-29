@@ -1,6 +1,6 @@
 # Universal CRM — Next Development Steps
 
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 ## Current cycle
 
@@ -9,6 +9,7 @@ STABILIZATION BEFORE MORE LARGE FEATURES
 Recently completed / materially stabilized:
 
 - F01 exact email identity
+- F02 verified, one-time, transaction-safe Organization invitation flow
 - F03 public DB health exposure
 - F04 Deal Stage transition race at application level
 - F05 related-data and assignment Permission policy
@@ -23,54 +24,53 @@ Do not recreate these features.
 
 ---
 
-# 1 — F02: Production-safe invitation flow
+# 1 — F02 follow-up: invitation delivery and administration
 
-This is now the next major stabilization task.
+The core F02 authorization problem is fixed.
 
-Current development state:
-
-- email verification exists
-- normal CRM access requires verified email
-- Team add-member rejects unverified identity
-- development Owner linker rejects unverified identity
-- current add-member flow still assumes the target User already exists
-
-Production-safe target:
+Implemented:
 
 administrator creates invitation
-→ invitation bound to Organization and intended identity
-→ one-time token
-→ expiration
-→ authenticated acceptance
-→ matching verified identity
-→ Membership creation/activation
+→ invitation is bound to Organization + canonical email + Role
+→ random raw token is generated
+→ only SHA-256 hash is stored
+→ invitation expires
+→ User authenticates
+→ User verifies email
+→ authenticated identity must match invitation
+→ current Organization and Role are revalidated
+→ Membership + Role are created atomically
+→ invitation becomes accepted
 
-Rules:
+Concurrency protection exists for:
 
-- knowing an email address is not sufficient authorization
-- token is single-use
-- token expires
-- accepted User must match intended identity
-- replay is rejected
-- invitation cannot grant another Organization
-- Owner bootstrap policy is explicit
-- invitation acceptance must remain tenant-scoped
-- role assignment must be validated server-side at acceptance time
+- duplicate active invitation creation
+- same-token replay
+- separate invitation acceptance for the same identity
+- Membership acquisition racing with invitation creation
 
-Suggested implementation direction:
+Current automated verification:
 
-- dedicated invitation table
-- opaque random token with hashed storage if practical
-- expiration timestamp
-- acceptedAt / revokedAt lifecycle
-- intended normalized email
-- organizationId
-- invited role set or a deliberate single-role policy
-- inviter Member/User identity
-- server-side acceptance operation
-- no Membership creation before successful acceptance
+- 30 unit/regression tests
+- 7 PostgreSQL integration tests
+- TypeScript
+- ESLint
+- production build
 
-Do not depend on email delivery details for the core authorization design.
+Remaining invitation work is operational/product work rather than the original security defect:
+
+- real production email provider
+- full invitation URL delivery instead of manual development transfer
+- pending invitation list
+- revoke invitation UI
+- resend/reissue UX
+- cleanup/reporting for old expired invitations
+
+Do not revert to direct Membership creation by administrator-supplied email.
+
+Decision:
+
+D047
 
 ---
 
@@ -101,12 +101,17 @@ Priority tests:
 - Owner system identity behavior
 - last Owner concurrency
 
-Already implemented for F06:
+Already implemented:
 
 - real PostgreSQL integration test for concurrent Owner-role removal
 - real PostgreSQL integration test for concurrent Owner deactivation
 - assertion that one active Owner remains
 - separate `npm run test:integration` command
+- same-token concurrent invitation acceptance
+- separate invitations for the same identity cannot create duplicate Memberships
+- wrong-email invitation acceptance rejection
+- concurrent invitation creation produces one active invitation
+- expired invitation does not block a new invitation
 
 Use real PostgreSQL integration tests when SQL/concurrency behavior matters.
 
@@ -260,7 +265,7 @@ A dedicated ownership-transfer UI may still improve administration later, but th
 
 Before starting the next large module, aim for:
 
-- F02 invitation design and core implementation established
+- F02 invitation authorization and concurrency flow implemented and integration-tested
 - broader core regression suite
 - CI
 - key PostgreSQL invariants planned or partly implemented

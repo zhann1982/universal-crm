@@ -2,19 +2,47 @@
 
 import Link from "next/link";
 import {
-  useRouter,
-} from "next/navigation";
-import {
+  Suspense,
   useState,
 } from "react";
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 
 import {
   authClient,
 } from "@/lib/auth/auth-client";
+import {
+  getSafeNextPath,
+} from "@/lib/auth/safe-next-path";
 
 export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthPageLoading />
+      }
+    >
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
+function RegisterForm() {
   const router =
     useRouter();
+
+  const searchParams =
+    useSearchParams();
+
+  const nextPath =
+    getSafeNextPath(
+      searchParams.get(
+        "next",
+      ),
+      "/crm",
+    );
 
   const [
     name,
@@ -47,6 +75,23 @@ export default function RegisterPage() {
     isPending,
     setIsPending,
   ] = useState(false);
+
+  const loginHref =
+    nextPath === "/crm"
+      ? "/login"
+      : `/login?next=${encodeURIComponent(
+          nextPath,
+        )}`;
+
+  const verifyPage =
+    `/verify-email?next=${encodeURIComponent(
+      nextPath,
+    )}`;
+
+  const verificationCallbackURL =
+    `/verify-email?verified=1&next=${encodeURIComponent(
+      nextPath,
+    )}`;
 
   async function handleSubmit(
     event:
@@ -106,7 +151,7 @@ export default function RegisterPage() {
             password,
 
             callbackURL:
-              "/verify-email?verified=1",
+              verificationCallbackURL,
           });
 
       if (signUpError) {
@@ -119,7 +164,7 @@ export default function RegisterPage() {
       }
 
       router.push(
-        "/verify-email",
+        verifyPage,
       );
 
       router.refresh();
@@ -230,9 +275,7 @@ export default function RegisterPage() {
               required
               minLength={8}
               autoComplete="new-password"
-              value={
-                password
-              }
+              value={password}
               onChange={(
                 event,
               ) =>
@@ -296,12 +339,22 @@ export default function RegisterPage() {
         <p className="mt-6 text-center text-sm text-slate-500">
           Уже есть аккаунт?{" "}
           <Link
-            href="/login"
+            href={loginHref}
             className="font-medium text-slate-950 hover:underline"
           >
             Войти
           </Link>
         </p>
+      </div>
+    </main>
+  );
+}
+
+function AuthPageLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+      <div className="text-sm text-slate-500">
+        Загрузка...
       </div>
     </main>
   );

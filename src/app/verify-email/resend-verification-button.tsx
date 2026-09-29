@@ -11,9 +11,11 @@ import {
 export function ResendVerificationButton({
   email,
   developmentMode,
+  callbackURL,
 }: {
   email: string;
   developmentMode: boolean;
+  callbackURL: string;
 }) {
   const [
     isPending,
@@ -44,9 +46,7 @@ export function ResendVerificationButton({
         await authClient
           .sendVerificationEmail({
             email,
-
-            callbackURL:
-              "/verify-email?verified=1",
+            callbackURL,
           });
 
       if (result.error) {
