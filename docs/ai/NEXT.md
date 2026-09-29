@@ -12,6 +12,7 @@ Recently completed / materially stabilized:
 - F03 public DB health exposure
 - F04 Deal Stage transition race at application level
 - F05 related-data and assignment Permission policy
+- F06 stable Owner identity + concurrency-safe last-Owner protection
 - F07 inactive Organization access
 - F08 unchanged inactive owner behavior
 - F09 strict date-only Deal expectedCloseAt
@@ -22,46 +23,9 @@ Do not recreate these features.
 
 ---
 
-# 1 — F06: Last Owner concurrency and stable Owner identity
+# 1 — F02: Production-safe invitation flow
 
-This is the next major stabilization task.
-
-Current weakness:
-
-read current Owners
-→ validate
-→ write
-
-is not concurrency-safe.
-
-Two concurrent administrative requests may both pass a pre-check and remove/deactivate different Owners.
-
-Required design goals:
-
-- stable system identity for Owner Role
-- explicit ownership-transfer semantics
-- concurrency-safe last-Owner invariant
-- no solution based only on another pre-check
-
-Directions to evaluate:
-
-- Role `systemKey`
-- explicit ownership transfer operation
-- atomic SQL
-- PostgreSQL function
-- transactional administrative path
-- database-supported invariant
-
-Acceptance criteria:
-
-- concurrent administrative operations cannot leave an Organization without required Owner state
-- changing Role display name cannot change security identity
-- ownership transfer is documented
-- integration/concurrency regression test exists
-
----
-
-# 2 — F02: Production-safe invitation flow
+This is now the next major stabilization task.
 
 Current development state:
 
@@ -69,6 +33,7 @@ Current development state:
 - normal CRM access requires verified email
 - Team add-member rejects unverified identity
 - development Owner linker rejects unverified identity
+- current add-member flow still assumes the target User already exists
 
 Production-safe target:
 
@@ -89,10 +54,27 @@ Rules:
 - replay is rejected
 - invitation cannot grant another Organization
 - Owner bootstrap policy is explicit
+- invitation acceptance must remain tenant-scoped
+- role assignment must be validated server-side at acceptance time
+
+Suggested implementation direction:
+
+- dedicated invitation table
+- opaque random token with hashed storage if practical
+- expiration timestamp
+- acceptedAt / revokedAt lifecycle
+- intended normalized email
+- organizationId
+- invited role set or a deliberate single-role policy
+- inviter Member/User identity
+- server-side acceptance operation
+- no Membership creation before successful acceptance
+
+Do not depend on email delivery details for the core authorization design.
 
 ---
 
-# 3 — Regression tests for completed stabilization
+# 2 — Regression tests for completed stabilization
 
 Priority tests:
 
@@ -113,16 +95,26 @@ Priority tests:
 - impossible calendar dates
 - stale Deal edit version conflict
 - Kanban vs stale form
-- PostgreSQL/browser verification of page-version conflicts for Kanban and manual Stage changes (unit regression tests now exist)
+- PostgreSQL/browser verification of page-version conflicts for Kanban and manual Stage changes
 - Deal Stage/Pipeline validation
 - archive/restore lifecycle conflict
+- Owner system identity behavior
 - last Owner concurrency
+
+Already implemented for F06:
+
+- real PostgreSQL integration test for concurrent Owner-role removal
+- real PostgreSQL integration test for concurrent Owner deactivation
+- assertion that one active Owner remains
+- separate `npm run test:integration` command
 
 Use real PostgreSQL integration tests when SQL/concurrency behavior matters.
 
+Do not point integration tests at production data.
+
 ---
 
-# 4 — Add CI
+# 3 — Add CI
 
 Target GitHub Actions pipeline:
 
@@ -133,16 +125,26 @@ Target GitHub Actions pipeline:
 → `npm test`
 → `npm run build`
 
+Database integration tests require a separate CI database strategy.
+
 Rules:
 
 - no production `DATABASE_URL`
 - no production secrets
-- database tests use dedicated test environment
+- database tests use dedicated disposable/test environment
 - any TypeScript/lint/test/build failure blocks the workflow
+- integration tests must clean up their fixtures
+- CI must never mutate production CRM data
+
+Possible staging approach:
+
+1. add non-database CI first
+2. add dedicated database integration job separately
+3. keep unit/regression tests fast and deterministic
 
 ---
 
-# 5 — Strengthen PostgreSQL invariants
+# 4 — Strengthen PostgreSQL invariants
 
 Before adding constraints:
 
@@ -164,9 +166,11 @@ Priority invariants:
 
 Application validation remains required.
 
+For Member ↔ Role, the new system Role identity does not replace tenant-consistency validation.
+
 ---
 
-# 6 — F12 scaling
+# 5 — F12 scaling
 
 Current structural scale limitations include:
 
@@ -190,13 +194,15 @@ Do not introduce Redis or microservices for ordinary query/UI scaling.
 
 ---
 
-# 7 — Clean up business-operation boundaries
+# 6 — Clean up business-operation boundaries
 
 Continue moving genuinely shared rules into focused domain modules.
 
-Existing example:
+Existing examples:
 
 `src/modules/deals/transition-deal.ts`
+
+`src/modules/members/owner-guard.ts`
 
 High-value candidates:
 
@@ -204,7 +210,8 @@ High-value candidates:
 - Deal full edit
 - Company owner assignment
 - Client ↔ Company relation mutation
-- Team ownership operations
+- invitation acceptance
+- ownership transfer if a dedicated UX is later added
 
 Target Server Action shape:
 
@@ -217,16 +224,49 @@ Do not create a generic repository abstraction.
 
 ---
 
+# F06 completed design
+
+Current Owner invariant implementation:
+
+stable Role identity
+→ `roles.systemKey`
+
+Owner machine identity
+→ `systemKey = "owner"`
+
+Owner-reducing Team mutation
+→ start PostgreSQL transaction
+→ acquire organization-scoped transaction advisory lock
+→ evaluate current committed Owner state
+→ reject mutation if it would remove/deactivate the last active Owner
+→ otherwise mutate
+
+Current coverage:
+
+- Team UI manually verified
+- concurrent Owner-role removal integration tested
+- concurrent Owner deactivation integration tested
+- one active Owner remains after concurrent destructive requests
+
+Custom Roles may use `systemKey = null`.
+
+Display name such as `Owner` is no longer the security identity.
+
+A dedicated ownership-transfer UI may still improve administration later, but the current invariant no longer depends on a sequential pre-check.
+
+---
+
 # Stabilization exit criteria
 
 Before starting the next large module, aim for:
 
-- F06 design/implementation substantially strengthened
-- F02 invitation design established
-- core regression suite
+- F02 invitation design and core implementation established
+- broader core regression suite
 - CI
 - key PostgreSQL invariants planned or partly implemented
 - no major unresolved authorization ambiguity
+
+F06 no longer blocks stabilization exit.
 
 Not every long-term production feature must be complete.
 

@@ -1,6 +1,6 @@
 # Universal CRM — Architecture Decisions
 
-Last updated: 2026-09-27
+Last updated: 2026-09-28
 
 ## Decision ID rule
 
@@ -198,13 +198,15 @@ Kanban shows one selected Pipeline. Drag-and-drop changes Stage only inside that
 
 ## D024 — Owner protection needs stronger identity and atomic invariant
 
-Status: accepted as current limitation
+Status: superseded by D046
 
-Target:
+This recorded the earlier stabilization requirement for:
 
 - stable Role system identity
-- explicit ownership transfer
+- explicit ownership semantics
 - concurrency-safe last-Owner protection
+
+D046 records the implemented design.
 
 ---
 
@@ -471,3 +473,64 @@ Server mutations enforce assignment restrictions independently of UI controls.
 Reason:
 
 reference selectors and related-record displays are authorization surfaces. Users should receive only the related information required by their granted module Permissions.
+
+---
+
+## D046 — System Roles use stable systemKey and last-Owner mutations are serialized
+
+Status: accepted and implemented
+
+System Role security identity is separate from the human-readable Role name.
+
+Schema:
+
+`roles.systemKey`
+
+Rules:
+
+- `systemKey` is nullable
+- custom Roles may keep `systemKey = null`
+- system Role keys are stable machine identifiers
+- `Owner` uses `systemKey = "owner"`
+- seeded system Roles also use stable keys such as `admin`, `manager`, and `viewer`
+- `(organizationId, systemKey)` is unique for non-null values
+- Role display names must not be used as authorization identity
+
+Last-Owner invariant:
+
+Any Team mutation that can reduce the number of active Owners must use the shared Owner-guard business operation.
+
+Current implementation:
+
+`src/modules/members/owner-guard.ts`
+
+Flow:
+
+PostgreSQL transaction
+→ acquire organization-scoped transaction advisory lock
+→ read current committed Member/Role state
+→ evaluate whether the mutation would remove or deactivate the last active Owner
+→ reject if it would
+→ otherwise mutate inside the same transaction
+
+The same organization-scoped lock is used for both:
+
+- removing/changing Owner roles
+- deactivating an active Owner Member
+
+This ensures two concurrent destructive requests for different Owners cannot both pass an earlier stale pre-check and leave the Organization with zero active Owners.
+
+The current Neon HTTP implementation uses the raw Neon SQL transaction API for this focused operation; normal application queries continue to use Drizzle.
+
+Verification:
+
+- Team UI scenarios manually verified
+- concurrent Owner-role removal tested against real PostgreSQL
+- concurrent Owner deactivation tested against real PostgreSQL
+- integration tests assert that one destructive operation succeeds, the other is blocked, and one active Owner remains
+
+An explicit ownership-transfer UI may be added later for better administration UX, but it is not required for the current invariant.
+
+Reason:
+
+Role names are editable/display-oriented labels, while authorization requires stable machine identity. The last-Owner rule is a concurrency invariant and cannot be protected reliably by a separate read/check/write sequence.

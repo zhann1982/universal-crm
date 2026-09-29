@@ -29,10 +29,13 @@ The modular-monolith architecture remains appropriate.
 Repeated local checks during stabilization:
 
 - `npm test`
+- `npm run test:integration`
 - `npx tsc --noEmit --incremental false`
 - `npm run lint`
 
-Recent F05 permission scenarios were also manually checked in the browser and reported working.
+Recent F05 permission scenarios were manually checked in the browser and reported working.
+
+F06 Owner protection was also manually verified through the Team UI and verified with real PostgreSQL concurrency integration tests against Neon.
 
 A fresh complete production build after all latest local changes has not yet been recorded.
 
@@ -97,7 +100,15 @@ Implemented:
 - self-role protection
 - self-deactivation protection
 - inactive Organization access denial
-- application-level last-Owner protection
+- stable system Role identity through nullable `roles.systemKey`
+- `Owner` security identity through `systemKey = "owner"`
+- concurrency-safe last-Owner protection for role removal
+- concurrency-safe last-Owner protection for Member deactivation
+- organization-scoped PostgreSQL transaction advisory lock for Owner-reducing mutations
+
+System Role display names are no longer used as machine security identity.
+
+Custom Roles may keep `systemKey = null`.
 
 F07:
 
@@ -105,11 +116,21 @@ FIXED FOR CURRENT DEVELOPMENT TENANT MODEL
 
 F06:
 
-OPEN
+FIXED AT CURRENT APPLICATION / POSTGRESQL TRANSACTION LEVEL
 
-Last-Owner protection is still not concurrency-safe.
+The previous sequential read-check-write race has been replaced for Owner-reducing Team mutations by:
 
-Owner system identity still needs a stable `systemKey` or equivalent.
+transaction
+→ organization-scoped advisory lock
+→ re-read current committed Owner state
+→ validate last-Owner invariant
+→ mutate
+
+Two concurrent attempts to remove/deactivate the final two active Owners are serialized. Integration tests verify that only one destructive mutation succeeds and one active Owner remains.
+
+Current note:
+
+An explicit dedicated ownership-transfer workflow is still a possible future UX improvement, but it is no longer required for the current last-Owner race fix.
 
 ---
 
@@ -403,11 +424,25 @@ FIXED
 
 # Testing
 
-Automated coverage currently includes:
+Automated unit/regression coverage currently includes:
 
 - canonical email lookup behavior
 - `_` and `%` literal email identity behavior
 - strict Deal calendar date validation
+- Deal Stage page-version conflict behavior
+
+PostgreSQL integration coverage currently includes:
+
+- concurrent Owner-role removal
+- concurrent Owner deactivation
+- last active Owner invariant after concurrent destructive requests
+
+Commands:
+
+- `npm test`
+- `npm run test:integration`
+
+The Owner integration suite creates an isolated temporary Organization and deletes it after each test. It uses the configured development/test PostgreSQL connection and therefore must not be treated as a production CI database strategy.
 
 Still needed:
 
@@ -417,7 +452,6 @@ Still needed:
 - owner-assignment RBAC tests
 - related-data visibility tests
 - Deal conflict integration tests
-- last Owner concurrency test
 - PostgreSQL invariant tests
 - E2E critical workflow suite
 
@@ -434,7 +468,10 @@ Target:
 → `npx tsc --noEmit --incremental false`
 → `npm run lint`
 → `npm test`
+→ database integration tests against a dedicated test database
 → `npm run build`
+
+Do not run destructive integration tests against production data.
 
 ---
 
@@ -450,7 +487,7 @@ F04 — FIXED AT APPLICATION LEVEL
 
 F05 — FIXED / MANUALLY VERIFIED
 
-F06 — OPEN
+F06 — FIXED AT CURRENT APPLICATION / POSTGRESQL TRANSACTION LEVEL
 
 F07 — FIXED FOR CURRENT DEVELOPMENT TENANT MODEL
 
@@ -486,12 +523,12 @@ Do not start another large module yet.
 
 Priority:
 
-1. F06 — stable Owner identity + concurrency-safe last-Owner invariant
-2. F02 — production invitation / membership acquisition
-3. regression tests for completed stabilization work
-4. GitHub Actions CI
-5. stronger PostgreSQL invariants
-6. F12 scaling work as datasets grow
+1. F02 — production invitation / membership acquisition
+2. regression tests for completed stabilization work
+3. GitHub Actions CI
+4. stronger PostgreSQL invariants
+5. F12 scaling work as datasets grow
+6. continue extracting genuinely shared business operations into focused modules
 
 After sufficient stabilization:
 
