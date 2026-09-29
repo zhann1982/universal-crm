@@ -26,22 +26,25 @@ The modular-monolith architecture remains appropriate.
 
 # Verification
 
-Repeated local checks during stabilization:
-
-- `npm test`
-- `npm run test:integration`
-- `npx tsc --noEmit --incremental false`
-- `npm run lint`
-
-Latest complete local verification after regression coverage expansion:
+Latest complete local verification:
 
 - `npm test` — 37 tests passed
-- `npm run test:integration` — 12 tests passed
+- `npm run test:integration` — 23 tests passed
 - `npx tsc --noEmit --incremental false` — passed
 - `npm run lint` — passed
 - `npm run build` — passed
 
-Current automated coverage includes Owner invariants, invitation concurrency, tenant access lifecycle, Client ↔ Company lifecycle and tenant boundaries, plus shared responsible-Member assignment policy regression tests.
+Current automated coverage includes:
+
+- exact canonical email identity
+- invitation token and safe redirect behavior
+- Owner concurrency
+- invitation concurrency
+- tenant access lifecycle
+- Client ↔ Company lifecycle
+- cross-tenant boundaries
+- responsible-Member permission policy
+- responsible-Member active/inactive Membership semantics
 
 GitHub Actions CI is implemented.
 
@@ -62,7 +65,7 @@ Current CI checks:
 - `npm run lint`
 - `npm test`
 
-The first GitHub Actions run completed successfully.
+The latest pushed CI baseline is passing.
 
 Database integration tests are intentionally not included yet because they require a dedicated non-production PostgreSQL test environment.
 
@@ -123,9 +126,7 @@ Implemented:
 - safe same-origin continuation through login/register/email verification
 - `/invite` acceptance page
 
-Concurrency uses PostgreSQL transaction advisory locks.
-
-Creation and acceptance share the canonical-email lock namespace so Membership acquisition cannot race with creation of another active invitation.
+Creation and acceptance share the canonical-email PostgreSQL advisory-lock namespace.
 
 Acceptance also protects reuse of the same token.
 
@@ -133,7 +134,7 @@ Current development limitation:
 
 - production email delivery is not configured
 - invitation token/link is currently transferred manually during development
-- invitation administration UX for listing/revoking/resending invitations can be improved later
+- invitation administration UX for listing/revoking/resending can be improved later
 
 These are operational/product follow-ups, not the original F02 authorization flaw.
 
@@ -152,29 +153,26 @@ Implemented:
 - multiple Roles per Member
 - Permissions
 - Team listing
-- adding registered Users
 - role assignment/update
 - Member activation/deactivation
 - self-role protection
 - self-deactivation protection
 - inactive Organization access denial
 - stable system Role identity through nullable `roles.systemKey`
-- `Owner` security identity through `systemKey = "owner"`
+- `Owner` machine identity through `systemKey = "owner"`
 - concurrency-safe last-Owner protection for role removal
 - concurrency-safe last-Owner protection for Member deactivation
 - organization-scoped PostgreSQL transaction advisory lock for Owner-reducing mutations
 
-System Role display names are no longer used as machine security identity.
-
-Custom Roles may keep `systemKey = null`.
+System Role display names are not used as machine security identity.
 
 F07:
 
 FIXED AND INTEGRATION-TESTED FOR CURRENT DEVELOPMENT TENANT MODEL
 
-Automated PostgreSQL coverage verifies:
+PostgreSQL coverage verifies:
 
-- inactive Organization is rejected by the tenant access resolver
+- inactive Organization is rejected
 - inactive Membership is rejected
 - active Membership remains allowed
 
@@ -184,7 +182,7 @@ F06:
 
 FIXED AT CURRENT APPLICATION / POSTGRESQL TRANSACTION LEVEL
 
-The previous sequential read-check-write race has been replaced for Owner-reducing Team mutations by:
+Owner-reducing Team mutations use:
 
 transaction
 → organization-scoped advisory lock
@@ -192,29 +190,7 @@ transaction
 → validate last-Owner invariant
 → mutate
 
-Two concurrent attempts to remove/deactivate the final two active Owners are serialized. Integration tests verify that only one destructive mutation succeeds and one active Owner remains.
-
-Current note:
-
-An explicit dedicated ownership-transfer workflow is still a possible future UX improvement, but it is no longer required for the current last-Owner race fix.
-
----
-
-# Clients
-
-Implemented:
-
-- create
-- list
-- detail
-- edit
-- archive
-- restore
-- search
-- filters
-- pagination
-- tenant scoping
-- RBAC
+Concurrent destructive Owner requests are serialized and integration-tested.
 
 ---
 
@@ -236,17 +212,31 @@ Implemented:
 - tenant scoping
 - RBAC
 
-Responsible Member rule:
+Responsible Member rules:
 
 - existing owner may remain unchanged even if inactive
 - newly assigned owner must be active
+- newly assigned owner must belong to the same Organization
 - without `members.read`, assignment is limited to self or no owner
 - Member email is not included in normal assignment DTOs
 - hidden foreign Member names use neutral `Сотрудник`
 
+Shared resolver:
+
+`src/modules/members/owner-assignment.ts`
+
 F08:
 
-IMPLEMENTED
+FIXED AND POSTGRESQL REGRESSION-TESTED
+
+Verified:
+
+- unchanged inactive owner remains allowed
+- new inactive owner is rejected
+- inactive owner is rejected during create
+- active same-Organization owner is allowed
+- active owner from another Organization is rejected
+- owner can be cleared even when previous owner is inactive
 
 ---
 
@@ -258,29 +248,23 @@ Implemented:
 - unlink
 - reverse display
 - tenant validation
-- archived Client lifecycle guard in shared domain operation
-- shared Client ↔ Company relationship mutation module
+- archived Client lifecycle guard
+- cross-tenant denial
 
-Archived Client:
+Shared mutation module:
 
-→ cannot link Company
-→ cannot unlink Company
+`src/modules/clients/client-company-relation.ts`
 
 F11:
 
 FIXED AND INTEGRATION-TESTED
 
-PostgreSQL regression coverage verifies:
+PostgreSQL coverage verifies:
 
 - archived Client cannot create a new Company relationship
 - archived Client cannot remove an existing Company relationship
 - active Client may remove an existing relationship to an archived Company
-
-The Server Actions delegate relationship lifecycle rules to:
-
-`src/modules/clients/client-company-relation.ts`
-
-A browser-level stale-UI test remains a possible additional layer, but the direct server-side mutation rule is now automatically covered.
+- cross-tenant Client/Company relations are rejected
 
 ---
 
@@ -321,9 +305,7 @@ Implemented:
 - Company assignment
 - responsible Member assignment
 - expected close date
-- notes/description
-- archive
-- restore
+- archive / restore
 - archive view
 - Kanban
 - drag-and-drop
@@ -333,9 +315,13 @@ Implemented:
 - tenant scoping
 - RBAC
 
-Shared transition module:
+Shared Stage transition:
 
 `src/modules/deals/transition-deal.ts`
+
+Shared responsible-Member validation:
+
+`src/modules/members/owner-assignment.ts`
 
 F04:
 
@@ -343,42 +329,13 @@ FIXED AT APPLICATION LEVEL
 
 Database-level composite invariant remains future work.
 
----
-
-# Deal optimistic locking
-
-Implemented:
-
-- `version integer not null default 1`
-- expected version in edit flow
-- conditional full Deal update
-- conditional Stage transition
-- page-rendered expected version from Kanban and manual Stage selector
-- stale Stage requests rejected before no-op handling
-- version increment on edit
-- version increment on Stage transition
-- version increment on archive
-- version increment on restore
-- explicit conflict behavior for primary stale mutation paths
-
-Manual scenarios already verified:
-
-- two-tab stale edit
-- Kanban invalidates stale edit form
-- normal sequential edits
-
 F10:
 
 FIXED AT CURRENT APPLICATION LEVEL
 
-Nuance:
+Optimistic locking uses Deal `version`.
 
-Stage transitions now require the version observed on the page. Unit regression
-tests execute the shared transition operation with mocked database boundaries,
-including a stale no-op and zero affected rows after a concurrent write. These
-are not PostgreSQL integration or browser tests.
-
-archive/restore currently read current version at mutation time, so strict page-rendered stale-button intent protection is not identical to edit-form optimistic locking.
+More PostgreSQL/browser verification of stale Deal conflict paths remains a priority.
 
 ---
 
@@ -402,8 +359,7 @@ Implemented:
 - leap-year handling
 - impossible dates rejected
 - empty value becomes null
-- display avoids JS Date timezone conversion
-- migration to date semantics
+- display avoids JavaScript Date timezone conversion
 
 F09:
 
@@ -417,8 +373,6 @@ D044
 
 # Related-data permission policy
 
-Implemented policy:
-
 Responsible Member assignment:
 
 with `members.read`
@@ -429,24 +383,17 @@ without `members.read`
 
 Existing owner may remain unchanged even if inactive.
 
-Responsible Member assignment permission logic is shared through:
+Permission-only logic:
 
 `src/modules/members/owner-assignment-policy.ts`
 
-The shared policy is used by both Company and Deal mutations.
+Tenant + active-Membership resolution:
+
+`src/modules/members/owner-assignment.ts`
+
+Both Company and Deal use the shared resolver.
 
 Member email is excluded from normal owner-selection DTOs.
-
-Responsible Member display:
-
-with `members.read`
-→ real display name
-
-without `members.read`, self
-→ own display name
-
-without `members.read`, another Member
-→ `Сотрудник`
 
 Related entity visibility:
 
@@ -454,34 +401,17 @@ Related entity visibility:
 - linked Client data in Company views requires `clients.read`
 - Dashboard aggregates require corresponding module `.read`
 
-Queries are gated before related data is serialized where relevant.
-
-Deal edit without `companies.read` preserves the existing relationship using a neutral label `Текущая компания`.
-
-Representative Manager/Viewer-style browser checks passed.
-
 F05:
 
-FIXED / PARTIALLY AUTOMATED + MANUALLY VERIFIED
+FIXED FOR ASSIGNMENT RULES / PARTIALLY AUTOMATED FOR RELATED-DATA VISIBILITY
+
+Automated coverage now includes both permission-level owner assignment behavior and PostgreSQL active/inactive tenant Membership validation.
+
+More automated related-data visibility coverage is still needed.
 
 Decision:
 
 D045
-
----
-
-# Dashboard
-
-Implemented:
-
-basic CRM Dashboard
-
-Current aggregate policy:
-
-- Client count requires `clients.read`
-- Member count requires `members.read`
-- Role count requires `roles.read`
-- Organization card remains visible in normal CRM context
 
 ---
 
@@ -507,59 +437,57 @@ FIXED
 
 # Testing
 
-Automated unit/regression coverage currently includes:
+Current unit/regression result:
 
-- canonical email lookup behavior
-- `_` and `%` literal email identity behavior
-- strict Deal calendar date validation
-- Deal Stage page-version conflict behavior
-- safe same-origin `next` redirect validation
-- invitation token generation and hashing
-- responsible Member assignment without `members.read`
-- self-assignment behavior
-- foreign Member assignment rejection
-- unchanged existing owner preservation
-- owner clearing behavior
+37 / 37 passing.
 
-PostgreSQL integration coverage currently includes:
+Coverage includes:
+
+- canonical email lookup
+- `_` and `%` literal email identity
+- strict Deal calendar dates
+- Deal Stage page-version conflicts
+- safe same-origin `next`
+- invitation token generation/hashing
+- responsible Member assignment policy
+
+Current PostgreSQL integration result:
+
+23 / 23 passing.
+
+Coverage includes:
 
 - concurrent Owner-role removal
 - concurrent Owner deactivation
-- last active Owner invariant after concurrent destructive requests
-- concurrent acceptance of the same invitation
-- concurrent acceptance of separate invitations for the same identity
-- invitation identity mismatch rejection
-- concurrent invitation creation for the same Organization/email
-- replacement after an expired invitation
-- inactive Organization access rejection
-- inactive Membership access rejection
+- last active Owner invariant
+- same-token invitation acceptance concurrency
+- separate invitations for same identity
+- invitation identity mismatch
+- concurrent invitation creation
+- expired invitation replacement
+- inactive Organization denial
+- inactive Membership denial
 - archived Client link rejection
 - archived Client unlink rejection
 - active Client unlink from archived Company
-- Client from another Organization cannot be linked
-- Company from another Organization cannot be linked
-- relationship from another Organization cannot be unlinked
-- Member from another Organization cannot act as invitation inviter
-- Role from another Organization cannot be used in an invitation
-
-Current result:
-
-17 / 17 integration tests passing.
-
-Commands:
-
-- `npm test`
-- `npm run test:integration`
-
-The Owner integration suite creates an isolated temporary Organization and deletes it after each test. It uses the configured development/test PostgreSQL connection and therefore must not be treated as a production CI database strategy.
+- cross-tenant Client/Company link denial
+- cross-tenant relation unlink denial
+- cross-tenant invitation inviter denial
+- cross-tenant invitation Role denial
+- unchanged inactive responsible Member allowed
+- new inactive responsible Member rejected
+- inactive responsible Member rejected during create
+- active same-Organization responsible Member allowed
+- foreign-Organization responsible Member rejected
+- owner clearing with inactive previous owner
 
 Still needed:
 
-- Company / Deal owner-assignment integration tests for active/inactive Membership validation
 - related-data visibility tests
-- Deal conflict integration tests
-- PostgreSQL invariant tests
+- Deal conflict PostgreSQL/browser tests
+- stronger PostgreSQL invariant tests
 - E2E critical workflow suite
+- representative scale tests for F12
 
 ---
 
@@ -567,27 +495,21 @@ Still needed:
 
 Implemented for non-database checks.
 
-Current workflow:
-
-`.github/workflows/ci.yml`
-
-Current GitHub Actions status:
+Current GitHub Actions status for the latest pushed baseline:
 
 PASSING
 
-Database integration tests remain local until a dedicated CI PostgreSQL strategy is introduced.
-
-Target:
+Current CI:
 
 `npm ci`
 → `next typegen`
 → `npx tsc --noEmit --incremental false`
 → `npm run lint`
 → `npm test`
-→ database integration tests against a dedicated test database
-→ `npm run build`
 
-Do not run destructive integration tests against production data.
+Database integration tests remain local until a dedicated CI PostgreSQL strategy exists.
+
+Never run destructive integration tests against production data.
 
 ---
 
@@ -601,13 +523,13 @@ F03 — FIXED
 
 F04 — FIXED AT APPLICATION LEVEL
 
-F05 — FIXED / MANUALLY VERIFIED
+F05 — FIXED FOR ASSIGNMENT RULES / PARTIALLY AUTOMATED FOR RELATED-DATA VISIBILITY
 
 F06 — FIXED AT CURRENT APPLICATION / POSTGRESQL TRANSACTION LEVEL
 
 F07 — FIXED AND INTEGRATION-TESTED FOR CURRENT DEVELOPMENT TENANT MODEL
 
-F08 — IMPLEMENTED
+F08 — FIXED AND POSTGRESQL REGRESSION-TESTED
 
 F09 — FIXED
 
@@ -639,12 +561,12 @@ Do not start another large module yet.
 
 Priority:
 
-1. broader regression tests for completed stabilization work
-2. stronger PostgreSQL invariants
-3. F12 scaling work as datasets grow
-4. dedicated CI database strategy for integration tests
-5. production invitation email delivery and invitation administration UX
-6. continue extracting genuinely shared business operations into focused modules
+1. related-data visibility regression tests
+2. Deal conflict PostgreSQL/browser verification
+3. stronger PostgreSQL invariants
+4. F12 scaling
+5. dedicated CI database strategy
+6. production invitation email delivery and invitation administration UX
 
 After sufficient stabilization:
 

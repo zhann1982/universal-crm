@@ -17,7 +17,6 @@ import { db } from "@/db";
 import {
   companies,
   deals,
-  organizationMembers,
   pipelineStages,
   pipelines,
 } from "@/db/schema";
@@ -36,8 +35,8 @@ import {
   transitionDeal,
 } from "@/modules/deals/transition-deal";
 import {
-  evaluateOwnerAssignment,
-} from "@/modules/members/owner-assignment-policy";
+  resolveOwnerAssignment,
+} from "@/modules/members/owner-assignment";
 
 function getFormValues(
   formData: FormData,
@@ -325,88 +324,69 @@ export async function createDeal(
   }
 
   /*
-   * Owner
+   * Responsible Member.
+   *
+   * F05:
+   * without members.read only self/null
+   * is allowed.
+   *
+   * Every new non-null owner must also
+   * be an active Member of this tenant.
    */
+  const ownerResult =
+    await resolveOwnerAssignment({
+      organizationId:
+        organization.id,
 
-  if (
-    data.ownerMemberId
-  ) {
-    const ownerPolicy =
-      evaluateOwnerAssignment({
-        mode: "create",
+      mode:
+        "create",
 
-        currentMemberId:
-          member.id,
+      currentMemberId:
+        member.id,
 
-        canReadMembers:
-          permissions.has(
-            "members.read",
-          ),
+      canReadMembers:
+        permissions.has(
+          "members.read",
+        ),
 
-        requestedOwnerMemberId:
-          data.ownerMemberId,
+      requestedOwnerMemberId:
+        data.ownerMemberId,
     });
 
   if (
-    !ownerPolicy.allowed
+    ownerResult.status ===
+    "forbidden"
   ) {
-      return {
-        values,
+    return {
+      values,
 
-        errors: {
-          ownerMemberId: [
-            "Нельзя назначить этого сотрудника.",
-          ],
-        },
+      errors: {
+        ownerMemberId: [
+          "Нельзя назначить этого сотрудника.",
+        ],
+      },
 
-        message:
-          "Проверьте данные формы.",
-      };
-    }
+      message:
+        "Проверьте данные формы.",
+    };
+  }
 
-    const [owner] =
-      await db
-        .select({
-          id:
-            organizationMembers.id,
-        })
-        .from(
-          organizationMembers,
-        )
-        .where(
-          and(
-            eq(
-              organizationMembers.id,
-              data.ownerMemberId,
-            ),
+  if (
+    ownerResult.status ===
+    "owner-unavailable"
+  ) {
+    return {
+      values,
 
-            eq(
-              organizationMembers.organizationId,
-              organization.id,
-            ),
+      errors: {
+        ownerMemberId: [
+          "Ответственный сотрудник недоступен.",
+        ],
+      },
 
-            eq(
-              organizationMembers.status,
-              "active",
-            ),
-          ),
-        )
-        .limit(1);
-
-    if (!owner) {
-      return {
-        values,
-
-        errors: {
-          ownerMemberId: [
-            "Ответственный сотрудник недоступен.",
-          ],
-        },
-
-        message:
-          "Проверьте данные формы.",
-      };
-    }
+      message:
+        "Проверьте данные формы.",
+    };
   }
 
   const expectedCloseAt =
@@ -493,9 +473,19 @@ export async function moveDealToStage(
     "deals.update",
   );
 
-  const versionResult = dealVersionSchema.safeParse(formData.get("version"));
-  if (!versionResult.success) {
-    redirect(`/crm/deals/${dealId}?error=stage-conflict`);
+  const versionResult =
+    dealVersionSchema.safeParse(
+      formData.get(
+        "version",
+      ),
+    );
+
+  if (
+    !versionResult.success
+  ) {
+    redirect(
+      `/crm/deals/${dealId}?error=stage-conflict`,
+    );
   }
 
   const stageId =
@@ -519,7 +509,9 @@ export async function moveDealToStage(
           organization.id,
 
         dealId,
-        expectedVersion: versionResult.data,
+
+        expectedVersion:
+          versionResult.data,
 
         targetStageId:
           stageId,
@@ -966,104 +958,73 @@ export async function updateDeal(
   }
 
   /*
-   * Responsible member
+   * Responsible Member.
+   *
+   * F05 + F08:
+   * - unchanged owner may remain even if
+   *   that Membership is now inactive;
+   * - every newly assigned non-null owner
+   *   must be active in this Organization;
+   * - without members.read only self/null
+   *   may be newly assigned.
    */
+  const ownerResult =
+    await resolveOwnerAssignment({
+      organizationId:
+        organization.id,
+
+      mode:
+        "update",
+
+      currentMemberId:
+        member.id,
+
+      canReadMembers:
+        permissions.has(
+          "members.read",
+        ),
+
+      requestedOwnerMemberId:
+        data.ownerMemberId,
+
+      existingOwnerMemberId:
+        existingDeal.ownerMemberId,
+    });
 
   if (
-    data.ownerMemberId
+    ownerResult.status ===
+    "forbidden"
   ) {
-    const ownerPolicy =
-      evaluateOwnerAssignment({
-        mode: "update",
+    return {
+      values,
 
-        currentMemberId:
-          member.id,
+      errors: {
+        ownerMemberId: [
+          "Нельзя назначить этого сотрудника.",
+        ],
+      },
 
-          canReadMembers:
-            permissions.has(
-              "members.read",
-            ),
+      message:
+        "Проверьте данные формы.",
+    };
+  }
 
-          requestedOwnerMemberId:
-            data.ownerMemberId,
+  if (
+    ownerResult.status ===
+    "owner-unavailable"
+  ) {
+    return {
+      values,
 
-          existingOwnerMemberId:
-            existingDeal.ownerMemberId,
-        });
+      errors: {
+        ownerMemberId: [
+          "Ответственный сотрудник недоступен.",
+        ],
+      },
 
-    const ownerChanged =
-      ownerPolicy.ownerChanged;
-
-    if (
-      !ownerPolicy.allowed
-    ) {
-      return {
-        values,
-
-        errors: {
-          ownerMemberId: [
-            "Нельзя назначить этого сотрудника.",
-          ],
-        },
-
-        message:
-          "Проверьте данные формы.",
-      };
-    }
-
-    const conditions = [
-      eq(
-        organizationMembers.id,
-        data.ownerMemberId,
-      ),
-
-      eq(
-        organizationMembers.organizationId,
-        organization.id,
-      ),
-    ];
-
-    if (
-      ownerChanged
-    ) {
-      conditions.push(
-        eq(
-          organizationMembers.status,
-          "active",
-        ),
-      );
-    }
-
-    const [owner] =
-      await db
-        .select({
-          id:
-            organizationMembers.id,
-        })
-        .from(
-          organizationMembers,
-        )
-        .where(
-          and(
-            ...conditions,
-          ),
-        )
-        .limit(1);
-
-    if (!owner) {
-      return {
-        values,
-
-        errors: {
-          ownerMemberId: [
-            "Ответственный сотрудник недоступен.",
-          ],
-        },
-
-        message:
-          "Проверьте данные формы.",
-      };
-    }
+      message:
+        "Проверьте данные формы.",
+    };
   }
 
   const expectedCloseAt =

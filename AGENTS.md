@@ -38,7 +38,9 @@ Responsibilities:
 - `NEXT.md` — current development priorities
 - `DECISIONS.md` — architecture/product decisions and rationale
 
-If documentation disagrees with code, inspect the current implementation, verify behavior, then update STATUS/NEXT. Do not reimplement an already existing feature.
+If documentation disagrees with code, inspect the current implementation, verify behavior, then update STATUS/NEXT.
+
+Do not reimplement an already existing feature.
 
 Keep separate meanings for:
 
@@ -53,9 +55,11 @@ Keep separate meanings for:
 
 Decision IDs are permanent.
 
-Never renumber or reuse existing IDs. New decisions receive the next unused ID.
+Never renumber or reuse existing IDs.
 
-Current latest decision: `D045`.
+Current latest decision:
+
+`D047`
 
 ---
 
@@ -82,7 +86,7 @@ Architecture:
 - Server Actions for mutations
 - PostgreSQL primary datastore
 - server-side authorization
-- organization-based multi-tenancy
+- Organization-based multi-tenancy
 
 Do not add Redis, queues, microservices, a separate backend, vector databases, a dedicated AI backend, or paid infrastructure without a concrete requirement.
 
@@ -105,15 +109,22 @@ session
 → Permissions
 → business operation
 
-Current development still uses the fixed Organization:
+Current development still uses:
 
 `slug = development`
 
 Future Organization switching must validate active Membership server-side.
 
+Important access code:
+
+- `src/modules/access/tenant-access.ts`
+- `src/lib/current-organization.ts`
+- `src/lib/auth/current-member.ts`
+- `src/lib/auth/permissions.ts`
+
 ---
 
-## Authentication
+## Authentication / identity
 
 Better Auth owns:
 
@@ -129,128 +140,226 @@ CRM owns:
 - Permissions
 - tenant authorization
 
-Stable User identity is Better Auth `user.id`.
+Stable User identity:
 
-`organization_members.userId` maps CRM Membership to the Better Auth User.
+`user.id`
 
-Email is not the long-term authorization identity.
+CRM mapping:
+
+`organization_members.userId`
+
+Email is not authorization identity.
 
 Normal CRM access requires verified email ownership.
 
----
-
-## Email identity
-
-Identity lookup by email uses canonical exact comparison:
+Canonical email identity lookup:
 
 trim
 → lowercase
 → exact equality
 
-Never use `LIKE` or `ILIKE` for identity matching.
+Never use LIKE/ILIKE for identity matching.
 
-Characters such as `_` and `%` are literal.
+`_` and `%` are literal.
 
-Ambiguous canonical matches must be rejected.
+Ambiguous canonical identity matches must be rejected.
+
+---
+
+## Organization invitations
+
+Decision:
+
+`D047`
+
+Normal Team onboarding uses verified one-time invitations.
+
+Rules:
+
+- invitation belongs to one Organization
+- intended identity is canonical normalized email
+- raw token is cryptographically random
+- only SHA-256 token hash is stored
+- invitation expires
+- accepted/revoked lifecycle is explicit
+- no Membership exists before successful acceptance
+- acceptance requires authenticated Better Auth User
+- authenticated email must be verified
+- canonical authenticated email must exactly match invitation identity
+- Organization and Role are revalidated during acceptance
+- Membership + Role creation and invitation acceptance are atomic
+- browser userId/email/organizationId are never authorization proof
+
+Creation and acceptance share the canonical-email advisory-lock namespace:
+
+`universal-crm-invitation-email`
+
+Do not revert to direct Membership creation from administrator-supplied email.
+
+Production email delivery and invitation administration are product/operations follow-ups.
 
 ---
 
 ## Authorization
 
-Authorization is enforced server-side.
+Authorization is server-side.
 
-Client-side visibility is only UX.
-
-Primary helpers:
-
-- `getCurrentMember()`
-- `getCurrentAccessContext()`
-- `hasPermission()`
-- `requirePermission()`
+Client-side visibility is UX only.
 
 A valid UUID is never proof of access.
 
-For every relationship ID validate:
+For relationship IDs validate:
 
 - current Organization
 - required Permission
 - lifecycle state
 - relationship-specific invariants
 
-Do not fetch or serialize related data merely because the parent record is visible.
+Do not fetch or serialize related data merely because the parent entity is visible.
 
 ---
 
-## Related-data / assignment policy
+## Responsible Member policy
 
-Accepted decision: `D045`.
+Decision:
 
-Responsible Member assignment:
+`D045`
 
-- with `members.read`: may assign any active Member in the Organization
-- without `members.read`: may assign only self or no owner
+With `members.read`:
 
-Existing responsible Member:
+→ may assign any active Member in the Organization
+
+Without `members.read`:
+
+→ may assign only self or no owner
+
+Existing owner:
 
 - may remain unchanged
 - may remain if inactive
-- may remain if the current User cannot otherwise browse that Member
+- may remain even if current User cannot browse that Member
 
-Assignment DTOs must not include Member email unless product behavior explicitly requires it.
+Assignment/reference DTOs must not expose Member email unless explicitly required.
 
 Responsible Member display:
 
-- with `members.read`: real display name may be shown
-- without `members.read`, self: own display name may be shown
-- without `members.read`, another Member: use neutral `Сотрудник`
+- with `members.read` → real display name
+- self → own display name
+- hidden foreign Member → `Сотрудник`
 
-Related entity visibility follows the target module read permission:
+Shared modules:
 
-- Company data in Deal views requires `companies.read`
-- linked Client data in Company views requires `clients.read`
-- Dashboard aggregates require the corresponding module `.read`
+- `src/modules/members/owner-assignment-policy.ts`
+- `src/modules/members/owner-assignment.ts`
 
-Server mutations enforce assignment rules independently of UI controls.
+`owner-assignment-policy.ts` owns permission rules.
+
+`owner-assignment.ts` adds:
+
+- same-Organization validation
+- active Membership validation for new non-null owners
+- unchanged inactive-owner preservation
+
+Company and Deal owner mutations use the shared resolver.
 
 ---
 
-## Existing inactive relationships
+## Existing inactive owner semantics
 
-Current pattern:
+Decision:
+
+`D042`
 
 unchanged inactive owner
-→ may remain
+→ allowed
 
-new owner assignment
-→ new owner must be active
+new inactive owner
+→ rejected
 
-Do not block unrelated record edits because the already-existing owner became inactive.
+new owner from another Organization
+→ rejected
+
+clear owner
+→ allowed
+
+Do not block unrelated edits because an existing owner later became inactive.
+
+---
+
+## Team / Owner
+
+Decision:
+
+`D046`
+
+System Role machine identity uses:
+
+`roles.systemKey`
+
+Owner:
+
+`systemKey = "owner"`
+
+Do not use Role display names as security identity.
+
+Any Team mutation reducing active Owners must use:
+
+`src/modules/members/owner-guard.ts`
+
+Flow:
+
+PostgreSQL transaction
+→ Organization-scoped transaction advisory lock
+→ read current committed Owner state
+→ reject removal/deactivation of last active Owner
+→ mutate
+
+F06 is fixed at the current application/PostgreSQL transaction level.
+
+---
+
+## Client ↔ Company
+
+Relationship:
+
+many-to-many via `client_companies`
+
+Shared mutation module:
+
+`src/modules/clients/client-company-relation.ts`
+
+Rules:
+
+- archived Client cannot link Company
+- archived Client cannot unlink Company
+- same-tenant validation is mandatory
+- cross-tenant link/unlink attempts are rejected
+
+Do not rely on UI hiding alone.
 
 ---
 
 ## Deals
 
-Deal state derives from `pipeline_stages.type`.
+Deal stores:
 
-Valid Stage types:
+- organizationId
+- pipelineId
+- stageId
+
+Stage types:
 
 - open
 - won
 - lost
 
-Rules:
+Deal state derives from Stage type.
 
 open
 → `closedAt = null`
 
 won/lost
 → `closedAt` set
-
-A Deal stores:
-
-- organizationId
-- pipelineId
-- stageId
 
 Stage must belong to the same Organization and Pipeline.
 
@@ -262,7 +371,7 @@ Use:
 
 `src/modules/deals/transition-deal.ts`
 
-Do not create another independent Stage-transition implementation.
+Do not create a second independent Stage-transition implementation.
 
 The shared operation owns:
 
@@ -274,7 +383,7 @@ The shared operation owns:
 - `closedAt`
 - optimistic concurrency
 
-Manual selector, Kanban and future automation/API/AI Stage changes should use the same operation.
+Manual Stage selector, Kanban, future API, automation and AI should reuse the same operation.
 
 ---
 
@@ -293,9 +402,9 @@ Current mutation examples:
 - archive
 - restore
 
-A stale mutation must not silently overwrite newer state.
+Stale mutations must not silently overwrite newer state.
 
-Preferred conditional update:
+Preferred conditional update validates:
 
 - id
 - organizationId
@@ -305,21 +414,23 @@ Preferred conditional update:
 
 Zero affected rows must not be reported as success.
 
-A no-op that changes no business state does not need to increment version.
-
 ---
 
 ## Deal expectedCloseAt
 
-Accepted decision: `D044`.
+Decision:
 
-`expectedCloseAt` is a date-only calendar value.
+`D044`
+
+Semantics:
+
+date-only calendar value
 
 Storage:
 
 PostgreSQL `date`
 
-Application representation:
+Application:
 
 `YYYY-MM-DD`
 
@@ -327,25 +438,14 @@ Rules:
 
 - strict calendar validation
 - reject impossible dates
-- do not validate with `Date.parse` normalization
-- do not route normal display through JavaScript `Date`
-- do not apply timezone conversion
-
----
-
-## Client ↔ Company lifecycle
-
-Client/Company is many-to-many via `client_companies`.
-
-Archived Client relationship mutations are rejected server-side.
-
-Do not rely only on UI button hiding.
+- do not use `Date.parse` normalization
+- do not use JavaScript Date timezone conversion for normal display
 
 ---
 
 ## Concurrency
 
-Do not assume:
+Never assume:
 
 read
 → validate
@@ -353,30 +453,18 @@ read
 
 is concurrency-safe.
 
-Use one or more of:
+Use:
 
 - optimistic locking
 - atomic SQL
-- transactional logic
-- database constraint
+- focused transactional logic
+- database constraints
 
-Key remaining concurrency issue:
+Already protected:
 
-`F06` last Owner protection.
-
----
-
-## Team / Owner
-
-Current last-Owner protection is not concurrency-safe.
-
-Target:
-
-- stable Role `systemKey`
-- explicit ownership-transfer policy
-- concurrency-safe last-Owner invariant
-
-Do not use mutable Role display names as long-term security identity.
+- last active Owner invariant
+- invitation creation/acceptance
+- primary Deal optimistic-locking paths
 
 ---
 
@@ -384,7 +472,7 @@ Do not use mutable Role display names as long-term security identity.
 
 Application validation remains required.
 
-Priority future PostgreSQL invariants include:
+Priority PostgreSQL invariants:
 
 - Stage Organization + Pipeline consistency
 - Deal Organization + Pipeline + Stage consistency
@@ -395,7 +483,14 @@ Priority future PostgreSQL invariants include:
 - Deal amount/currency consistency
 - default Pipeline uniqueness if confirmed
 
-Do not edit already-applied migrations casually. Create new migrations.
+Do not casually edit already-applied migrations.
+
+Before adding a new invariant:
+
+inspect data
+→ repair invalid rows deliberately
+→ create new migration
+→ verify against PostgreSQL
 
 ---
 
@@ -407,7 +502,7 @@ Do not assume ordinary interactive transaction callbacks are available.
 
 `db.batch()` does not make earlier pre-checks concurrency-safe.
 
-For critical invariants deliberately choose atomic SQL, PostgreSQL function, transactional driver, database constraint, or optimistic locking.
+Critical invariants may use focused raw Neon SQL transactions where ordering/locking is required.
 
 ---
 
@@ -420,17 +515,19 @@ archive
 
 over hard deletion.
 
-If archived means immutable, enforce that in Server Actions/domain operations, not only in the UI.
+If archived means immutable, enforce it server-side.
 
 ---
 
 ## Money
 
-Persistent Deal amounts use PostgreSQL `numeric(14,2)`.
+Persistent Deal amount:
+
+PostgreSQL `numeric(14,2)`
 
 Currency is separate.
 
-Do not combine KZT + USD + EUR into one total without an explicit exchange-rate feature.
+Do not sum KZT + USD + EUR without an explicit exchange-rate feature.
 
 ---
 
@@ -453,48 +550,72 @@ If a secret is committed, rotate it.
 
 ## Testing
 
+Latest locally verified baseline:
+
+- `npm test` — 37 / 37
+- `npm run test:integration` — 23 / 23
+- TypeScript — passed
+- ESLint — passed
+- production build — passed
+
 Current automated coverage includes:
 
-- exact canonical email behavior
-- `_` and `%` literal identity behavior
-- strict Deal calendar-date validation
+- canonical email identity
+- invitation token/safe redirect behavior
+- last-Owner concurrency
+- invitation concurrency
+- inactive Organization/Membership access
+- Client ↔ Company lifecycle
+- cross-tenant boundaries
+- owner-assignment RBAC
+- active/inactive owner Membership semantics
 
 Priority additions:
 
-- inactive Organization
-- cross-tenant denial
-- archived Client relationship mutation
-- owner-assignment RBAC
-- related-data visibility
-- stale Deal conflicts
-- last Owner concurrency
-- PostgreSQL invariants
-- E2E critical flows
+- related-data visibility tests
+- Deal conflict PostgreSQL/browser tests
+- PostgreSQL invariant tests
+- E2E critical workflow suite
+- F12 representative scale tests
 
-Use PostgreSQL integration tests for PostgreSQL/concurrency invariants.
+Use PostgreSQL integration tests when PostgreSQL/concurrency behavior matters.
+
+Never point integration tests at production data.
 
 ---
 
 ## CI
 
-Target:
+GitHub Actions CI exists and is passing for non-database checks.
+
+Current CI:
 
 `npm ci`
 → `next typegen`
 → `npx tsc --noEmit --incremental false`
 → `npm run lint`
 → `npm test`
-→ `npm run build`
 
-Never point CI integration tests at production data.
+Database integration tests remain local until a dedicated non-production PostgreSQL CI environment exists.
+
+Do not add production `DATABASE_URL` to GitHub Actions.
 
 ---
 
 ## Roadmap discipline
 
-Do not start another large product module while dangerous identity, authorization, lifecycle and concurrency ambiguity remains.
+Do not start another large product module while important authorization, integrity and scale gaps remain.
 
-Next major product module after stabilization remains:
+Current stabilization priorities:
+
+1. related-data visibility regression coverage
+2. Deal conflict integration/browser coverage
+3. stronger PostgreSQL invariants
+4. F12 scaling
+5. dedicated CI PostgreSQL strategy
+6. production invitation email delivery/admin UX
+
+Next major product module:
 
 Tasks
 

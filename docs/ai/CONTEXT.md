@@ -1,6 +1,6 @@
 # Universal CRM — Project Context
 
-Last updated: 2026-09-27
+Last updated: 2026-09-29
 
 ## Goal
 
@@ -67,15 +67,13 @@ The major CRM foundation already exists.
 
 Current stabilization focus:
 
-- identity safety
-- tenant access
-- lifecycle rules
-- concurrency
-- permission semantics
-- validation
-- database integrity
-- regression tests
-- CI
+- regression coverage
+- related-data visibility
+- Deal conflict verification
+- PostgreSQL invariants
+- F12 scaling
+- CI database isolation
+- production invitation delivery/admin UX
 
 After sufficient stabilization, the next major product module is:
 
@@ -93,7 +91,7 @@ Tenant-owned CRM data uses:
 
 Trusted Organization context must come from authenticated server state.
 
-Current target security chain:
+Current security chain:
 
 session
 → verified User
@@ -107,6 +105,12 @@ Current development version still selects:
 `slug = development`
 
 Future Organization switching must validate active Membership server-side.
+
+Shared tenant-access module:
+
+`src/modules/access/tenant-access.ts`
+
+PostgreSQL regression coverage verifies inactive Organization and inactive Membership denial.
 
 ---
 
@@ -123,14 +127,28 @@ Inactive Membership denies normal CRM access.
 
 A Member may have multiple Roles.
 
-Current system concepts include:
+Current system Role concepts include:
 
 - Owner
 - Admin
 - Manager
 - Viewer
 
-Owner security identity still needs a stable system identifier such as `systemKey`.
+Stable machine identity uses:
+
+`roles.systemKey`
+
+Owner uses:
+
+`systemKey = "owner"`
+
+System Role display names are not authorization identity.
+
+Last active Owner protection is concurrency-safe through:
+
+`src/modules/members/owner-guard.ts`
+
+It uses an Organization-scoped PostgreSQL transaction advisory lock.
 
 ---
 
@@ -146,9 +164,11 @@ CRM Membership uses:
 
 `organization_members.userId`
 
-Email is used only for controlled discovery/invitation flows.
+Normal CRM access requires:
 
-Current email lookup:
+`session.user.emailVerified = true`
+
+Current email identity lookup:
 
 - trim
 - lowercase
@@ -156,11 +176,47 @@ Current email lookup:
 - no LIKE / ILIKE identity matching
 - ambiguous canonical matches rejected
 
-Normal CRM access requires:
+---
 
-`session.user.emailVerified = true`
+# Organization invitations
 
-Production email delivery and invitation acceptance are still incomplete.
+Decision `D047` is implemented for the core authorization flow.
+
+Membership onboarding uses a verified one-time invitation.
+
+Invitation stores/binds:
+
+- Organization
+- canonical intended email
+- one Role in the current UX
+- SHA-256 token hash
+- expiration
+- inviter
+- accepted/revoked lifecycle
+
+Membership does not exist before successful acceptance.
+
+Acceptance requires:
+
+authenticated Better Auth User
+→ verified email
+→ exact canonical identity match
+→ active Organization
+→ valid same-Organization Role
+→ no existing Membership
+→ atomic Membership + Role creation
+→ invitation accepted
+
+Creation and acceptance use focused PostgreSQL transaction/advisory-lock protection.
+
+Current remaining invitation work:
+
+- production email provider
+- real URL delivery
+- pending invitation administration
+- revoke/resend/reissue UX
+
+These are product/operations follow-ups, not the original authorization defect.
 
 ---
 
@@ -212,6 +268,38 @@ Examples:
 - linked Client information in Company views requires `clients.read`
 - Dashboard module counts require that module `.read`
 
+Shared owner-assignment code:
+
+- `src/modules/members/owner-assignment-policy.ts`
+- `src/modules/members/owner-assignment.ts`
+
+The first module owns the permission policy.
+
+The second adds same-tenant and active-Membership validation.
+
+---
+
+# Existing inactive owner semantics
+
+Decision `D042` is implemented and PostgreSQL regression-tested.
+
+existing inactive owner
+→ may remain unchanged
+
+new inactive owner
+→ rejected
+
+new owner from another Organization
+→ rejected
+
+new active owner from same Organization
+→ allowed when Permission policy permits
+
+clear owner
+→ allowed
+
+Company and Deal use the same shared owner-assignment resolver.
+
 ---
 
 # Client
@@ -260,13 +348,9 @@ Implemented:
 - tenant scoping
 - RBAC
 
-Owner rule:
+Responsible Member changes use:
 
-existing inactive owner
-→ may remain unchanged
-
-new owner
-→ must be active
+`src/modules/members/owner-assignment.ts`
 
 ---
 
@@ -276,7 +360,13 @@ Many-to-many via:
 
 `client_companies`
 
+Shared mutation module:
+
+`src/modules/clients/client-company-relation.ts`
+
 Archived Client relationship mutation is rejected server-side.
+
+Cross-tenant link/unlink attempts are rejected.
 
 This applies to direct Server Action calls, not only the visible UI.
 
@@ -333,6 +423,8 @@ Deal data includes:
 
 Deal state derives from Stage type.
 
+Responsible Member changes use the same owner-assignment resolver as Company.
+
 ---
 
 # Deal transition
@@ -375,6 +467,10 @@ Current examples:
 
 Stale edit paths are rejected rather than silently overwriting newer data.
 
+Current application-level protection is implemented.
+
+More PostgreSQL/browser conflict coverage remains valuable.
+
 ---
 
 # Deal expected close date
@@ -404,6 +500,31 @@ PostgreSQL `numeric(14,2)`
 Currency is separate.
 
 Different currencies remain separate in totals unless an explicit exchange-rate feature is introduced.
+
+---
+
+# Testing state
+
+Latest locally verified baseline:
+
+- 37 unit/regression tests
+- 23 PostgreSQL integration tests
+- TypeScript passed
+- ESLint passed
+- production build passed
+
+Integration coverage includes:
+
+- last-Owner concurrency
+- invitation concurrency
+- inactive Organization/Membership access
+- Client ↔ Company lifecycle
+- cross-tenant boundaries
+- owner-assignment active/inactive Membership behavior
+
+GitHub Actions runs the non-database verification suite.
+
+Integration tests remain local until a dedicated non-production PostgreSQL CI environment exists.
 
 ---
 
@@ -474,11 +595,13 @@ AI must never receive unrestricted database access.
 
 Major remaining areas:
 
-- F06 last-Owner concurrency and stable Owner identity
-- F02 production invitation flow
-- regression coverage
-- CI
+- related-data visibility regression tests
+- Deal optimistic-conflict PostgreSQL/browser verification
 - stronger PostgreSQL invariants
 - F12 unbounded loading / scaling
+- dedicated CI PostgreSQL strategy
+- production invitation email delivery/admin UX
 
-F05, F09 and F11 have been materially addressed in the current local code.
+F01–F11 are materially addressed at their documented current scope.
+
+F12 remains open.

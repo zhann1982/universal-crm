@@ -16,7 +16,6 @@ import {
 import { db } from "@/db";
 import {
   companies,
-  organizationMembers,
 } from "@/db/schema";
 import {
   requirePermission,
@@ -29,8 +28,8 @@ import {
   type UpdateCompanyState,
 } from "@/lib/validation/company";
 import {
-  evaluateOwnerAssignment,
-} from "@/modules/members/owner-assignment-policy";
+  resolveOwnerAssignment,
+} from "@/modules/members/owner-assignment";
 
 function getFormValues(
   formData: FormData,
@@ -85,48 +84,6 @@ function getFormValues(
   };
 }
 
-async function isValidOwner(
-  organizationId: string,
-  ownerMemberId:
-    | string
-    | null,
-) {
-  if (!ownerMemberId) {
-    return true;
-  }
-
-  const [owner] =
-    await db
-      .select({
-        id:
-          organizationMembers.id,
-      })
-      .from(
-        organizationMembers,
-      )
-      .where(
-        and(
-          eq(
-            organizationMembers.id,
-            ownerMemberId,
-          ),
-
-          eq(
-            organizationMembers.organizationId,
-            organizationId,
-          ),
-
-          eq(
-            organizationMembers.status,
-            "active",
-          ),
-        ),
-      )
-      .limit(1);
-
-  return Boolean(owner);
-}
-
 export async function createCompany(
   _previousState:
     CreateCompanyState,
@@ -167,20 +124,24 @@ export async function createCompany(
   const data =
     result.data;
 
-    /*
-  * F05.
-  *
-  * Без members.read пользователь
-  * не может назначить ответственным
-  * произвольного сотрудника.
-  *
-  * Разрешены:
-  * - текущий пользователь
-  * - отсутствие ответственного
-  */
-  const ownerPolicy =
-    evaluateOwnerAssignment({
-      mode: "create",
+  /*
+   * F05 + active Membership validation.
+   *
+   * Без members.read пользователь
+   * может назначить только себя
+   * или оставить owner пустым.
+   *
+   * Любой новый non-null owner
+   * дополнительно должен быть
+   * активным Member этой Organization.
+   */
+  const ownerResult =
+    await resolveOwnerAssignment({
+      organizationId:
+        organization.id,
+
+      mode:
+        "create",
 
       currentMemberId:
         member.id,
@@ -195,7 +156,8 @@ export async function createCompany(
     });
 
   if (
-    !ownerPolicy.allowed
+    ownerResult.status ===
+    "forbidden"
   ) {
     return {
       values,
@@ -209,13 +171,11 @@ export async function createCompany(
       message:
         "Проверьте данные формы.",
     };
-  }  
+  }
 
   if (
-    !(await isValidOwner(
-      organization.id,
-      data.ownerMemberId,
-    ))
+    ownerResult.status ===
+    "owner-unavailable"
   ) {
     return {
       values,
@@ -393,8 +353,8 @@ export async function updateCompany(
    * состояние Company.
    *
    * Это нужно в том числе,
-   * чтобы понять, действительно
-   * ли пользователь меняет owner.
+   * чтобы определить, меняется
+   * ли owner.
    */
   const [existingCompany] =
     await db
@@ -442,40 +402,43 @@ export async function updateCompany(
   }
 
   /*
-   * F08.
+   * F05 + F08.
    *
-   * Если ответственный НЕ меняется,
-   * разрешаем сохранить компанию,
-   * даже если текущий owner уже
-   * стал неактивным.
+   * Неизменённый owner может
+   * остаться даже если Membership
+   * уже стала inactive.
    *
-   * Но назначить нового
-   * неактивного сотрудника
-   * по-прежнему нельзя.
+   * Новый non-null owner должен:
+   * - пройти permission policy;
+   * - принадлежать этой Organization;
+   * - иметь active Membership.
    */
-  const ownerChanged =
-    data.ownerMemberId !==
-    existingCompany.ownerMemberId;
+  const ownerResult =
+    await resolveOwnerAssignment({
+      organizationId:
+        organization.id,
 
-  /*
-  * F05.
-  *
-  * Если owner действительно меняется,
-  * пользователь без members.read
-  * может назначить только себя.
-  *
-  * Текущего чужого owner можно
-  * оставить без изменений — это
-  * сохраняет правило F08.
-  */
+      mode:
+        "update",
+
+      currentMemberId:
+        member.id,
+
+      canReadMembers:
+        permissions.has(
+          "members.read",
+        ),
+
+      requestedOwnerMemberId:
+        data.ownerMemberId,
+
+      existingOwnerMemberId:
+        existingCompany.ownerMemberId,
+    });
+
   if (
-    ownerChanged &&
-    data.ownerMemberId &&
-    !permissions.has(
-      "members.read",
-    ) &&
-    data.ownerMemberId !==
-      member.id
+    ownerResult.status ===
+    "forbidden"
   ) {
     return {
       values,
@@ -492,11 +455,8 @@ export async function updateCompany(
   }
 
   if (
-    ownerChanged &&
-    !(await isValidOwner(
-      organization.id,
-      data.ownerMemberId,
-    ))
+    ownerResult.status ===
+    "owner-unavailable"
   ) {
     return {
       values,

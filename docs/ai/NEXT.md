@@ -12,156 +12,66 @@ Recently completed / materially stabilized:
 - F02 verified, one-time, transaction-safe Organization invitation flow
 - F03 public DB health exposure
 - F04 Deal Stage transition race at application level
-- F05 related-data and assignment Permission policy
+- F05 responsible-Member assignment Permission policy
 - F06 stable Owner identity + concurrency-safe last-Owner protection
 - F07 inactive Organization / Membership access with PostgreSQL regression coverage
-- F08 unchanged inactive owner behavior
+- F08 inactive-owner preservation + new-owner active Membership validation
 - F09 strict date-only Deal expectedCloseAt
 - F10 primary Deal optimistic-locking paths
 - F11 archived Client relationship mutation with PostgreSQL regression coverage
+- cross-tenant Client ↔ Company and invitation boundaries
+- shared Company/Deal owner-assignment resolver
 
 Do not recreate these features.
 
 ---
 
-# 1 — F02 follow-up: invitation delivery and administration
+# 1 — Regression tests for remaining authorization surfaces
 
-The core F02 authorization problem is fixed.
+Highest-value next tests:
 
-Implemented:
-
-administrator creates invitation
-→ invitation is bound to Organization + canonical email + Role
-→ random raw token is generated
-→ only SHA-256 hash is stored
-→ invitation expires
-→ User authenticates
-→ User verifies email
-→ authenticated identity must match invitation
-→ current Organization and Role are revalidated
-→ Membership + Role are created atomically
-→ invitation becomes accepted
-
-Concurrency protection exists for:
-
-- duplicate active invitation creation
-- same-token replay
-- separate invitation acceptance for the same identity
-- Membership acquisition racing with invitation creation
-
-Current automated verification:
-
-- 37 unit/regression tests
-- 17 PostgreSQL integration tests
-- TypeScript
-- ESLint
-- production build
-
-Remaining invitation work is operational/product work rather than the original security defect:
-
-- real production email provider
-- full invitation URL delivery instead of manual development transfer
-- pending invitation list
-- revoke invitation UI
-- resend/reissue UX
-- cleanup/reporting for old expired invitations
-
-Do not revert to direct Membership creation by administrator-supplied email.
-
-Decision:
-
-D047
-
----
-
-# 2 — Regression tests for completed stabilization
-
-Priority tests:
-
-- exact email identity
-- verified-email CRM gate
-- unchanged inactive Company owner
-- unchanged inactive Deal owner
 - hidden Member data without `members.read`
 - Company hidden in Deal without `companies.read`
 - linked Clients not queried without `clients.read`
 - Dashboard aggregate Permission policy
-- impossible calendar dates
-- stale Deal edit version conflict
-- Kanban vs stale form
-- PostgreSQL/browser verification of page-version conflicts for Kanban and manual Stage changes
-- Deal Stage/Pipeline validation
-- archive/restore lifecycle conflict
-- Owner system identity behavior
-- last Owner concurrency
+- verified-email CRM gate at application boundary
 
 Already implemented:
 
-- real PostgreSQL integration test for concurrent Owner-role removal
-- real PostgreSQL integration test for concurrent Owner deactivation
-- assertion that one active Owner remains
-- separate `npm run test:integration` command
-- same-token concurrent invitation acceptance
-- separate invitations for the same identity cannot create duplicate Memberships
-- wrong-email invitation acceptance rejection
-- concurrent invitation creation produces one active invitation
-- expired invitation does not block a new invitation
-- inactive Organization access rejection
-- inactive Membership access rejection
-- archived Client cannot create a Company relationship
-- archived Client cannot remove an existing Company relationship
-- active Client may unlink an archived Company relationship
-- cross-tenant Client ↔ Company link rejection
-- cross-tenant Client ↔ Company unlink rejection
-- cross-tenant invitation inviter rejection
-- cross-tenant invitation Role rejection
-- shared Company / Deal responsible-Member assignment policy
-- self-assignment without `members.read`
-- foreign Member assignment rejection without `members.read`
-- unchanged existing owner preservation
-- owner clearing behavior
+- owner-assignment RBAC unit coverage
+- owner active/inactive PostgreSQL coverage
+- cross-tenant relationship denial
+- cross-tenant invitation inviter/Role denial
+- inactive Organization/Membership denial
 
-Use real PostgreSQL integration tests when SQL/concurrency behavior matters.
+Goal:
 
-Do not point integration tests at production data.
+turn remaining manually verified permission semantics into automated regressions.
 
 ---
 
-# 3 — Expand CI safely
+# 2 — Deal conflict integration / browser verification
 
-Basic GitHub Actions CI is implemented and passing.
+Current application-level optimistic locking is implemented.
 
-Current workflow:
+Next coverage should verify real workflows such as:
 
-`.github/workflows/ci.yml`
+- stale full Deal edit against PostgreSQL
+- Kanban Stage move vs stale edit form
+- manual Stage selector vs stale version
+- archive vs stale edit
+- restore/lifecycle conflict behavior
+- zero-row conditional update is surfaced as conflict, never success
 
-Current checks:
+Use real PostgreSQL where the result depends on committed database state.
 
-`npm ci`
-→ `next typegen`
-→ `npx tsc --noEmit --incremental false`
-→ `npm run lint`
-→ `npm test`
+Use browser/E2E only where page-rendered version and stale UI behavior matter.
 
-Current design deliberately excludes database integration tests.
-
-Reason:
-
-- integration tests mutate PostgreSQL fixtures
-- they currently use `DATABASE_URL`
-- production database credentials must never be used in CI
-- a dedicated disposable/test PostgreSQL environment is required first
-
-Next CI step:
-
-1. keep current non-database CI fast and deterministic
-2. create dedicated CI PostgreSQL strategy
-3. add `npm run test:integration` only after isolation is guaranteed
-4. optionally add production build once safe build-time environment handling is established
+Do not add a second independent Deal mutation path merely for testing.
 
 ---
 
-# 4 — Strengthen PostgreSQL invariants
+# 3 — Strengthen PostgreSQL invariants
 
 Before adding constraints:
 
@@ -169,6 +79,7 @@ inspect data
 → identify invalid rows
 → repair deliberately
 → create new migration
+→ verify against PostgreSQL
 
 Priority invariants:
 
@@ -183,11 +94,11 @@ Priority invariants:
 
 Application validation remains required.
 
-For Member ↔ Role, the new system Role identity does not replace tenant-consistency validation.
+Do not edit already-applied migrations casually.
 
 ---
 
-# 5 — F12 scaling
+# 4 — F12 scaling
 
 Current structural scale limitations include:
 
@@ -211,28 +122,78 @@ Do not introduce Redis or microservices for ordinary query/UI scaling.
 
 ---
 
-# 6 — Clean up business-operation boundaries
+# 5 — Expand CI safely
+
+Basic GitHub Actions CI is implemented and passing.
+
+Current CI:
+
+`npm ci`
+→ `next typegen`
+→ `npx tsc --noEmit --incremental false`
+→ `npm run lint`
+→ `npm test`
+
+Current local verification additionally includes:
+
+- `npm run test:integration` — 23 PostgreSQL tests
+- `npm run build`
+
+Database integration tests are deliberately excluded from CI because they mutate PostgreSQL fixtures and currently use `DATABASE_URL`.
+
+Next CI step:
+
+1. keep non-database CI fast and deterministic
+2. create a dedicated non-production PostgreSQL CI strategy
+3. add `npm run test:integration` only after isolation is guaranteed
+4. add production build only after safe build-time environment handling is established
+
+Never use production database credentials for destructive CI tests.
+
+---
+
+# 6 — F02 product/operations follow-up
+
+The core invitation authorization flow is fixed and integration-tested.
+
+Remaining work:
+
+- real production email provider
+- full invitation URL delivery
+- pending invitation list
+- revoke invitation UI
+- resend/reissue UX
+- cleanup/reporting for old expired invitations
+
+Do not revert to direct Membership creation by administrator-supplied email.
+
+Decision:
+
+D047
+
+---
+
+# 7 — Business-operation boundaries
 
 Continue moving genuinely shared rules into focused domain modules.
 
-Existing examples:
+Current examples:
 
 `src/modules/deals/transition-deal.ts`
 
 `src/modules/members/owner-guard.ts`
 
+`src/modules/members/owner-assignment-policy.ts`
+
+`src/modules/members/owner-assignment.ts`
+
 `src/modules/access/tenant-access.ts`
 
 `src/modules/clients/client-company-relation.ts`
 
-`src/modules/members/owner-assignment-policy.ts`
+`src/modules/invitations/create-invitation.ts`
 
-High-value candidates:
-
-- Deal lifecycle mutation
-- Deal full edit
-- invitation acceptance
-- ownership transfer if a dedicated UX is later added
+`src/modules/invitations/accept-invitation.ts`
 
 Target Server Action shape:
 
@@ -241,39 +202,30 @@ parse input
 → call domain operation
 → translate result to UI response
 
-Do not create a generic repository abstraction.
+Potential future extractions should be justified by duplicated business rules, not abstraction for its own sake.
+
+Do not create a generic repository framework.
 
 ---
 
-# F06 completed design
+# Current automated verification
 
-Current Owner invariant implementation:
+Locally verified:
 
-stable Role identity
-→ `roles.systemKey`
+- 37 / 37 unit/regression tests
+- 23 / 23 PostgreSQL integration tests
+- TypeScript passed
+- ESLint passed
+- production build passed
 
-Owner machine identity
-→ `systemKey = "owner"`
+Current PostgreSQL coverage includes:
 
-Owner-reducing Team mutation
-→ start PostgreSQL transaction
-→ acquire organization-scoped transaction advisory lock
-→ evaluate current committed Owner state
-→ reject mutation if it would remove/deactivate the last active Owner
-→ otherwise mutate
-
-Current coverage:
-
-- Team UI manually verified
-- concurrent Owner-role removal integration tested
-- concurrent Owner deactivation integration tested
-- one active Owner remains after concurrent destructive requests
-
-Custom Roles may use `systemKey = null`.
-
-Display name such as `Owner` is no longer the security identity.
-
-A dedicated ownership-transfer UI may still improve administration later, but the current invariant no longer depends on a sequential pre-check.
+- Owner concurrency
+- invitation concurrency
+- inactive tenant access
+- Client ↔ Company lifecycle
+- cross-tenant boundaries
+- responsible-Member active/inactive Membership semantics
 
 ---
 
@@ -281,13 +233,11 @@ A dedicated ownership-transfer UI may still improve administration later, but th
 
 Before starting the next large module, aim for:
 
-- F02 invitation authorization and concurrency flow implemented and integration-tested
-- broader core regression suite
-- CI
-- key PostgreSQL invariants planned or partly implemented
+- remaining related-data authorization semantics automated
+- important Deal stale-write paths verified against PostgreSQL/browser behavior
+- key PostgreSQL invariants implemented or deliberately deferred with rationale
+- F12 initial scale limits addressed for representative data
 - no major unresolved authorization ambiguity
-
-F06 no longer blocks stabilization exit.
 
 Not every long-term production feature must be complete.
 
@@ -329,7 +279,7 @@ Initial views:
 - completed
 - Deals without a next action
 
-Authorization must use the same trusted tenant context.
+Authorization must use the same trusted tenant context and owner-assignment rules.
 
 ---
 
