@@ -1,12 +1,10 @@
-import { eq } from "drizzle-orm";
 import {
   redirect,
 } from "next/navigation";
 
-import { db } from "@/db";
 import {
-  organizations,
-} from "@/db/schema";
+  getOrganizationForAccessBySlug,
+} from "@/modules/access/tenant-access";
 
 export async function getCurrentOrganization() {
   /*
@@ -17,43 +15,28 @@ export async function getCurrentOrganization() {
    * выбор текущей организации
    * пользователя.
    */
-  const [organization] =
-    await db
-      .select()
-      .from(
-        organizations,
-      )
-      .where(
-        eq(
-          organizations.slug,
-          "development",
-        ),
-      )
-      .limit(1);
+  const result =
+    await getOrganizationForAccessBySlug(
+      "development",
+    );
 
-  if (!organization) {
+  if (
+    result.status ===
+    "not-found"
+  ) {
     throw new Error(
       "Development organization not found",
     );
   }
 
-  /*
-   * Неактивная организация
-   * не должна иметь доступ
-   * к данным CRM.
-   *
-   * При этом данные организации
-   * не удаляются — доступ можно
-   * восстановить повторной
-   * активацией.
-   */
   if (
-    !organization.isActive
+    result.status ===
+    "inactive"
   ) {
     redirect(
       "/no-access?reason=organization-inactive",
     );
   }
 
-  return organization;
+  return result.organization;
 }

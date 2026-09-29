@@ -1,11 +1,6 @@
 "use server";
 
 import {
-  and,
-  eq,
-  isNull,
-} from "drizzle-orm";
-import {
   revalidatePath,
 } from "next/cache";
 import {
@@ -13,38 +8,50 @@ import {
 } from "next/navigation";
 import { z } from "zod";
 
-import { db } from "@/db";
-import {
-  clientCompanies,
-  clients,
-  companies,
-} from "@/db/schema";
 import {
   requirePermission,
 } from "@/lib/auth/permissions";
+import {
+  linkClientCompany,
+  unlinkClientCompany,
+} from "@/modules/clients/client-company-relation";
 
-const relationSchema = z.object({
-  clientId:
-    z.string().uuid(),
+const relationSchema =
+  z.object({
+    clientId:
+      z.string().uuid(),
 
-  companyId:
-    z.string().uuid(),
-});
+    companyId:
+      z.string().uuid(),
+  });
 
 function parseRelation(
   formData: FormData,
 ) {
   return relationSchema.safeParse({
     clientId: String(
-      formData.get("clientId") ??
-        "",
+      formData.get(
+        "clientId",
+      ) ?? "",
     ),
 
     companyId: String(
-      formData.get("companyId") ??
-        "",
+      formData.get(
+        "companyId",
+      ) ?? "",
     ),
   });
+}
+
+function relationForbidden(
+  status: string,
+) {
+  return (
+    status ===
+      "client-unavailable" ||
+    status ===
+      "company-unavailable"
+  );
 }
 
 export async function linkClientToCompany(
@@ -67,117 +74,49 @@ export async function linkClientToCompany(
     );
   }
 
-  const result =
+  const parsed =
     parseRelation(
       formData,
     );
 
-  if (!result.success) {
+  if (!parsed.success) {
     redirect(
       "/crm/clients",
     );
   }
 
-  const {
-    clientId,
-    companyId,
-  } = result.data;
+  const result =
+    await linkClientCompany({
+      organizationId:
+        organization.id,
 
-  const [client] =
-    await db
-      .select({
-        id: clients.id,
-      })
-      .from(clients)
-      .where(
-        and(
-          eq(
-            clients.id,
-            clientId,
-          ),
+      clientId:
+        parsed.data.clientId,
 
-          eq(
-            clients.organizationId,
-            organization.id,
-          ),
-
-          eq(
-            clients.isArchived,
-            false,
-          ),
-
-          isNull(
-            clients.deletedAt,
-          ),
-        ),
-      )
-      .limit(1);
-
-  const [company] =
-    await db
-      .select({
-        id: companies.id,
-      })
-      .from(companies)
-      .where(
-        and(
-          eq(
-            companies.id,
-            companyId,
-          ),
-
-          eq(
-            companies.organizationId,
-            organization.id,
-          ),
-
-          eq(
-            companies.isArchived,
-            false,
-          ),
-
-          isNull(
-            companies.deletedAt,
-          ),
-        ),
-      )
-      .limit(1);
+      companyId:
+        parsed.data.companyId,
+    });
 
   if (
-    !client ||
-    !company
+    relationForbidden(
+      result.status,
+    )
   ) {
     redirect(
       "/crm/forbidden",
     );
   }
 
-  await db
-    .insert(
-      clientCompanies,
-    )
-    .values({
-      organizationId:
-        organization.id,
-
-      clientId:
-        client.id,
-
-      companyId:
-        company.id,
-    })
-    .onConflictDoNothing();
-
   revalidatePath(
-    `/crm/clients/${client.id}`,
+    `/crm/clients/${parsed.data.clientId}`,
   );
 
   revalidatePath(
-    `/crm/companies/${company.id}`,
+    `/crm/companies/${parsed.data.companyId}`,
   );
 
   redirect(
-    `/crm/clients/${client.id}`,
+    `/crm/clients/${parsed.data.clientId}`,
   );
 }
 
@@ -201,167 +140,48 @@ export async function unlinkClientFromCompany(
     );
   }
 
-  const result =
+  const parsed =
     parseRelation(
       formData,
     );
 
-  if (!result.success) {
+  if (!parsed.success) {
     redirect(
       "/crm/clients",
     );
   }
 
-  const {
-    clientId,
-    companyId,
-  } = result.data;
+  const result =
+    await unlinkClientCompany({
+      organizationId:
+        organization.id,
 
-  /*
-   * Архивированный Client считается
-   * недоступным для изменения связей.
-   *
-   * Раньше unlink проверял только
-   * deletedAt и поэтому прямой вызов
-   * Server Action мог изменить связь
-   * архивированного Client.
-   */
-  const [client] =
-    await db
-      .select({
-        id:
-          clients.id,
-      })
-      .from(
-        clients,
-      )
-      .where(
-        and(
-          eq(
-            clients.id,
-            clientId,
-          ),
+      clientId:
+        parsed.data.clientId,
 
-          eq(
-            clients.organizationId,
-            organization.id,
-          ),
-
-          eq(
-            clients.isArchived,
-            false,
-          ),
-
-          isNull(
-            clients.deletedAt,
-          ),
-        ),
-      )
-      .limit(1);
-
-  /*
-   * Для unlink сохраняем текущую
-   * семантику Company:
-   *
-   * существующую связь разрешено
-   * удалить даже если Company уже
-   * находится в архиве.
-   *
-   * F11 относится именно к
-   * immutable-состоянию Client.
-   */
-  const [company] =
-    await db
-      .select({
-        id:
-          companies.id,
-      })
-      .from(
-        companies,
-      )
-      .where(
-        and(
-          eq(
-            companies.id,
-            companyId,
-          ),
-
-          eq(
-            companies.organizationId,
-            organization.id,
-          ),
-
-          isNull(
-            companies.deletedAt,
-          ),
-        ),
-      )
-      .limit(1);
+      companyId:
+        parsed.data.companyId,
+    });
 
   if (
-    !client ||
-    !company
+    relationForbidden(
+      result.status,
+    )
   ) {
     redirect(
       "/crm/forbidden",
     );
   }
 
-  const deleted =
-    await db
-      .delete(
-        clientCompanies,
-      )
-      .where(
-        and(
-          eq(
-            clientCompanies.organizationId,
-            organization.id,
-          ),
-
-          eq(
-            clientCompanies.clientId,
-            client.id,
-          ),
-
-          eq(
-            clientCompanies.companyId,
-            company.id,
-          ),
-        ),
-      )
-      .returning({
-        clientId:
-          clientCompanies.clientId,
-
-        companyId:
-          clientCompanies.companyId,
-      });
-
-  /*
-   * Если связи уже нет, это безопасный
-   * idempotent результат.
-   *
-   * Никакие чужие или cross-tenant
-   * записи при этом не изменяются.
-   */
-  if (
-    deleted.length === 0
-  ) {
-    redirect(
-      `/crm/clients/${client.id}`,
-    );
-  }
-
   revalidatePath(
-    `/crm/clients/${client.id}`,
+    `/crm/clients/${parsed.data.clientId}`,
   );
 
   revalidatePath(
-    `/crm/companies/${company.id}`,
+    `/crm/companies/${parsed.data.companyId}`,
   );
 
   redirect(
-    `/crm/clients/${client.id}`,
+    `/crm/clients/${parsed.data.clientId}`,
   );
 }

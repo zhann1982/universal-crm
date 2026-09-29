@@ -14,11 +14,11 @@ Recently completed / materially stabilized:
 - F04 Deal Stage transition race at application level
 - F05 related-data and assignment Permission policy
 - F06 stable Owner identity + concurrency-safe last-Owner protection
-- F07 inactive Organization access
+- F07 inactive Organization / Membership access with PostgreSQL regression coverage
 - F08 unchanged inactive owner behavior
 - F09 strict date-only Deal expectedCloseAt
 - F10 primary Deal optimistic-locking paths
-- F11 archived Client relationship mutation at code level
+- F11 archived Client relationship mutation with PostgreSQL regression coverage
 
 Do not recreate these features.
 
@@ -52,7 +52,7 @@ Concurrency protection exists for:
 Current automated verification:
 
 - 30 unit/regression tests
-- 7 PostgreSQL integration tests
+- 12 PostgreSQL integration tests
 - TypeScript
 - ESLint
 - production build
@@ -80,8 +80,6 @@ Priority tests:
 
 - exact email identity
 - verified-email CRM gate
-- inactive Membership
-- inactive Organization
 - cross-tenant entity denial
 - unchanged inactive Company owner
 - unchanged inactive Deal owner
@@ -90,8 +88,6 @@ Priority tests:
 - Company hidden in Deal without `companies.read`
 - linked Clients not queried without `clients.read`
 - Dashboard aggregate Permission policy
-- archived Client link rejection
-- archived Client unlink rejection
 - impossible calendar dates
 - stale Deal edit version conflict
 - Kanban vs stale form
@@ -112,6 +108,11 @@ Already implemented:
 - wrong-email invitation acceptance rejection
 - concurrent invitation creation produces one active invitation
 - expired invitation does not block a new invitation
+- inactive Organization access rejection
+- inactive Membership access rejection
+- archived Client cannot create a Company relationship
+- archived Client cannot remove an existing Company relationship
+- active Client may unlink an archived Company relationship
 
 Use real PostgreSQL integration tests when SQL/concurrency behavior matters.
 
@@ -213,12 +214,15 @@ Existing examples:
 
 `src/modules/members/owner-guard.ts`
 
+`src/modules/access/tenant-access.ts`
+
+`src/modules/clients/client-company-relation.ts`
+
 High-value candidates:
 
 - Deal lifecycle mutation
 - Deal full edit
 - Company owner assignment
-- Client ↔ Company relation mutation
 - invitation acceptance
 - ownership transfer if a dedicated UX is later added
 

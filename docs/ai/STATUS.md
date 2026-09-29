@@ -33,15 +33,15 @@ Repeated local checks during stabilization:
 - `npx tsc --noEmit --incremental false`
 - `npm run lint`
 
-Latest complete local verification after F02 invitation stabilization:
+Latest complete local verification after regression coverage expansion:
 
 - `npm test` — 30 tests passed
-- `npm run test:integration` — 7 tests passed
+- `npm run test:integration` — 12 tests passed
 - `npx tsc --noEmit --incremental false` — passed
 - `npm run lint` — passed
 - `npm run build` — passed
 
-Current PostgreSQL integration coverage includes both Owner invariants and invitation concurrency behavior.
+Current PostgreSQL integration coverage includes Owner invariants, invitation concurrency, tenant access lifecycle, and Client ↔ Company relationship lifecycle rules.
 
 GitHub Actions CI is implemented.
 
@@ -170,7 +170,15 @@ Custom Roles may keep `systemKey = null`.
 
 F07:
 
-FIXED FOR CURRENT DEVELOPMENT TENANT MODEL
+FIXED AND INTEGRATION-TESTED FOR CURRENT DEVELOPMENT TENANT MODEL
+
+Automated PostgreSQL coverage verifies:
+
+- inactive Organization is rejected by the tenant access resolver
+- inactive Membership is rejected
+- active Membership remains allowed
+
+The current application still uses the fixed `development` Organization until real Organization selection is introduced.
 
 F06:
 
@@ -250,7 +258,8 @@ Implemented:
 - unlink
 - reverse display
 - tenant validation
-- archived Client lifecycle guard inside Server Action
+- archived Client lifecycle guard in shared domain operation
+- shared Client ↔ Company relationship mutation module
 
 Archived Client:
 
@@ -259,9 +268,19 @@ Archived Client:
 
 F11:
 
-CODE FIXED
+FIXED AND INTEGRATION-TESTED
 
-A dedicated stale-UI regression test remains desirable.
+PostgreSQL regression coverage verifies:
+
+- archived Client cannot create a new Company relationship
+- archived Client cannot remove an existing Company relationship
+- active Client may remove an existing relationship to an archived Company
+
+The Server Actions delegate relationship lifecycle rules to:
+
+`src/modules/clients/client-company-relation.ts`
+
+A browser-level stale-UI test remains a possible additional layer, but the direct server-side mutation rule is now automatically covered.
 
 ---
 
@@ -501,10 +520,15 @@ PostgreSQL integration coverage currently includes:
 - invitation identity mismatch rejection
 - concurrent invitation creation for the same Organization/email
 - replacement after an expired invitation
+- inactive Organization access rejection
+- inactive Membership access rejection
+- archived Client link rejection
+- archived Client unlink rejection
+- active Client unlink from archived Company
 
 Current result:
 
-7 / 7 integration tests passing.
+12 / 12 integration tests passing.
 
 Commands:
 
@@ -516,8 +540,6 @@ The Owner integration suite creates an isolated temporary Organization and delet
 Still needed:
 
 - cross-tenant regression suite
-- inactive Organization automated test
-- archived Client relationship test
 - owner-assignment RBAC tests
 - related-data visibility tests
 - Deal conflict integration tests
@@ -568,7 +590,7 @@ F05 — FIXED / MANUALLY VERIFIED
 
 F06 — FIXED AT CURRENT APPLICATION / POSTGRESQL TRANSACTION LEVEL
 
-F07 — FIXED FOR CURRENT DEVELOPMENT TENANT MODEL
+F07 — FIXED AND INTEGRATION-TESTED FOR CURRENT DEVELOPMENT TENANT MODEL
 
 F08 — IMPLEMENTED
 
@@ -576,7 +598,7 @@ F09 — FIXED
 
 F10 — FIXED AT CURRENT APPLICATION LEVEL
 
-F11 — CODE FIXED
+F11 — FIXED AND INTEGRATION-TESTED
 
 F12 — OPEN
 
