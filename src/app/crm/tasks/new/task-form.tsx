@@ -26,6 +26,9 @@ type TaskFormProps = {
   companies: Option[];
   deals: Option[];
   defaultOwnerMemberId: string;
+  defaultClientId?: string;
+  defaultCompanyId?: string;
+  defaultDealId?: string;
 };
 
 export function TaskForm({
@@ -34,6 +37,9 @@ export function TaskForm({
   companies,
   deals,
   defaultOwnerMemberId,
+  defaultClientId = "",
+  defaultCompanyId = "",
+  defaultDealId = "",
 }: TaskFormProps) {
   const [state, formAction, pending] =
     useActionState(
@@ -45,7 +51,6 @@ export function TaskForm({
     useState(
       state.values?.dueAt ?? "",
     );
-
 
   const dueAtLocal =
     isoToLocalInput(
@@ -280,7 +285,8 @@ export function TaskForm({
             emptyLabel="Без клиента"
             options={clients}
             defaultValue={
-              state.values?.clientId
+              state.values?.clientId ??
+              defaultClientId
             }
             errors={
               state.errors?.clientId
@@ -293,7 +299,8 @@ export function TaskForm({
             emptyLabel="Без компании"
             options={companies}
             defaultValue={
-              state.values?.companyId
+              state.values?.companyId ??
+              defaultCompanyId
             }
             errors={
               state.errors?.companyId
@@ -306,7 +313,8 @@ export function TaskForm({
             emptyLabel="Без сделки"
             options={deals}
             defaultValue={
-              state.values?.dealId
+              state.values?.dealId ??
+              defaultDealId
             }
             errors={
               state.errors?.dealId

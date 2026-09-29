@@ -21,7 +21,30 @@ import {
   TaskForm,
 } from "./task-form";
 
-export default async function NewTaskPage() {
+type SearchParams = {
+  [key: string]:
+    | string
+    | string[]
+    | undefined;
+};
+
+function getSingleValue(
+  value:
+    | string
+    | string[]
+    | undefined,
+) {
+  return Array.isArray(value)
+    ? value[0]
+    : value;
+}
+
+export default async function NewTaskPage({
+  searchParams,
+}: {
+  searchParams:
+    Promise<SearchParams>;
+}) {
   const {
     organization,
     member,
@@ -29,6 +52,9 @@ export default async function NewTaskPage() {
   } = await requirePermission(
     "tasks.create",
   );
+
+  const rawSearchParams =
+    await searchParams;
 
   let memberList: Array<{
     id: string;
@@ -210,6 +236,51 @@ export default async function NewTaskPage() {
           )
       : [];
 
+  const requestedClientId =
+    getSingleValue(
+      rawSearchParams.clientId,
+    );
+
+  const requestedCompanyId =
+    getSingleValue(
+      rawSearchParams.companyId,
+    );
+
+  const requestedDealId =
+    getSingleValue(
+      rawSearchParams.dealId,
+    );
+
+  const defaultClientId =
+    requestedClientId &&
+    clientList.some(
+      (client) =>
+        client.id ===
+        requestedClientId,
+    )
+      ? requestedClientId
+      : "";
+
+  const defaultCompanyId =
+    requestedCompanyId &&
+    companyList.some(
+      (company) =>
+        company.id ===
+        requestedCompanyId,
+    )
+      ? requestedCompanyId
+      : "";
+
+  const defaultDealId =
+    requestedDealId &&
+    dealList.some(
+      (deal) =>
+        deal.id ===
+        requestedDealId,
+    )
+      ? requestedDealId
+      : "";
+
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
@@ -279,6 +350,15 @@ export default async function NewTaskPage() {
         }
         defaultOwnerMemberId={
           member.id
+        }
+        defaultClientId={
+          defaultClientId
+        }
+        defaultCompanyId={
+          defaultCompanyId
+        }
+        defaultDealId={
+          defaultDealId
         }
       />
     </div>

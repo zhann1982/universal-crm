@@ -8,6 +8,9 @@ import {
   notFound,
 } from "next/navigation";
 
+import {
+  RelatedTasksSection,
+} from "@/app/crm/tasks/related-tasks-section";
 import { db } from "@/db";
 import {
   pipelineStages,
@@ -162,15 +165,11 @@ export default async function DealPage({
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-bold">
-                {
-                  deal.title
-                }
+                {deal.title}
               </h1>
 
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium">
-                {
-                  deal.stageName
-                }
+                {deal.stageName}
               </span>
 
               <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
@@ -189,9 +188,7 @@ export default async function DealPage({
 
             <p className="mt-2 text-sm text-slate-500">
               Воронка:{" "}
-              {
-                deal.pipelineName
-              }
+              {deal.pipelineName}
             </p>
           </div>
 
@@ -213,9 +210,7 @@ export default async function DealPage({
             ) &&
               !deal.isArchived && (
                 <ArchiveDealButton
-                  dealId={
-                    deal.id
-                  }
+                  dealId={deal.id}
                 />
               )}
 
@@ -224,9 +219,7 @@ export default async function DealPage({
             ) &&
               deal.isArchived && (
                 <RestoreDealButton
-                  dealId={
-                    deal.id
-                  }
+                  dealId={deal.id}
                 />
               )}
           </div>
@@ -294,12 +287,15 @@ export default async function DealPage({
             </p>
 
             <form
-              action={
-                moveAction
-              }
+              action={moveAction}
               className="mt-5 flex flex-wrap items-end gap-3"
             >
-              <input type="hidden" name="version" value={deal.version} />
+              <input
+                type="hidden"
+                name="version"
+                value={deal.version}
+              />
+
               <div className="min-w-64 flex-1">
                 <label
                   htmlFor="stageId"
@@ -317,25 +313,14 @@ export default async function DealPage({
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-500"
                 >
                   {stages.map(
-                    (
-                      stage,
-                    ) => (
+                    (stage) => (
                       <option
-                        key={
-                          stage.id
-                        }
-                        value={
-                          stage.id
-                        }
+                        key={stage.id}
+                        value={stage.id}
                       >
-                        {
-                          stage.name
-                        }
+                        {stage.name}
                         {" — "}
-                        {
-                          stage.probability
-                        }
-                        %
+                        {stage.probability}%
                       </option>
                     ),
                   )}
@@ -378,16 +363,12 @@ export default async function DealPage({
 
             <InfoItem
               label="Воронка"
-              value={
-                deal.pipelineName
-              }
+              value={deal.pipelineName}
             />
 
             <InfoItem
               label="Этап"
-              value={
-                deal.stageName
-              }
+              value={deal.stageName}
             />
 
             <InfoItem
@@ -483,6 +464,26 @@ export default async function DealPage({
         </section>
       )}
 
+      {permissions.has(
+        "tasks.read",
+      ) && (
+        <RelatedTasksSection
+          organizationId={
+            organization.id
+          }
+          relationType="deal"
+          relationId={deal.id}
+          canCreateTasks={
+            permissions.has(
+              "tasks.create",
+            )
+          }
+          relationIsArchived={
+            deal.isArchived
+          }
+        />
+      )}
+
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">
           Описание / заметка
@@ -490,9 +491,7 @@ export default async function DealPage({
 
         {deal.notes ? (
           <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-            {
-              deal.notes
-            }
+            {deal.notes}
           </p>
         ) : (
           <p className="mt-4 text-sm text-slate-400">

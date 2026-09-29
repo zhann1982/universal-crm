@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
+  RelatedTasksSection,
+} from "@/app/crm/tasks/related-tasks-section";
+import {
   requirePermission,
 } from "@/lib/auth/permissions";
 import {
@@ -262,6 +265,28 @@ export default async function ClientPage({
           )
         }
       />
+
+      {currentPermissions.has(
+        "tasks.read",
+      ) && (
+        <RelatedTasksSection
+          organizationId={
+            organization.id
+          }
+          relationType="client"
+          relationId={
+            client.id
+          }
+          canCreateTasks={
+            currentPermissions.has(
+              "tasks.create",
+            )
+          }
+          relationIsArchived={
+            client.isArchived
+          }
+        />
+      )}
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">

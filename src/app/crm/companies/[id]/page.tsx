@@ -7,6 +7,9 @@ import {
   notFound,
 } from "next/navigation";
 
+import {
+  RelatedTasksSection,
+} from "@/app/crm/tasks/related-tasks-section";
 import { db } from "@/db";
 import {
   organizationMembers,
@@ -325,6 +328,28 @@ export default async function CompanyPage({
           )
         }
       />
+
+      {currentPermissions.has(
+        "tasks.read",
+      ) && (
+        <RelatedTasksSection
+          organizationId={
+            organization.id
+          }
+          relationType="company"
+          relationId={
+            company.id
+          }
+          canCreateTasks={
+            currentPermissions.has(
+              "tasks.create",
+            )
+          }
+          relationIsArchived={
+            company.isArchived
+          }
+        />
+      )}
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">
