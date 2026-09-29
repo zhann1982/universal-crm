@@ -43,7 +43,28 @@ Latest complete local verification after F02 invitation stabilization:
 
 Current PostgreSQL integration coverage includes both Owner invariants and invitation concurrency behavior.
 
-No GitHub Actions CI workflow exists yet.
+GitHub Actions CI is implemented.
+
+Current CI workflow:
+
+`.github/workflows/ci.yml`
+
+Runs on:
+
+- push to `main`
+- pull requests targeting `main`
+
+Current CI checks:
+
+- `npm ci`
+- `npx next typegen`
+- `npx tsc --noEmit --incremental false`
+- `npm run lint`
+- `npm test`
+
+The first GitHub Actions run completed successfully.
+
+Database integration tests are intentionally not included yet because they require a dedicated non-production PostgreSQL test environment.
 
 ---
 
@@ -507,7 +528,17 @@ Still needed:
 
 # CI
 
-Not implemented.
+Implemented for non-database checks.
+
+Current workflow:
+
+`.github/workflows/ci.yml`
+
+Current GitHub Actions status:
+
+PASSING
+
+Database integration tests remain local until a dedicated CI PostgreSQL strategy is introduced.
 
 Target:
 
@@ -572,9 +603,9 @@ Do not start another large module yet.
 Priority:
 
 1. broader regression tests for completed stabilization work
-2. GitHub Actions CI
-3. stronger PostgreSQL invariants
-4. F12 scaling work as datasets grow
+2. stronger PostgreSQL invariants
+3. F12 scaling work as datasets grow
+4. dedicated CI database strategy for integration tests
 5. production invitation email delivery and invitation administration UX
 6. continue extracting genuinely shared business operations into focused modules
 

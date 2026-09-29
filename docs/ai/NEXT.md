@@ -119,33 +119,37 @@ Do not point integration tests at production data.
 
 ---
 
-# 3 — Add CI
+# 3 — Expand CI safely
 
-Target GitHub Actions pipeline:
+Basic GitHub Actions CI is implemented and passing.
+
+Current workflow:
+
+`.github/workflows/ci.yml`
+
+Current checks:
 
 `npm ci`
 → `next typegen`
 → `npx tsc --noEmit --incremental false`
 → `npm run lint`
 → `npm test`
-→ `npm run build`
 
-Database integration tests require a separate CI database strategy.
+Current design deliberately excludes database integration tests.
 
-Rules:
+Reason:
 
-- no production `DATABASE_URL`
-- no production secrets
-- database tests use dedicated disposable/test environment
-- any TypeScript/lint/test/build failure blocks the workflow
-- integration tests must clean up their fixtures
-- CI must never mutate production CRM data
+- integration tests mutate PostgreSQL fixtures
+- they currently use `DATABASE_URL`
+- production database credentials must never be used in CI
+- a dedicated disposable/test PostgreSQL environment is required first
 
-Possible staging approach:
+Next CI step:
 
-1. add non-database CI first
-2. add dedicated database integration job separately
-3. keep unit/regression tests fast and deterministic
+1. keep current non-database CI fast and deterministic
+2. create dedicated CI PostgreSQL strategy
+3. add `npm run test:integration` only after isolation is guaranteed
+4. optionally add production build once safe build-time environment handling is established
 
 ---
 
