@@ -73,6 +73,26 @@ const PERMISSIONS = [
     key: "deals.delete",
     name: "Удаление сделок",
   },
+    {
+    key: "tasks.read",
+    name: "Просмотр задач",
+  },
+  {
+    key: "tasks.create",
+    name: "Создание задач",
+  },
+  {
+    key: "tasks.update",
+    name: "Изменение задач",
+  },
+  {
+    key: "tasks.archive",
+    name: "Архивация задач",
+  },
+  {
+    key: "tasks.delete",
+    name: "Удаление задач",
+  },
   {
     key: "pipelines.read",
     name: "Просмотр воронок",
@@ -229,6 +249,11 @@ async function main() {
         "deals.update",
         "deals.archive",
 
+        "tasks.read",
+        "tasks.create",
+        "tasks.update",
+        "tasks.archive",
+
         "pipelines.read",
       ],
     },
@@ -243,6 +268,7 @@ async function main() {
         "clients.read",
         "companies.read",
         "deals.read",
+        "tasks.read",
         "pipelines.read",
       ],
     },

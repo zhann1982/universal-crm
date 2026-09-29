@@ -1479,3 +1479,252 @@ export const deals =
       ),
     ],
   );
+
+  /*
+|--------------------------------------------------------------------------
+| Tasks
+|--------------------------------------------------------------------------
+|
+| Рабочие задачи CRM.
+|
+| Задача может быть связана с Client, Company и Deal.
+| Все связи являются необязательными.
+|
+*/
+
+export const tasks =
+  pgTable(
+    "tasks",
+    {
+      id: uuid("id")
+        .defaultRandom()
+        .primaryKey(),
+
+      organizationId: uuid(
+        "organization_id",
+      )
+        .notNull()
+        .references(
+          () =>
+            organizations.id,
+          {
+            onDelete:
+              "cascade",
+          },
+        ),
+
+      /*
+       * Ответственный за задачу.
+       */
+      ownerMemberId: uuid(
+        "owner_member_id",
+      ).references(
+        () =>
+          organizationMembers.id,
+        {
+          onDelete:
+            "set null",
+        },
+      ),
+
+      /*
+       * Кто создал задачу.
+       *
+       * Если Membership когда-нибудь
+       * будет удалена, сама Task
+       * должна сохраниться.
+       */
+      createdByMemberId: uuid(
+        "created_by_member_id",
+      ).references(
+        () =>
+          organizationMembers.id,
+        {
+          onDelete:
+            "set null",
+        },
+      ),
+
+      clientId: uuid(
+        "client_id",
+      ).references(
+        () => clients.id,
+        {
+          onDelete:
+            "set null",
+        },
+      ),
+
+      companyId: uuid(
+        "company_id",
+      ).references(
+        () =>
+          companies.id,
+        {
+          onDelete:
+            "set null",
+        },
+      ),
+
+      dealId: uuid(
+        "deal_id",
+      ).references(
+        () => deals.id,
+        {
+          onDelete:
+            "set null",
+        },
+      ),
+
+      title: varchar(
+        "title",
+        {
+          length: 240,
+        },
+      ).notNull(),
+
+      description:
+        text("description"),
+
+      /*
+       * Initial statuses:
+       *
+       * todo
+       * in_progress
+       * completed
+       * cancelled
+       */
+      status: varchar(
+        "status",
+        {
+          length: 32,
+        },
+      )
+        .default("todo")
+        .notNull(),
+
+      /*
+       * Initial priorities:
+       *
+       * low
+       * normal
+       * high
+       * urgent
+       */
+      priority: varchar(
+        "priority",
+        {
+          length: 32,
+        },
+      )
+        .default("normal")
+        .notNull(),
+
+      /*
+       * Task deadline is an exact
+       * point in time, unlike the
+       * Deal expectedCloseAt date.
+       */
+      dueAt: timestamp(
+        "due_at",
+        {
+          withTimezone: true,
+        },
+      ),
+
+      completedAt: timestamp(
+        "completed_at",
+        {
+          withTimezone: true,
+        },
+      ),
+
+      isArchived: boolean(
+        "is_archived",
+      )
+        .default(false)
+        .notNull(),
+
+      /*
+       * Optimistic locking.
+       */
+      version: integer(
+        "version",
+      )
+        .default(1)
+        .notNull(),
+
+      createdAt: timestamp(
+        "created_at",
+        {
+          withTimezone: true,
+        },
+      )
+        .defaultNow()
+        .notNull(),
+
+      updatedAt: timestamp(
+        "updated_at",
+        {
+          withTimezone: true,
+        },
+      )
+        .defaultNow()
+        .notNull(),
+
+      deletedAt: timestamp(
+        "deleted_at",
+        {
+          withTimezone: true,
+        },
+      ),
+    },
+    (table) => [
+      index(
+        "tasks_organization_idx",
+      ).on(
+        table.organizationId,
+      ),
+
+      index(
+        "tasks_org_status_due_at_idx",
+      ).on(
+        table.organizationId,
+        table.status,
+        table.dueAt,
+      ),
+
+      index(
+        "tasks_org_owner_status_idx",
+      ).on(
+        table.organizationId,
+        table.ownerMemberId,
+        table.status,
+      ),
+
+      index(
+        "tasks_client_idx",
+      ).on(
+        table.clientId,
+      ),
+
+      index(
+        "tasks_company_idx",
+      ).on(
+        table.companyId,
+      ),
+
+      index(
+        "tasks_deal_idx",
+      ).on(
+        table.dealId,
+      ),
+
+      index(
+        "tasks_org_created_at_idx",
+      ).on(
+        table.organizationId,
+        table.createdAt,
+      ),
+    ],
+  );

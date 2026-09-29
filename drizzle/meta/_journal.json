@@ -64,6 +64,13 @@
       "when": 1790661005422,
       "tag": "0008_purple_war_machine",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790686231539,
+      "tag": "0009_cynical_enchantress",
+      "breakpoints": true
     }
   ]
 }
