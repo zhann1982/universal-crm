@@ -525,10 +525,15 @@ PostgreSQL integration coverage currently includes:
 - archived Client link rejection
 - archived Client unlink rejection
 - active Client unlink from archived Company
+- Client from another Organization cannot be linked
+- Company from another Organization cannot be linked
+- relationship from another Organization cannot be unlinked
+- Member from another Organization cannot act as invitation inviter
+- Role from another Organization cannot be used in an invitation
 
 Current result:
 
-12 / 12 integration tests passing.
+17 / 17 integration tests passing.
 
 Commands:
 
@@ -539,7 +544,6 @@ The Owner integration suite creates an isolated temporary Organization and delet
 
 Still needed:
 
-- cross-tenant regression suite
 - owner-assignment RBAC tests
 - related-data visibility tests
 - Deal conflict integration tests

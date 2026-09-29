@@ -52,7 +52,7 @@ Concurrency protection exists for:
 Current automated verification:
 
 - 30 unit/regression tests
-- 12 PostgreSQL integration tests
+- 17 PostgreSQL integration tests
 - TypeScript
 - ESLint
 - production build
@@ -80,7 +80,6 @@ Priority tests:
 
 - exact email identity
 - verified-email CRM gate
-- cross-tenant entity denial
 - unchanged inactive Company owner
 - unchanged inactive Deal owner
 - Manager owner assignment restriction
@@ -113,6 +112,10 @@ Already implemented:
 - archived Client cannot create a Company relationship
 - archived Client cannot remove an existing Company relationship
 - active Client may unlink an archived Company relationship
+- cross-tenant Client ↔ Company link rejection
+- cross-tenant Client ↔ Company unlink rejection
+- cross-tenant invitation inviter rejection
+- cross-tenant invitation Role rejection
 
 Use real PostgreSQL integration tests when SQL/concurrency behavior matters.
 
