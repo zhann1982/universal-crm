@@ -854,6 +854,9 @@ export async function completeTask(
     redirect("/crm/tasks");
   }
 
+  const returnTo =
+    getTaskReturnTo(formData);
+
   const [updated] =
     await db
       .update(tasks)
@@ -899,7 +902,12 @@ export async function completeTask(
 
   if (!updated) {
     redirect(
-      `/crm/tasks/${parsed.taskId}?error=conflict`,
+      returnTo
+        ? withTaskError(
+            returnTo,
+            "conflict",
+          )
+        : `/crm/tasks/${parsed.taskId}?error=conflict`,
     );
   }
 
@@ -908,7 +916,8 @@ export async function completeTask(
   );
 
   redirect(
-    `/crm/tasks/${updated.id}`,
+    returnTo ??
+      `/crm/tasks/${updated.id}`,
   );
 }
 
@@ -928,6 +937,9 @@ export async function reopenTask(
   if (!parsed) {
     redirect("/crm/tasks");
   }
+
+  const returnTo =
+    getTaskReturnTo(formData);
 
   const [updated] =
     await db
@@ -974,7 +986,12 @@ export async function reopenTask(
 
   if (!updated) {
     redirect(
-      `/crm/tasks/${parsed.taskId}?error=conflict`,
+      returnTo
+        ? withTaskError(
+            returnTo,
+            "conflict",
+          )
+        : `/crm/tasks/${parsed.taskId}?error=conflict`,
     );
   }
 
@@ -983,7 +1000,8 @@ export async function reopenTask(
   );
 
   redirect(
-    `/crm/tasks/${updated.id}`,
+    returnTo ??
+      `/crm/tasks/${updated.id}`,
   );
 }
 
@@ -1003,6 +1021,9 @@ export async function archiveTask(
   if (!parsed) {
     redirect("/crm/tasks");
   }
+
+  const returnTo =
+    getTaskReturnTo(formData);
 
   const [archived] =
     await db
@@ -1043,7 +1064,12 @@ export async function archiveTask(
 
   if (!archived) {
     redirect(
-      `/crm/tasks/${parsed.taskId}?error=conflict`,
+      returnTo
+        ? withTaskError(
+            returnTo,
+            "conflict",
+          )
+        : `/crm/tasks/${parsed.taskId}?error=conflict`,
     );
   }
 
@@ -1052,7 +1078,8 @@ export async function archiveTask(
   );
 
   redirect(
-    "/crm/tasks",
+    returnTo ??
+      "/crm/tasks",
   );
 }
 
@@ -1074,6 +1101,9 @@ export async function restoreTask(
       "/crm/tasks?view=archive",
     );
   }
+
+  const returnTo =
+    getTaskReturnTo(formData);
 
   const [restored] =
     await db
@@ -1114,7 +1144,12 @@ export async function restoreTask(
 
   if (!restored) {
     redirect(
-      `/crm/tasks/${parsed.taskId}?error=conflict`,
+      returnTo
+        ? withTaskError(
+            returnTo,
+            "conflict",
+          )
+        : `/crm/tasks/${parsed.taskId}?error=conflict`,
     );
   }
 
@@ -1123,8 +1158,63 @@ export async function restoreTask(
   );
 
   redirect(
-    `/crm/tasks/${restored.id}`,
+    returnTo ??
+      `/crm/tasks/${restored.id}`,
   );
+}
+
+function getTaskReturnTo(
+  formData: FormData,
+) {
+  const value =
+    formData.get("returnTo");
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized =
+    value.trim();
+
+  if (normalized === "/crm") {
+    return normalized;
+  }
+
+  if (
+    normalized === "/crm/tasks" ||
+    normalized.startsWith(
+      "/crm/tasks?",
+    )
+  ) {
+    return normalized;
+  }
+
+  return null;
+}
+
+function withTaskError(
+  returnTo: string,
+  error: string,
+) {
+  if (returnTo === "/crm") {
+    return "/crm";
+  }
+
+  const queryIndex =
+    returnTo.indexOf("?");
+
+  const params =
+    new URLSearchParams(
+      queryIndex >= 0
+        ? returnTo.slice(
+            queryIndex + 1,
+          )
+        : "",
+    );
+
+  params.set("error", error);
+
+  return `/crm/tasks?${params.toString()}`;
 }
 
 function parseTaskMutationForm(

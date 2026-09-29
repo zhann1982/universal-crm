@@ -1,12 +1,16 @@
 import {
   and,
+  asc,
   count,
   desc,
   eq,
   gte,
+  ilike,
+  isNotNull,
   isNull,
   lt,
   notInArray,
+  or,
 } from "drizzle-orm";
 import Link from "next/link";
 import {
@@ -26,6 +30,12 @@ import {
   type TaskListQuery,
 } from "@/lib/validation/task";
 
+import {
+  archiveTask,
+  completeTask,
+  reopenTask,
+  restoreTask,
+} from "./actions";
 import {
   TaskDueAt,
 } from "./task-due-at";
@@ -72,14 +82,19 @@ export default async function TasksPage({
     taskListQuerySchema.parse({
       view:
         rawSearchParams.view,
+      status:
+        rawSearchParams.status,
+      priority:
+        rawSearchParams.priority,
+      due:
+        rawSearchParams.due,
+      owner:
+        rawSearchParams.owner,
+      q:
+        rawSearchParams.q,
       page:
         rawSearchParams.page,
     });
-
-  const {
-    view,
-    page,
-  } = query;
 
   const {
     organization,
@@ -88,6 +103,68 @@ export default async function TasksPage({
   } = await requirePermission(
     "tasks.read",
   );
+
+  const canReadMembers =
+    permissions.has(
+      "members.read",
+    );
+
+  const memberOptions =
+    canReadMembers
+      ? await db
+          .select({
+            id:
+              organizationMembers.id,
+            displayName:
+              organizationMembers.displayName,
+            status:
+              organizationMembers.status,
+          })
+          .from(
+            organizationMembers,
+          )
+          .where(
+            eq(
+              organizationMembers.organizationId,
+              organization.id,
+            ),
+          )
+          .orderBy(
+            asc(
+              organizationMembers.displayName,
+            ),
+          )
+      : [];
+
+  const effectiveOwner =
+    query.owner === "any" ||
+    query.owner === "mine" ||
+    query.owner ===
+      "unassigned"
+      ? query.owner
+      : canReadMembers &&
+          memberOptions.some(
+            (item) =>
+              item.id ===
+              query.owner,
+          )
+        ? query.owner
+        : "any";
+
+  const normalizedQuery: TaskListQuery = {
+    ...query,
+    owner:
+      effectiveOwner,
+  };
+
+  const {
+    view,
+    status,
+    priority,
+    due,
+    q,
+    page,
+  } = normalizedQuery;
 
   const now = new Date();
 
@@ -111,6 +188,9 @@ export default async function TasksPage({
         )
       : view === "overdue"
         ? and(
+            isNotNull(
+              tasks.dueAt,
+            ),
             lt(
               tasks.dueAt,
               now,
@@ -119,6 +199,9 @@ export default async function TasksPage({
           )
         : view === "upcoming"
           ? and(
+              isNotNull(
+                tasks.dueAt,
+              ),
               gte(
                 tasks.dueAt,
                 now,
@@ -131,6 +214,81 @@ export default async function TasksPage({
                 "completed",
               )
             : undefined;
+
+  const statusCondition =
+    status === "any"
+      ? undefined
+      : eq(
+          tasks.status,
+          status,
+        );
+
+  const priorityCondition =
+    priority === "any"
+      ? undefined
+      : eq(
+          tasks.priority,
+          priority,
+        );
+
+  const dueCondition =
+    due === "overdue"
+      ? and(
+          isNotNull(
+            tasks.dueAt,
+          ),
+          lt(
+            tasks.dueAt,
+            now,
+          ),
+        )
+      : due === "upcoming"
+        ? and(
+            isNotNull(
+              tasks.dueAt,
+            ),
+            gte(
+              tasks.dueAt,
+              now,
+            ),
+          )
+        : due === "none"
+          ? isNull(
+              tasks.dueAt,
+            )
+          : undefined;
+
+  const ownerCondition =
+    effectiveOwner === "mine"
+      ? eq(
+          tasks.ownerMemberId,
+          member.id,
+        )
+      : effectiveOwner ===
+          "unassigned"
+        ? isNull(
+            tasks.ownerMemberId,
+          )
+        : effectiveOwner ===
+            "any"
+          ? undefined
+          : eq(
+              tasks.ownerMemberId,
+              effectiveOwner,
+            );
+
+  const searchCondition = q
+    ? or(
+        ilike(
+          tasks.title,
+          `%${q}%`,
+        ),
+        ilike(
+          tasks.description,
+          `%${q}%`,
+        ),
+      )
+    : undefined;
 
   const whereCondition = and(
     eq(
@@ -145,6 +303,11 @@ export default async function TasksPage({
       tasks.deletedAt,
     ),
     viewCondition,
+    statusCondition,
+    priorityCondition,
+    dueCondition,
+    ownerCondition,
+    searchCondition,
   );
 
   const [countResult] =
@@ -180,7 +343,7 @@ export default async function TasksPage({
   ) {
     redirect(
       buildTasksHref({
-        view,
+        ...normalizedQuery,
         page:
           currentPage,
       }),
@@ -192,9 +355,7 @@ export default async function TasksPage({
     PAGE_SIZE;
 
   const taskRows =
-    permissions.has(
-      "members.read",
-    )
+    canReadMembers
       ? await db
           .select({
             id:
@@ -213,13 +374,23 @@ export default async function TasksPage({
               organizationMembers.displayName,
             createdAt:
               tasks.createdAt,
+            version:
+              tasks.version,
+            isArchived:
+              tasks.isArchived,
           })
           .from(tasks)
           .leftJoin(
             organizationMembers,
-            eq(
-              tasks.ownerMemberId,
-              organizationMembers.id,
+            and(
+              eq(
+                tasks.ownerMemberId,
+                organizationMembers.id,
+              ),
+              eq(
+                organizationMembers.organizationId,
+                organization.id,
+              ),
             ),
           )
           .where(
@@ -249,6 +420,10 @@ export default async function TasksPage({
                 tasks.ownerMemberId,
               createdAt:
                 tasks.createdAt,
+              version:
+                tasks.version,
+              isArchived:
+                tasks.isArchived,
             })
             .from(tasks)
             .where(
@@ -272,10 +447,17 @@ export default async function TasksPage({
                 : null,
         }));
 
+  const currentListHref =
+    buildTasksHref({
+      ...normalizedQuery,
+      page:
+        currentPage,
+    });
+
   const previousHref =
     currentPage > 1
       ? buildTasksHref({
-          view,
+          ...normalizedQuery,
           page:
             currentPage - 1,
         })
@@ -284,7 +466,7 @@ export default async function TasksPage({
   const nextHref =
     currentPage < totalPages
       ? buildTasksHref({
-          view,
+          ...normalizedQuery,
           page:
             currentPage + 1,
         })
@@ -301,6 +483,14 @@ export default async function TasksPage({
         taskRows.length,
       totalTasks,
     );
+
+  const rawError =
+    rawSearchParams.error;
+
+  const error =
+    Array.isArray(rawError)
+      ? rawError[0]
+      : rawError;
 
   return (
     <div>
@@ -329,6 +519,12 @@ export default async function TasksPage({
           </Link>
         )}
       </div>
+
+      {error === "conflict" && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Задача уже была изменена другим действием. Список обновлён — при необходимости повторите операцию.
+        </div>
+      )}
 
       <div className="mb-6 flex flex-wrap gap-2">
         <TaskViewLink
@@ -386,16 +582,161 @@ export default async function TasksPage({
         </TaskViewLink>
       </div>
 
+      <form
+        method="get"
+        action="/crm/tasks"
+        className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+      >
+        {view !== "all" && (
+          <input
+            type="hidden"
+            name="view"
+            value={view}
+          />
+        )}
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="xl:col-span-2">
+            <label
+              htmlFor="q"
+              className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500"
+            >
+              Поиск
+            </label>
+
+            <input
+              id="q"
+              name="q"
+              defaultValue={q}
+              placeholder="Название или описание"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
+            />
+          </div>
+
+          <FilterSelect
+            label="Статус"
+            name="status"
+            value={status}
+            options={[
+              ["any", "Все"],
+              ["todo", "К выполнению"],
+              ["in_progress", "В работе"],
+              ["completed", "Выполнена"],
+              ["cancelled", "Отменена"],
+            ]}
+          />
+
+          <FilterSelect
+            label="Приоритет"
+            name="priority"
+            value={priority}
+            options={[
+              ["any", "Все"],
+              ["low", "Низкий"],
+              ["normal", "Обычный"],
+              ["high", "Высокий"],
+              ["urgent", "Срочный"],
+            ]}
+          />
+
+          <FilterSelect
+            label="Срок"
+            name="due"
+            value={due}
+            options={[
+              ["any", "Любой"],
+              ["overdue", "Просрочен"],
+              ["upcoming", "Предстоящий"],
+              ["none", "Без срока"],
+            ]}
+          />
+
+          <div>
+            <label
+              htmlFor="owner"
+              className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500"
+            >
+              Ответственный
+            </label>
+
+            <select
+              id="owner"
+              name="owner"
+              defaultValue={
+                effectiveOwner
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-500"
+            >
+              <option value="any">
+                Все
+              </option>
+              <option value="mine">
+                Мои
+              </option>
+              <option value="unassigned">
+                Без ответственного
+              </option>
+
+              {memberOptions.map(
+                (item) => (
+                  <option
+                    key={item.id}
+                    value={item.id}
+                  >
+                    {item.displayName ||
+                      "Сотрудник"}
+                    {item.status !==
+                    "active"
+                      ? " (неактивен)"
+                      : ""}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs text-slate-500">
+            Найдено: {totalTasks}
+          </div>
+
+          <div className="flex gap-2">
+            <Link
+              href={
+                buildTasksHref({
+                  view,
+                  status: "any",
+                  priority: "any",
+                  due: "any",
+                  owner: "any",
+                  q: "",
+                  page: 1,
+                })
+              }
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Сбросить
+            </Link>
+
+            <button
+              type="submit"
+              className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              Применить
+            </button>
+          </div>
+        </div>
+      </form>
+
       {taskRows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
           <h2 className="text-lg font-semibold">
-            Задач пока нет
+            Задачи не найдены
           </h2>
 
           <p className="mt-2 text-sm text-slate-500">
-            Создайте первую задачу
-            или выберите другой
-            фильтр.
+            Измените фильтры или создайте новую задачу.
           </p>
         </div>
       ) : (
@@ -418,6 +759,9 @@ export default async function TasksPage({
                   </TableHead>
                   <TableHead>
                     Срок
+                  </TableHead>
+                  <TableHead>
+                    Действия
                   </TableHead>
                 </tr>
               </thead>
@@ -501,6 +845,108 @@ export default async function TasksPage({
                             "—"
                           )}
                         </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex min-w-56 flex-wrap gap-2">
+                            {!task.isArchived &&
+                              permissions.has(
+                                "tasks.update",
+                              ) && (
+                                <Link
+                                  href={`/crm/tasks/${task.id}/edit`}
+                                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                                >
+                                  Изменить
+                                </Link>
+                              )}
+
+                            {!task.isArchived &&
+                              permissions.has(
+                                "tasks.update",
+                              ) &&
+                              task.status !==
+                                "completed" &&
+                              task.status !==
+                                "cancelled" && (
+                                <TaskActionForm
+                                  action={
+                                    completeTask
+                                  }
+                                  taskId={task.id}
+                                  version={
+                                    task.version
+                                  }
+                                  returnTo={
+                                    currentListHref
+                                  }
+                                  label="Выполнить"
+                                  className="border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                />
+                              )}
+
+                            {!task.isArchived &&
+                              permissions.has(
+                                "tasks.update",
+                              ) &&
+                              task.status ===
+                                "completed" && (
+                                <TaskActionForm
+                                  action={
+                                    reopenTask
+                                  }
+                                  taskId={task.id}
+                                  version={
+                                    task.version
+                                  }
+                                  returnTo={
+                                    currentListHref
+                                  }
+                                  label="Вернуть"
+                                  className="border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                />
+                              )}
+
+                            {!task.isArchived &&
+                              permissions.has(
+                                "tasks.archive",
+                              ) && (
+                                <TaskActionForm
+                                  action={
+                                    archiveTask
+                                  }
+                                  taskId={task.id}
+                                  version={
+                                    task.version
+                                  }
+                                  returnTo={
+                                    currentListHref
+                                  }
+                                  label="Архив"
+                                  className="border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                                />
+                              )}
+
+                            {view === "archive" &&
+                              permissions.has(
+                                "tasks.archive",
+                              ) && (
+                                <TaskActionForm
+                                  action={
+                                    restoreTask
+                                  }
+                                  taskId={task.id}
+                                  version={
+                                    task.version
+                                  }
+                                  returnTo={
+                                    currentListHref
+                                  }
+                                  label="Восстановить"
+                                  className="border-slate-900 bg-slate-900 text-white hover:bg-slate-700"
+                                />
+                              )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   },
@@ -550,6 +996,11 @@ export default async function TasksPage({
 
 function buildTasksHref({
   view,
+  status,
+  priority,
+  due,
+  owner,
+  q,
   page,
 }: TaskListQuery) {
   const params =
@@ -562,6 +1013,38 @@ function buildTasksHref({
     );
   }
 
+  if (status !== "any") {
+    params.set(
+      "status",
+      status,
+    );
+  }
+
+  if (priority !== "any") {
+    params.set(
+      "priority",
+      priority,
+    );
+  }
+
+  if (due !== "any") {
+    params.set(
+      "due",
+      due,
+    );
+  }
+
+  if (owner !== "any") {
+    params.set(
+      "owner",
+      owner,
+    );
+  }
+
+  if (q) {
+    params.set("q", q);
+  }
+
   if (page > 1) {
     params.set(
       "page",
@@ -569,11 +1052,11 @@ function buildTasksHref({
     );
   }
 
-  const query =
+  const queryString =
     params.toString();
 
-  return query
-    ? `/crm/tasks?${query}`
+  return queryString
+    ? `/crm/tasks?${queryString}`
     : "/crm/tasks";
 }
 
@@ -597,6 +1080,94 @@ function TaskViewLink({
     >
       {children}
     </Link>
+  );
+}
+
+function FilterSelect({
+  label,
+  name,
+  value,
+  options,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  options: Array<
+    [string, string]
+  >;
+}) {
+  return (
+    <div>
+      <label
+        htmlFor={name}
+        className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500"
+      >
+        {label}
+      </label>
+
+      <select
+        id={name}
+        name={name}
+        defaultValue={value}
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-500"
+      >
+        {options.map(
+          ([optionValue, optionLabel]) => (
+            <option
+              key={optionValue}
+              value={optionValue}
+            >
+              {optionLabel}
+            </option>
+          ),
+        )}
+      </select>
+    </div>
+  );
+}
+
+function TaskActionForm({
+  action,
+  taskId,
+  version,
+  returnTo,
+  label,
+  className,
+}: {
+  action: (
+    formData: FormData,
+  ) => Promise<void>;
+  taskId: string;
+  version: number;
+  returnTo: string;
+  label: string;
+  className: string;
+}) {
+  return (
+    <form action={action}>
+      <input
+        type="hidden"
+        name="taskId"
+        value={taskId}
+      />
+      <input
+        type="hidden"
+        name="version"
+        value={version}
+      />
+      <input
+        type="hidden"
+        name="returnTo"
+        value={returnTo}
+      />
+
+      <button
+        type="submit"
+        className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${className}`}
+      >
+        {label}
+      </button>
+    </form>
   );
 }
 

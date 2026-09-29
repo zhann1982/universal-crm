@@ -166,6 +166,52 @@ export const taskListQuerySchema =
       ])
       .catch("all"),
 
+    status: z
+      .enum([
+        "any",
+        "todo",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ])
+      .catch("any"),
+
+    priority: z
+      .enum([
+        "any",
+        "low",
+        "normal",
+        "high",
+        "urgent",
+      ])
+      .catch("any"),
+
+    due: z
+      .enum([
+        "any",
+        "overdue",
+        "upcoming",
+        "none",
+      ])
+      .catch("any"),
+
+    owner: z
+      .union([
+        z.enum([
+          "any",
+          "mine",
+          "unassigned",
+        ]),
+        z.string().uuid(),
+      ])
+      .catch("any"),
+
+    q: z
+      .string()
+      .trim()
+      .max(100)
+      .catch(""),
+
     page: z.coerce
       .number()
       .int()

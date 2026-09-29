@@ -22,6 +22,9 @@ import {
 } from "@/lib/auth/permissions";
 
 import {
+  completeTask,
+} from "./tasks/actions";
+import {
   TaskDueAt,
 } from "./tasks/task-due-at";
 
@@ -31,6 +34,13 @@ type DashboardCard = {
     | string
     | number;
   href?: string;
+};
+
+type TaskSummary = {
+  active: number;
+  overdue: number;
+  urgent: number;
+  withoutDueAt: number;
 };
 
 export default async function CrmDashboardPage() {
@@ -61,7 +71,6 @@ export default async function CrmDashboardPage() {
               clients.organizationId,
               organization.id,
             ),
-
             eq(
               clients.isArchived,
               false,
@@ -130,11 +139,22 @@ export default async function CrmDashboardPage() {
     });
   }
 
+  cards.push({
+    title: "Организация",
+    value:
+      organization.name,
+  });
+
+  let taskSummary:
+    TaskSummary | null = null;
+
   let myTaskRows: Array<{
     id: string;
     title: string;
     priority: string;
+    status: string;
     dueAt: Date | null;
+    version: number;
   }> = [];
 
   if (
@@ -168,7 +188,9 @@ export default async function CrmDashboardPage() {
         ),
       );
 
-    const [myTasksResult] =
+    const now = new Date();
+
+    const [activeResult] =
       await db
         .select({
           count: count(),
@@ -178,7 +200,7 @@ export default async function CrmDashboardPage() {
           activeTaskCondition,
         );
 
-    const [overdueTasksResult] =
+    const [overdueResult] =
       await db
         .select({
           count: count(),
@@ -192,27 +214,52 @@ export default async function CrmDashboardPage() {
             ),
             lt(
               tasks.dueAt,
-              new Date(),
+              now,
             ),
           ),
         );
 
-    cards.push(
-      {
-        title: "Мои активные задачи",
-        value:
-          myTasksResult.count,
-        href:
-          "/crm/tasks?view=mine",
-      },
-      {
-        title: "Просроченные задачи",
-        value:
-          overdueTasksResult.count,
-        href:
-          "/crm/tasks?view=overdue",
-      },
-    );
+    const [urgentResult] =
+      await db
+        .select({
+          count: count(),
+        })
+        .from(tasks)
+        .where(
+          and(
+            activeTaskCondition,
+            eq(
+              tasks.priority,
+              "urgent",
+            ),
+          ),
+        );
+
+    const [withoutDueAtResult] =
+      await db
+        .select({
+          count: count(),
+        })
+        .from(tasks)
+        .where(
+          and(
+            activeTaskCondition,
+            isNull(
+              tasks.dueAt,
+            ),
+          ),
+        );
+
+    taskSummary = {
+      active:
+        activeResult.count,
+      overdue:
+        overdueResult.count,
+      urgent:
+        urgentResult.count,
+      withoutDueAt:
+        withoutDueAtResult.count,
+    };
 
     myTaskRows =
       await db
@@ -221,7 +268,11 @@ export default async function CrmDashboardPage() {
           title: tasks.title,
           priority:
             tasks.priority,
+          status:
+            tasks.status,
           dueAt: tasks.dueAt,
+          version:
+            tasks.version,
         })
         .from(tasks)
         .where(
@@ -235,14 +286,8 @@ export default async function CrmDashboardPage() {
         .orderBy(
           asc(tasks.dueAt),
         )
-        .limit(6);
+        .limit(8);
   }
-
-  cards.push({
-    title: "Организация",
-    value:
-      organization.name,
-  });
 
   const now = new Date();
 
@@ -254,7 +299,7 @@ export default async function CrmDashboardPage() {
         </h1>
 
         <p className="mt-2 text-slate-500">
-          Основные показатели CRM.
+          Основные показатели CRM и мои ближайшие действия.
         </p>
       </div>
 
@@ -292,6 +337,66 @@ export default async function CrmDashboardPage() {
           },
         )}
       </div>
+
+      {taskSummary && (
+        <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">
+                Мои задачи
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Краткая рабочая сводка по активным задачам.
+              </p>
+            </div>
+
+            <Link
+              href="/crm/tasks?view=mine"
+              className="text-sm font-medium text-slate-600 transition hover:text-slate-950"
+            >
+              Открыть задачи →
+            </Link>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <TaskSummaryCard
+              label="Активные"
+              value={
+                taskSummary.active
+              }
+              href="/crm/tasks?view=mine"
+            />
+
+            <TaskSummaryCard
+              label="Просроченные"
+              value={
+                taskSummary.overdue
+              }
+              href="/crm/tasks?view=mine&due=overdue"
+              danger={
+                taskSummary.overdue > 0
+              }
+            />
+
+            <TaskSummaryCard
+              label="Срочные"
+              value={
+                taskSummary.urgent
+              }
+              href="/crm/tasks?view=mine&priority=urgent"
+            />
+
+            <TaskSummaryCard
+              label="Без срока"
+              value={
+                taskSummary.withoutDueAt
+              }
+              href="/crm/tasks?view=mine&due=none"
+            />
+          </div>
+        </section>
+      )}
 
       {permissions.has(
         "tasks.read",
@@ -334,7 +439,7 @@ export default async function CrmDashboardPage() {
                       key={task.id}
                       className="flex flex-wrap items-center justify-between gap-4 px-4 py-3"
                     >
-                      <div>
+                      <div className="min-w-0">
                         <Link
                           href={`/crm/tasks/${task.id}`}
                           className="font-medium transition hover:text-blue-700 hover:underline"
@@ -342,32 +447,80 @@ export default async function CrmDashboardPage() {
                           {task.title}
                         </Link>
 
-                        <div className="mt-1 text-xs text-slate-500">
-                          {task.priority ===
+                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
+                          <span>
+                            {task.priority ===
                             "urgent"
-                            ? "Срочный"
-                            : task.priority ===
-                                "high"
-                              ? "Высокий приоритет"
-                              : "Обычная задача"}
+                              ? "Срочный"
+                              : task.priority ===
+                                  "high"
+                                ? "Высокий приоритет"
+                                : task.priority ===
+                                    "low"
+                                  ? "Низкий приоритет"
+                                  : "Обычный приоритет"}
+                          </span>
+
+                          {isOverdue && (
+                            <span className="font-medium text-red-600">
+                              Просрочена
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div
-                        className={
-                          isOverdue
-                            ? "text-sm font-medium text-red-700"
-                            : "text-sm text-slate-600"
-                        }
-                      >
-                        {task.dueAt ? (
-                          <TaskDueAt
-                            value={
-                              task.dueAt.toISOString()
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div
+                          className={
+                            isOverdue
+                              ? "text-sm font-medium text-red-700"
+                              : "text-sm text-slate-600"
+                          }
+                        >
+                          {task.dueAt ? (
+                            <TaskDueAt
+                              value={
+                                task.dueAt.toISOString()
+                              }
+                            />
+                          ) : (
+                            "—"
+                          )}
+                        </div>
+
+                        {permissions.has(
+                          "tasks.update",
+                        ) && (
+                          <form
+                            action={
+                              completeTask
                             }
-                          />
-                        ) : (
-                          "—"
+                          >
+                            <input
+                              type="hidden"
+                              name="taskId"
+                              value={task.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="version"
+                              value={
+                                task.version
+                              }
+                            />
+                            <input
+                              type="hidden"
+                              name="returnTo"
+                              value="/crm"
+                            />
+
+                            <button
+                              type="submit"
+                              className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                              Выполнить
+                            </button>
+                          </form>
                         )}
                       </div>
                     </div>
@@ -393,5 +546,48 @@ export default async function CrmDashboardPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function TaskSummaryCard({
+  label,
+  value,
+  href,
+  danger = false,
+}: {
+  label: string;
+  value: number;
+  href: string;
+  danger?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={
+        danger
+          ? "rounded-lg border border-red-200 bg-red-50 p-4 transition hover:bg-red-100"
+          : "rounded-lg border border-slate-200 bg-slate-50 p-4 transition hover:bg-slate-100"
+      }
+    >
+      <div
+        className={
+          danger
+            ? "text-sm text-red-700"
+            : "text-sm text-slate-500"
+        }
+      >
+        {label}
+      </div>
+
+      <div
+        className={
+          danger
+            ? "mt-2 text-2xl font-bold text-red-800"
+            : "mt-2 text-2xl font-bold"
+        }
+      >
+        {value}
+      </div>
+    </Link>
   );
 }
