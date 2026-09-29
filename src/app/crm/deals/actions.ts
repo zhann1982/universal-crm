@@ -35,6 +35,9 @@ import {
 import {
   transitionDeal,
 } from "@/modules/deals/transition-deal";
+import {
+  evaluateOwnerAssignment,
+} from "@/modules/members/owner-assignment-policy";
 
 function getFormValues(
   formData: FormData,
@@ -328,13 +331,25 @@ export async function createDeal(
   if (
     data.ownerMemberId
   ) {
-    if (
-      !permissions.has(
-        "members.read",
-      ) &&
-      data.ownerMemberId !==
-        member.id
-    ) {
+    const ownerPolicy =
+      evaluateOwnerAssignment({
+        mode: "create",
+
+        currentMemberId:
+          member.id,
+
+        canReadMembers:
+          permissions.has(
+            "members.read",
+          ),
+
+        requestedOwnerMemberId:
+          data.ownerMemberId,
+    });
+
+  if (
+    !ownerPolicy.allowed
+  ) {
       return {
         values,
 
@@ -957,17 +972,30 @@ export async function updateDeal(
   if (
     data.ownerMemberId
   ) {
+    const ownerPolicy =
+      evaluateOwnerAssignment({
+        mode: "update",
+
+        currentMemberId:
+          member.id,
+
+          canReadMembers:
+            permissions.has(
+              "members.read",
+            ),
+
+          requestedOwnerMemberId:
+            data.ownerMemberId,
+
+          existingOwnerMemberId:
+            existingDeal.ownerMemberId,
+        });
+
     const ownerChanged =
-      data.ownerMemberId !==
-      existingDeal.ownerMemberId;
+      ownerPolicy.ownerChanged;
 
     if (
-      ownerChanged &&
-      !permissions.has(
-        "members.read",
-      ) &&
-      data.ownerMemberId !==
-        member.id
+      !ownerPolicy.allowed
     ) {
       return {
         values,

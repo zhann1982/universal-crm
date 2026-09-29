@@ -35,13 +35,13 @@ Repeated local checks during stabilization:
 
 Latest complete local verification after regression coverage expansion:
 
-- `npm test` — 30 tests passed
+- `npm test` — 37 tests passed
 - `npm run test:integration` — 12 tests passed
 - `npx tsc --noEmit --incremental false` — passed
 - `npm run lint` — passed
 - `npm run build` — passed
 
-Current PostgreSQL integration coverage includes Owner invariants, invitation concurrency, tenant access lifecycle, and Client ↔ Company relationship lifecycle rules.
+Current automated coverage includes Owner invariants, invitation concurrency, tenant access lifecycle, Client ↔ Company lifecycle and tenant boundaries, plus shared responsible-Member assignment policy regression tests.
 
 GitHub Actions CI is implemented.
 
@@ -429,6 +429,12 @@ without `members.read`
 
 Existing owner may remain unchanged even if inactive.
 
+Responsible Member assignment permission logic is shared through:
+
+`src/modules/members/owner-assignment-policy.ts`
+
+The shared policy is used by both Company and Deal mutations.
+
 Member email is excluded from normal owner-selection DTOs.
 
 Responsible Member display:
@@ -456,7 +462,7 @@ Representative Manager/Viewer-style browser checks passed.
 
 F05:
 
-FIXED / MANUALLY VERIFIED
+FIXED / PARTIALLY AUTOMATED + MANUALLY VERIFIED
 
 Decision:
 
@@ -509,6 +515,11 @@ Automated unit/regression coverage currently includes:
 - Deal Stage page-version conflict behavior
 - safe same-origin `next` redirect validation
 - invitation token generation and hashing
+- responsible Member assignment without `members.read`
+- self-assignment behavior
+- foreign Member assignment rejection
+- unchanged existing owner preservation
+- owner clearing behavior
 
 PostgreSQL integration coverage currently includes:
 
@@ -544,7 +555,7 @@ The Owner integration suite creates an isolated temporary Organization and delet
 
 Still needed:
 
-- owner-assignment RBAC tests
+- Company / Deal owner-assignment integration tests for active/inactive Membership validation
 - related-data visibility tests
 - Deal conflict integration tests
 - PostgreSQL invariant tests

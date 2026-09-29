@@ -51,7 +51,7 @@ Concurrency protection exists for:
 
 Current automated verification:
 
-- 30 unit/regression tests
+- 37 unit/regression tests
 - 17 PostgreSQL integration tests
 - TypeScript
 - ESLint
@@ -82,7 +82,6 @@ Priority tests:
 - verified-email CRM gate
 - unchanged inactive Company owner
 - unchanged inactive Deal owner
-- Manager owner assignment restriction
 - hidden Member data without `members.read`
 - Company hidden in Deal without `companies.read`
 - linked Clients not queried without `clients.read`
@@ -116,6 +115,11 @@ Already implemented:
 - cross-tenant Client ↔ Company unlink rejection
 - cross-tenant invitation inviter rejection
 - cross-tenant invitation Role rejection
+- shared Company / Deal responsible-Member assignment policy
+- self-assignment without `members.read`
+- foreign Member assignment rejection without `members.read`
+- unchanged existing owner preservation
+- owner clearing behavior
 
 Use real PostgreSQL integration tests when SQL/concurrency behavior matters.
 
@@ -221,11 +225,12 @@ Existing examples:
 
 `src/modules/clients/client-company-relation.ts`
 
+`src/modules/members/owner-assignment-policy.ts`
+
 High-value candidates:
 
 - Deal lifecycle mutation
 - Deal full edit
-- Company owner assignment
 - invitation acceptance
 - ownership transfer if a dedicated UX is later added
 

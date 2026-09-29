@@ -28,6 +28,9 @@ import {
   type CreateCompanyState,
   type UpdateCompanyState,
 } from "@/lib/validation/company";
+import {
+  evaluateOwnerAssignment,
+} from "@/modules/members/owner-assignment-policy";
 
 function getFormValues(
   formData: FormData,
@@ -175,13 +178,24 @@ export async function createCompany(
   * - текущий пользователь
   * - отсутствие ответственного
   */
+  const ownerPolicy =
+    evaluateOwnerAssignment({
+      mode: "create",
+
+      currentMemberId:
+        member.id,
+
+      canReadMembers:
+        permissions.has(
+          "members.read",
+        ),
+
+      requestedOwnerMemberId:
+        data.ownerMemberId,
+    });
+
   if (
-    data.ownerMemberId &&
-    !permissions.has(
-      "members.read",
-    ) &&
-    data.ownerMemberId !==
-      member.id
+    !ownerPolicy.allowed
   ) {
     return {
       values,
