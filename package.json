@@ -11,7 +11,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --env-file=.env.local --import tsx src/db/seed.ts",
     "db:link-owner": "node --env-file=.env.local --import tsx src/db/link-dev-owner.ts",
-    "test": "node --import tsx --test src/lib/auth/email-identity.test.ts src/lib/auth/safe-next-path.test.ts src/lib/validation/deal.test.ts src/modules/deals/transition-deal.test.ts src/modules/invitations/invitation-token.test.ts src/modules/members/owner-assignment-policy.test.ts",
+    "test": "node --import tsx --test src/lib/auth/email-identity.test.ts src/lib/auth/safe-next-path.test.ts src/lib/validation/deal.test.ts src/modules/deals/transition-deal.test.ts src/modules/invitations/invitation-token.test.ts src/modules/members/owner-assignment-policy.test.ts src/modules/tasks/recurrence.test.ts",
     "test:integration": "node --env-file=.env.local --import tsx --test src/modules/members/owner-guard.integration.test.ts src/modules/invitations/accept-invitation.integration.test.ts src/modules/invitations/create-invitation.integration.test.ts src/modules/access/tenant-access.integration.test.ts src/modules/clients/client-company-relation.integration.test.ts src/modules/security/tenant-boundaries.integration.test.ts src/modules/members/owner-assignment.integration.test.ts"
   },
   "dependencies": {

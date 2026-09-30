@@ -12,9 +12,7 @@ const optionalUuid = z
     "Некорректный идентификатор",
   )
   .transform((value) =>
-    value === ""
-      ? null
-      : value,
+    value === "" ? null : value,
   );
 
 const isoDateTimePattern =
@@ -65,6 +63,15 @@ export const taskPrioritySchema =
     "urgent",
   ]);
 
+export const taskRecurrenceFrequencySchema =
+  z.enum([
+    "none",
+    "daily",
+    "weekly",
+    "monthly",
+    "yearly",
+  ]);
+
 export const taskIdSchema =
   z.string().uuid();
 
@@ -77,8 +84,17 @@ export const taskVersionSchema =
       "Некорректная версия задачи",
     );
 
-export const createTaskSchema =
-  z.object({
+export const taskScheduleVersionSchema =
+  z.coerce
+    .number()
+    .int()
+    .min(
+      1,
+      "Некорректная версия планирования",
+    );
+
+const taskFormSchema = z
+  .object({
     title: z
       .string()
       .trim()
@@ -113,6 +129,27 @@ export const createTaskSchema =
     dueAt:
       optionalIsoDateTime,
 
+    reminderAt:
+      optionalIsoDateTime,
+
+    recurrenceFrequency:
+      taskRecurrenceFrequencySchema,
+
+    recurrenceInterval: z.coerce
+      .number()
+      .int()
+      .min(
+        1,
+        "Минимальный интервал — 1",
+      )
+      .max(
+        365,
+        "Слишком большой интервал",
+      ),
+
+    recurrenceEndAt:
+      optionalIsoDateTime,
+
     ownerMemberId:
       optionalUuid,
 
@@ -124,10 +161,95 @@ export const createTaskSchema =
 
     dealId:
       optionalUuid,
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.reminderAt &&
+      data.dueAt &&
+      data.reminderAt.getTime() >
+        data.dueAt.getTime()
+    ) {
+      ctx.addIssue({
+        code:
+          "custom",
+        path: [
+          "reminderAt",
+        ],
+        message:
+          "Напоминание должно быть не позже срока выполнения",
+      });
+    }
+
+    if (
+      data.recurrenceFrequency !==
+        "none" &&
+      (data.status === "completed" ||
+        data.status === "cancelled")
+    ) {
+      ctx.addIssue({
+        code:
+          "custom",
+        path: [
+          "recurrenceFrequency",
+        ],
+        message:
+          "Повтор можно настроить только для активной задачи",
+      });
+    }
+
+    if (
+      data.recurrenceFrequency !==
+        "none" &&
+      !data.dueAt
+    ) {
+      ctx.addIssue({
+        code:
+          "custom",
+        path: ["dueAt"],
+        message:
+          "Для повторяющейся задачи укажите срок выполнения",
+      });
+    }
+
+    if (
+      data.recurrenceFrequency ===
+        "none" &&
+      data.recurrenceEndAt
+    ) {
+      ctx.addIssue({
+        code:
+          "custom",
+        path: [
+          "recurrenceEndAt",
+        ],
+        message:
+          "Сначала выберите повтор задачи",
+      });
+    }
+
+    if (
+      data.recurrenceEndAt &&
+      data.dueAt &&
+      data.recurrenceEndAt.getTime() <=
+        data.dueAt.getTime()
+    ) {
+      ctx.addIssue({
+        code:
+          "custom",
+        path: [
+          "recurrenceEndAt",
+        ],
+        message:
+          "Дата окончания повторов должна быть позже первого срока",
+      });
+    }
   });
 
+export const createTaskSchema =
+  taskFormSchema;
+
 export const updateTaskSchema =
-  createTaskSchema;
+  taskFormSchema;
 
 export type TaskFormInput =
   z.infer<
@@ -161,6 +283,7 @@ export const taskListQuerySchema =
         "mine",
         "overdue",
         "upcoming",
+        "reminders",
         "completed",
         "archive",
       ])
@@ -211,6 +334,19 @@ export const taskListQuerySchema =
       .trim()
       .max(100)
       .catch(""),
+
+    sort: z
+      .enum([
+        "created_desc",
+        "created_asc",
+        "due_asc",
+        "due_desc",
+        "priority_desc",
+        "priority_asc",
+        "title_asc",
+        "title_desc",
+      ])
+      .catch("created_desc"),
 
     page: z.coerce
       .number()

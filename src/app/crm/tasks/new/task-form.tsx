@@ -2,7 +2,6 @@
 
 import {
   useActionState,
-  useState,
 } from "react";
 
 import {
@@ -11,6 +10,9 @@ import {
 import type {
   CreateTaskState,
 } from "@/lib/validation/task";
+import {
+  TaskScheduleFields,
+} from "../task-schedule-fields";
 
 const initialState:
   CreateTaskState = {};
@@ -45,16 +47,6 @@ export function TaskForm({
     useActionState(
       createTask,
       initialState,
-    );
-
-  const [dueAtIso, setDueAtIso] =
-    useState(
-      state.values?.dueAt ?? "",
-    );
-
-  const dueAtLocal =
-    isoToLocalInput(
-      state.values?.dueAt,
     );
 
   return (
@@ -151,55 +143,6 @@ export function TaskForm({
 
           <div>
             <label
-              htmlFor="dueAtLocal"
-              className="mb-2 block text-sm font-medium"
-            >
-              Срок выполнения
-            </label>
-
-            <input
-              key={dueAtLocal}
-              id="dueAtLocal"
-              type="datetime-local"
-              defaultValue={
-                dueAtLocal
-              }
-              onChange={(event) => {
-                const value =
-                  event.target.value;
-
-                setDueAtIso(
-                  value
-                    ? new Date(
-                        value,
-                      ).toISOString()
-                    : "",
-                );
-              }}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-slate-500"
-            />
-
-            <input
-              type="hidden"
-              name="dueAt"
-              value={dueAtIso}
-            />
-
-            <p className="mt-2 text-xs text-slate-500">
-              Время сохраняется как
-              точный момент и учитывает
-              часовой пояс браузера.
-            </p>
-
-            <FieldErrors
-              errors={
-                state.errors?.dueAt
-              }
-            />
-          </div>
-
-          <div>
-            <label
               htmlFor="ownerMemberId"
               className="mb-2 block text-sm font-medium"
             >
@@ -268,6 +211,28 @@ export function TaskForm({
           />
         </div>
       </section>
+
+      <TaskScheduleFields
+        key={[
+          state.values?.dueAt ?? "",
+          state.values?.reminderAt ?? "",
+          state.values?.recurrenceFrequency ?? "none",
+          state.values?.recurrenceInterval ?? "1",
+          state.values?.recurrenceEndAt ?? "",
+        ].join("|")}
+        dueAt={state.values?.dueAt ?? ""}
+        reminderAt={state.values?.reminderAt ?? ""}
+        recurrenceFrequency={state.values?.recurrenceFrequency ?? "none"}
+        recurrenceInterval={state.values?.recurrenceInterval ?? "1"}
+        recurrenceEndAt={state.values?.recurrenceEndAt ?? ""}
+        errors={{
+          dueAt: state.errors?.dueAt,
+          reminderAt: state.errors?.reminderAt,
+          recurrenceFrequency: state.errors?.recurrenceFrequency,
+          recurrenceInterval: state.errors?.recurrenceInterval,
+          recurrenceEndAt: state.errors?.recurrenceEndAt,
+        }}
+      />
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">
@@ -510,34 +475,4 @@ function FieldErrors({
       ))}
     </div>
   );
-}
-
-function isoToLocalInput(
-  value?: string,
-) {
-  if (!value) {
-    return "";
-  }
-
-  const date =
-    new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return "";
-  }
-
-  const localDate =
-    new Date(
-      date.getTime() -
-        date.getTimezoneOffset() *
-          60_000,
-    );
-
-  return localDate
-    .toISOString()
-    .slice(0, 16);
 }

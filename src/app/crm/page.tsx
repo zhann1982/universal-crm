@@ -6,6 +6,7 @@ import {
   isNotNull,
   isNull,
   lt,
+  lte,
   notInArray,
 } from "drizzle-orm";
 import Link from "next/link";
@@ -20,9 +21,13 @@ import {
 import {
   getCurrentAccessContext,
 } from "@/lib/auth/permissions";
+import {
+  taskSchedules,
+} from "@/db/task-scheduling-schema";
 
 import {
   completeTask,
+  dismissTaskReminder,
 } from "./tasks/actions";
 import {
   TaskDueAt,
@@ -41,6 +46,14 @@ type TaskSummary = {
   overdue: number;
   urgent: number;
   withoutDueAt: number;
+  reminders: number;
+};
+
+type ReminderRow = {
+  id: string;
+  title: string;
+  reminderAt: Date;
+  scheduleVersion: number;
 };
 
 export default async function CrmDashboardPage() {
@@ -157,6 +170,9 @@ export default async function CrmDashboardPage() {
     version: number;
   }> = [];
 
+  let reminderRows:
+    ReminderRow[] = [];
+
   if (
     permissions.has(
       "tasks.read",
@@ -250,6 +266,104 @@ export default async function CrmDashboardPage() {
           ),
         );
 
+    const [reminderCountResult] =
+      await db
+        .select({
+          count: count(),
+        })
+        .from(tasks)
+        .innerJoin(
+          taskSchedules,
+          and(
+            eq(
+              taskSchedules.taskId,
+              tasks.id,
+            ),
+            eq(
+              taskSchedules.organizationId,
+              organization.id,
+            ),
+          ),
+        )
+        .where(
+          and(
+            activeTaskCondition,
+            isNotNull(
+              taskSchedules.reminderAt,
+            ),
+            lte(
+              taskSchedules.reminderAt,
+              now,
+            ),
+            isNull(
+              taskSchedules.reminderDismissedAt,
+            ),
+          ),
+        );
+
+    const reminderQueryRows =
+      await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          reminderAt:
+            taskSchedules.reminderAt,
+          scheduleVersion:
+            taskSchedules.version,
+        })
+        .from(tasks)
+        .innerJoin(
+          taskSchedules,
+          and(
+            eq(
+              taskSchedules.taskId,
+              tasks.id,
+            ),
+            eq(
+              taskSchedules.organizationId,
+              organization.id,
+            ),
+          ),
+        )
+        .where(
+          and(
+            activeTaskCondition,
+            isNotNull(
+              taskSchedules.reminderAt,
+            ),
+            lte(
+              taskSchedules.reminderAt,
+              now,
+            ),
+            isNull(
+              taskSchedules.reminderDismissedAt,
+            ),
+          ),
+        )
+        .orderBy(
+          asc(
+            taskSchedules.reminderAt,
+          ),
+        )
+        .limit(6);
+
+    reminderRows =
+      reminderQueryRows.flatMap(
+        (row) =>
+          row.reminderAt
+            ? [
+                {
+                  id: row.id,
+                  title: row.title,
+                  reminderAt:
+                    row.reminderAt,
+                  scheduleVersion:
+                    row.scheduleVersion,
+                },
+              ]
+            : [],
+      );
+
     taskSummary = {
       active:
         activeResult.count,
@@ -259,6 +373,8 @@ export default async function CrmDashboardPage() {
         urgentResult.count,
       withoutDueAt:
         withoutDueAtResult.count,
+      reminders:
+        reminderCountResult.count,
     };
 
     myTaskRows =
@@ -359,7 +475,7 @@ export default async function CrmDashboardPage() {
             </Link>
           </div>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <TaskSummaryCard
               label="Активные"
               value={
@@ -394,9 +510,107 @@ export default async function CrmDashboardPage() {
               }
               href="/crm/tasks?view=mine&due=none"
             />
+
+            <TaskSummaryCard
+              label="Напоминания"
+              value={
+                taskSummary.reminders
+              }
+              href="/crm/tasks?view=reminders&owner=mine"
+              danger={
+                taskSummary.reminders > 0
+              }
+            />
           </div>
         </section>
       )}
+
+      {permissions.has(
+        "tasks.read",
+      ) &&
+        reminderRows.length > 0 && (
+          <section className="mt-8 rounded-xl border border-amber-200 bg-amber-50/50 p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-amber-950">
+                  Напоминания
+                </h2>
+
+                <p className="mt-1 text-sm text-amber-800">
+                  Напоминания по моим активным задачам, время которых уже наступило.
+                </p>
+              </div>
+
+              <Link
+                href="/crm/tasks?view=reminders&owner=mine"
+                className="text-sm font-medium text-amber-900 transition hover:text-amber-700"
+              >
+                Все напоминания →
+              </Link>
+            </div>
+
+            <div className="mt-5 divide-y divide-amber-100 overflow-hidden rounded-lg border border-amber-200 bg-white">
+              {reminderRows.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-4 px-4 py-3"
+                >
+                  <div>
+                    <Link
+                      href={`/crm/tasks/${item.id}`}
+                      className="font-medium transition hover:text-blue-700 hover:underline"
+                    >
+                      {item.title}
+                    </Link>
+
+                    <div className="mt-1 text-xs text-amber-700">
+                      <TaskDueAt
+                        value={
+                          item.reminderAt.toISOString()
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {permissions.has(
+                    "tasks.update",
+                  ) && (
+                    <form
+                      action={
+                        dismissTaskReminder
+                      }
+                    >
+                      <input
+                        type="hidden"
+                        name="taskId"
+                        value={item.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="scheduleVersion"
+                        value={
+                          item.scheduleVersion
+                        }
+                      />
+                      <input
+                        type="hidden"
+                        name="returnTo"
+                        value="/crm"
+                      />
+
+                      <button
+                        type="submit"
+                        className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition hover:bg-amber-100"
+                      >
+                        Скрыть
+                      </button>
+                    </form>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
       {permissions.has(
         "tasks.read",

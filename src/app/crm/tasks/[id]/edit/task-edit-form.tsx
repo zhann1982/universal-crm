@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   useActionState,
-  useState,
 } from "react";
 
 import {
@@ -12,6 +11,9 @@ import {
 import type {
   UpdateTaskState,
 } from "@/lib/validation/task";
+import {
+  TaskScheduleFields,
+} from "../../task-schedule-fields";
 
 type Option = {
   id: string;
@@ -25,6 +27,10 @@ type EditableTask = {
   status: string;
   priority: string;
   dueAt: string | null;
+  reminderAt: string | null;
+  recurrenceFrequency: string;
+  recurrenceInterval: number;
+  recurrenceEndAt: string | null;
   ownerMemberId: string | null;
   clientId: string | null;
   companyId: string | null;
@@ -60,23 +66,6 @@ export function TaskEditForm({
     useActionState(
       updateTask,
       initialState,
-    );
-
-  const initialDueAtIso =
-    state.values?.dueAt ??
-    task.dueAt ??
-    "";
-
-  const [dueAtIso, setDueAtIso] =
-    useState(
-      initialDueAtIso,
-    );
-
-  const dueAtLocal =
-    isoToLocalInput(
-      state.values?.dueAt ??
-        task.dueAt ??
-        undefined,
     );
 
   return (
@@ -185,55 +174,6 @@ export function TaskEditForm({
 
           <div>
             <label
-              htmlFor="dueAtLocal"
-              className="mb-2 block text-sm font-medium"
-            >
-              Срок выполнения
-            </label>
-
-            <input
-              key={dueAtLocal}
-              id="dueAtLocal"
-              type="datetime-local"
-              defaultValue={
-                dueAtLocal
-              }
-              onChange={(event) => {
-                const value =
-                  event.target.value;
-
-                setDueAtIso(
-                  value
-                    ? new Date(
-                        value,
-                      ).toISOString()
-                    : "",
-                );
-              }}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-slate-500"
-            />
-
-            <input
-              type="hidden"
-              name="dueAt"
-              value={dueAtIso}
-            />
-
-            <p className="mt-2 text-xs text-slate-500">
-              Время сохраняется как
-              точный момент с учётом
-              часового пояса браузера.
-            </p>
-
-            <FieldErrors
-              errors={
-                state.errors?.dueAt
-              }
-            />
-          </div>
-
-          <div>
-            <label
               htmlFor="ownerMemberId"
               className="mb-2 block text-sm font-medium"
             >
@@ -304,6 +244,28 @@ export function TaskEditForm({
           />
         </div>
       </section>
+
+      <TaskScheduleFields
+        key={[
+          state.values?.dueAt ?? task.dueAt ?? "",
+          state.values?.reminderAt ?? task.reminderAt ?? "",
+          state.values?.recurrenceFrequency ?? task.recurrenceFrequency,
+          state.values?.recurrenceInterval ?? String(task.recurrenceInterval),
+          state.values?.recurrenceEndAt ?? task.recurrenceEndAt ?? "",
+        ].join("|")}
+        dueAt={state.values?.dueAt ?? task.dueAt ?? ""}
+        reminderAt={state.values?.reminderAt ?? task.reminderAt ?? ""}
+        recurrenceFrequency={state.values?.recurrenceFrequency ?? task.recurrenceFrequency}
+        recurrenceInterval={state.values?.recurrenceInterval ?? String(task.recurrenceInterval)}
+        recurrenceEndAt={state.values?.recurrenceEndAt ?? task.recurrenceEndAt ?? ""}
+        errors={{
+          dueAt: state.errors?.dueAt,
+          reminderAt: state.errors?.reminderAt,
+          recurrenceFrequency: state.errors?.recurrenceFrequency,
+          recurrenceInterval: state.errors?.recurrenceInterval,
+          recurrenceEndAt: state.errors?.recurrenceEndAt,
+        }}
+      />
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">
@@ -606,34 +568,4 @@ function FieldErrors({
       ))}
     </div>
   );
-}
-
-function isoToLocalInput(
-  value?: string,
-) {
-  if (!value) {
-    return "";
-  }
-
-  const date =
-    new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return "";
-  }
-
-  const localDate =
-    new Date(
-      date.getTime() -
-        date.getTimezoneOffset() *
-          60_000,
-    );
-
-  return localDate
-    .toISOString()
-    .slice(0, 16);
 }

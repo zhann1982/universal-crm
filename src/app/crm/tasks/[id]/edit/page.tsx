@@ -22,6 +22,9 @@ import {
   requirePermission,
 } from "@/lib/auth/permissions";
 import {
+  taskSchedules,
+} from "@/db/task-scheduling-schema";
+import {
   taskIdSchema,
 } from "@/lib/validation/task";
 
@@ -108,6 +111,33 @@ export default async function EditTaskPage({
       `/crm/tasks/${task.id}`,
     );
   }
+
+  const [schedule] =
+    await db
+      .select({
+        reminderAt:
+          taskSchedules.reminderAt,
+        recurrenceFrequency:
+          taskSchedules.recurrenceFrequency,
+        recurrenceInterval:
+          taskSchedules.recurrenceInterval,
+        recurrenceEndAt:
+          taskSchedules.recurrenceEndAt,
+      })
+      .from(taskSchedules)
+      .where(
+        and(
+          eq(
+            taskSchedules.taskId,
+            task.id,
+          ),
+          eq(
+            taskSchedules.organizationId,
+            organization.id,
+          ),
+        ),
+      )
+      .limit(1);
 
   let memberOptions: Option[];
 
@@ -533,6 +563,20 @@ export default async function EditTaskPage({
           dueAt:
             task.dueAt
               ? task.dueAt.toISOString()
+              : null,
+          reminderAt:
+            schedule?.reminderAt
+              ? schedule.reminderAt.toISOString()
+              : null,
+          recurrenceFrequency:
+            schedule?.recurrenceFrequency ??
+            "none",
+          recurrenceInterval:
+            schedule?.recurrenceInterval ??
+            1,
+          recurrenceEndAt:
+            schedule?.recurrenceEndAt
+              ? schedule.recurrenceEndAt.toISOString()
               : null,
           ownerMemberId:
             task.ownerMemberId,

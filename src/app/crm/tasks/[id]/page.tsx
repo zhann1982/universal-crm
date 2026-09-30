@@ -20,12 +20,16 @@ import {
   requirePermission,
 } from "@/lib/auth/permissions";
 import {
+  taskSchedules,
+} from "@/db/task-scheduling-schema";
+import {
   taskIdSchema,
 } from "@/lib/validation/task";
 
 import {
   archiveTask,
   completeTask,
+  dismissTaskReminder,
   reopenTask,
   restoreTask,
 } from "../actions";
@@ -141,6 +145,39 @@ export default async function TaskPage({
   if (!task) {
     notFound();
   }
+
+  const [schedule] =
+    await db
+      .select({
+        reminderAt:
+          taskSchedules.reminderAt,
+        reminderDismissedAt:
+          taskSchedules.reminderDismissedAt,
+        recurrenceFrequency:
+          taskSchedules.recurrenceFrequency,
+        recurrenceInterval:
+          taskSchedules.recurrenceInterval,
+        recurrenceEndAt:
+          taskSchedules.recurrenceEndAt,
+        recurrenceSequence:
+          taskSchedules.recurrenceSequence,
+        version:
+          taskSchedules.version,
+      })
+      .from(taskSchedules)
+      .where(
+        and(
+          eq(
+            taskSchedules.taskId,
+            task.id,
+          ),
+          eq(
+            taskSchedules.organizationId,
+            organization.id,
+          ),
+        ),
+      )
+      .limit(1);
 
   let ownerLabel =
     task.ownerMemberId
@@ -340,6 +377,24 @@ export default async function TaskPage({
         "cancelled",
   );
 
+  const reminderDue = Boolean(
+    schedule?.reminderAt &&
+      schedule.reminderAt <= now &&
+      !schedule.reminderDismissedAt &&
+      task.status !== "completed" &&
+      task.status !== "cancelled",
+  );
+
+  const recurrenceLabel =
+    schedule?.recurrenceFrequency &&
+    schedule.recurrenceFrequency !==
+      "none"
+      ? formatRecurrence(
+          schedule.recurrenceFrequency,
+          schedule.recurrenceInterval,
+        )
+      : "Не повторяется";
+
   const rawError =
     rawSearchParams.error;
 
@@ -388,6 +443,19 @@ export default async function TaskPage({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {reminderDue &&
+              schedule?.version &&
+              permissions.has(
+                "tasks.update",
+              ) && (
+                <ReminderDismissForm
+                  taskId={task.id}
+                  scheduleVersion={
+                    schedule.version
+                  }
+                />
+              )}
+
             {!task.isArchived &&
               permissions.has(
                 "tasks.update",
@@ -474,6 +542,12 @@ export default async function TaskPage({
       {error === "conflict" && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Задача уже была изменена другим действием. Обновите страницу и повторите операцию.
+        </div>
+      )}
+
+      {error === "schedule-save" && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Основные данные задачи сохранены, но настройки напоминания или повтора сохранить не удалось. Откройте редактирование и повторите сохранение планирования.
         </div>
       )}
 
@@ -627,6 +701,51 @@ export default async function TaskPage({
               />
 
               <DetailRow
+                label="Напоминание"
+                value={
+                  schedule?.reminderAt ? (
+                    <TaskDueAt
+                      value={
+                        schedule.reminderAt.toISOString()
+                      }
+                    />
+                  ) : (
+                    "—"
+                  )
+                }
+                danger={reminderDue}
+              />
+
+              <DetailRow
+                label="Повтор"
+                value={recurrenceLabel}
+              />
+
+              {schedule?.recurrenceEndAt && (
+                <DetailRow
+                  label="Повторять до"
+                  value={
+                    <TaskDueAt
+                      value={
+                        schedule.recurrenceEndAt.toISOString()
+                      }
+                    />
+                  }
+                />
+              )}
+
+              {schedule?.recurrenceFrequency &&
+                schedule.recurrenceFrequency !==
+                  "none" && (
+                  <DetailRow
+                    label="Номер в серии"
+                    value={String(
+                      schedule.recurrenceSequence,
+                    )}
+                  />
+                )}
+
+              <DetailRow
                 label="Выполнена"
                 value={
                   task.completedAt ? (
@@ -676,6 +795,71 @@ export default async function TaskPage({
       </div>
     </div>
   );
+}
+
+function ReminderDismissForm({
+  taskId,
+  scheduleVersion,
+}: {
+  taskId: string;
+  scheduleVersion: number;
+}) {
+  return (
+    <form
+      action={
+        dismissTaskReminder
+      }
+    >
+      <input
+        type="hidden"
+        name="taskId"
+        value={taskId}
+      />
+      <input
+        type="hidden"
+        name="scheduleVersion"
+        value={scheduleVersion}
+      />
+      <input
+        type="hidden"
+        name="returnTo"
+        value={`/crm/tasks/${taskId}`}
+      />
+
+      <button
+        type="submit"
+        className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
+      >
+        Скрыть напоминание
+      </button>
+    </form>
+  );
+}
+
+function formatRecurrence(
+  frequency: string,
+  interval: number,
+) {
+  if (interval === 1) {
+    return frequency === "daily"
+      ? "Ежедневно"
+      : frequency === "weekly"
+        ? "Еженедельно"
+        : frequency === "monthly"
+          ? "Ежемесячно"
+          : "Ежегодно";
+  }
+
+  const unit =
+    frequency === "daily"
+      ? "дн."
+      : frequency === "weekly"
+        ? "нед."
+        : frequency === "monthly"
+          ? "мес."
+          : "г.";
+
+  return `Каждые ${interval} ${unit}`;
 }
 
 function TaskMutationForm({

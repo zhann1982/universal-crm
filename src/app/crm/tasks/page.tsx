@@ -9,8 +9,10 @@ import {
   isNotNull,
   isNull,
   lt,
+  lte,
   notInArray,
   or,
+  sql,
 } from "drizzle-orm";
 import Link from "next/link";
 import {
@@ -26,19 +28,27 @@ import {
   requirePermission,
 } from "@/lib/auth/permissions";
 import {
+  taskSchedules,
+} from "@/db/task-scheduling-schema";
+import {
   taskListQuerySchema,
   type TaskListQuery,
 } from "@/lib/validation/task";
 
 import {
   archiveTask,
+  bulkTaskAction,
   completeTask,
+  dismissTaskReminder,
   reopenTask,
   restoreTask,
 } from "./actions";
 import {
   TaskDueAt,
 } from "./task-due-at";
+import {
+  TaskSelectAllButtons,
+} from "./task-select-all-buttons";
 
 type SearchParams = {
   [key: string]:
@@ -92,6 +102,8 @@ export default async function TasksPage({
         rawSearchParams.owner,
       q:
         rawSearchParams.q,
+      sort:
+        rawSearchParams.sort,
       page:
         rawSearchParams.page,
     });
@@ -163,10 +175,61 @@ export default async function TasksPage({
     priority,
     due,
     q,
+    sort,
     page,
   } = normalizedQuery;
 
   const now = new Date();
+
+  const priorityRank =
+    sql<number>`case
+      when ${tasks.priority} = 'urgent' then 4
+      when ${tasks.priority} = 'high' then 3
+      when ${tasks.priority} = 'normal' then 2
+      when ${tasks.priority} = 'low' then 1
+      else 0
+    end`;
+
+  const taskOrderBy =
+    sort === "created_asc"
+      ? [
+          asc(tasks.createdAt),
+          asc(tasks.id),
+        ]
+      : sort === "due_asc"
+        ? [
+            sql`${tasks.dueAt} asc nulls last`,
+            desc(tasks.createdAt),
+          ]
+        : sort === "due_desc"
+          ? [
+              sql`${tasks.dueAt} desc nulls last`,
+              desc(tasks.createdAt),
+            ]
+          : sort === "priority_desc"
+            ? [
+                desc(priorityRank),
+                desc(tasks.createdAt),
+              ]
+            : sort === "priority_asc"
+              ? [
+                  asc(priorityRank),
+                  desc(tasks.createdAt),
+                ]
+              : sort === "title_asc"
+                ? [
+                    asc(tasks.title),
+                    desc(tasks.createdAt),
+                  ]
+                : sort === "title_desc"
+                  ? [
+                      desc(tasks.title),
+                      desc(tasks.createdAt),
+                    ]
+                  : [
+                      desc(tasks.createdAt),
+                      desc(tasks.id),
+                    ];
 
   const activeStatusCondition =
     notInArray(
@@ -208,6 +271,20 @@ export default async function TasksPage({
               ),
               activeStatusCondition,
             )
+          : view === "reminders"
+            ? and(
+                isNotNull(
+                  taskSchedules.reminderAt,
+                ),
+                lte(
+                  taskSchedules.reminderAt,
+                  now,
+                ),
+                isNull(
+                  taskSchedules.reminderDismissedAt,
+                ),
+                activeStatusCondition,
+              )
           : view === "completed"
             ? eq(
                 tasks.status,
@@ -316,6 +393,19 @@ export default async function TasksPage({
         total: count(),
       })
       .from(tasks)
+      .leftJoin(
+        taskSchedules,
+        and(
+          eq(
+            taskSchedules.taskId,
+            tasks.id,
+          ),
+          eq(
+            taskSchedules.organizationId,
+            organization.id,
+          ),
+        ),
+      )
       .where(
         whereCondition,
       );
@@ -378,8 +468,31 @@ export default async function TasksPage({
               tasks.version,
             isArchived:
               tasks.isArchived,
+            reminderAt:
+              taskSchedules.reminderAt,
+            reminderDismissedAt:
+              taskSchedules.reminderDismissedAt,
+            recurrenceFrequency:
+              taskSchedules.recurrenceFrequency,
+            recurrenceInterval:
+              taskSchedules.recurrenceInterval,
+            scheduleVersion:
+              taskSchedules.version,
           })
           .from(tasks)
+          .leftJoin(
+            taskSchedules,
+            and(
+              eq(
+                taskSchedules.taskId,
+                tasks.id,
+              ),
+              eq(
+                taskSchedules.organizationId,
+                organization.id,
+              ),
+            ),
+          )
           .leftJoin(
             organizationMembers,
             and(
@@ -397,9 +510,7 @@ export default async function TasksPage({
             whereCondition,
           )
           .orderBy(
-            desc(
-              tasks.createdAt,
-            ),
+            ...taskOrderBy,
           )
           .limit(PAGE_SIZE)
           .offset(offset)
@@ -424,15 +535,36 @@ export default async function TasksPage({
                 tasks.version,
               isArchived:
                 tasks.isArchived,
+              reminderAt:
+                taskSchedules.reminderAt,
+              reminderDismissedAt:
+                taskSchedules.reminderDismissedAt,
+              recurrenceFrequency:
+                taskSchedules.recurrenceFrequency,
+              recurrenceInterval:
+                taskSchedules.recurrenceInterval,
+              scheduleVersion:
+                taskSchedules.version,
             })
             .from(tasks)
+            .leftJoin(
+              taskSchedules,
+              and(
+                eq(
+                  taskSchedules.taskId,
+                  tasks.id,
+                ),
+                eq(
+                  taskSchedules.organizationId,
+                  organization.id,
+                ),
+              ),
+            )
             .where(
               whereCondition,
             )
             .orderBy(
-              desc(
-                tasks.createdAt,
-              ),
+              ...taskOrderBy,
             )
             .limit(PAGE_SIZE)
             .offset(offset)
@@ -492,6 +624,51 @@ export default async function TasksPage({
       ? rawError[0]
       : rawError;
 
+  const rawBulk =
+    rawSearchParams.bulk;
+
+  const bulk =
+    Array.isArray(rawBulk)
+      ? rawBulk[0]
+      : rawBulk;
+
+  const rawUpdated =
+    rawSearchParams.updated;
+
+  const updatedCount =
+    Number(
+      Array.isArray(rawUpdated)
+        ? rawUpdated[0]
+        : rawUpdated,
+    ) || 0;
+
+  const rawConflicts =
+    rawSearchParams.conflicts;
+
+  const conflictCount =
+    Number(
+      Array.isArray(rawConflicts)
+        ? rawConflicts[0]
+        : rawConflicts,
+    ) || 0;
+
+  const canBulkUpdate =
+    permissions.has(
+      "tasks.update",
+    );
+
+  const canBulkArchive =
+    permissions.has(
+      "tasks.archive",
+    );
+
+  const showBulkActions =
+    taskRows.length > 0 &&
+    (
+      canBulkUpdate ||
+      canBulkArchive
+    );
+
   return (
     <div>
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -503,7 +680,9 @@ export default async function TasksPage({
           <p className="mt-2 text-slate-500">
             {view === "archive"
               ? "Архив задач"
-              : "Рабочие задачи CRM"}
+              : view === "reminders"
+                ? "Сработавшие напоминания"
+                : "Рабочие задачи CRM"}
             : {totalTasks}
           </p>
         </div>
@@ -523,6 +702,21 @@ export default async function TasksPage({
       {error === "conflict" && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Задача уже была изменена другим действием. Список обновлён — при необходимости повторите операцию.
+        </div>
+      )}
+
+      {bulk === "no-selection" && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Выберите хотя бы одну задачу для массового действия.
+        </div>
+      )}
+
+      {bulk === "done" && (
+        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Массовое действие выполнено. Обновлено: {updatedCount}.
+          {conflictCount > 0
+            ? ` Конфликтов или пропущенных задач: ${conflictCount}.`
+            : ""}
         </div>
       )}
 
@@ -564,6 +758,15 @@ export default async function TasksPage({
         </TaskViewLink>
 
         <TaskViewLink
+          href="/crm/tasks?view=reminders"
+          active={
+            view === "reminders"
+          }
+        >
+          Напоминания
+        </TaskViewLink>
+
+        <TaskViewLink
           href="/crm/tasks?view=completed"
           active={
             view === "completed"
@@ -595,7 +798,7 @@ export default async function TasksPage({
           />
         )}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
           <div className="xl:col-span-2">
             <label
               htmlFor="q"
@@ -694,6 +897,22 @@ export default async function TasksPage({
               )}
             </select>
           </div>
+
+          <FilterSelect
+            label="Сортировка"
+            name="sort"
+            value={sort}
+            options={[
+              ["created_desc", "Сначала новые"],
+              ["created_asc", "Сначала старые"],
+              ["due_asc", "Срок: ближайшие"],
+              ["due_desc", "Срок: поздние"],
+              ["priority_desc", "Приоритет: высокий"],
+              ["priority_asc", "Приоритет: низкий"],
+              ["title_asc", "Название: А–Я"],
+              ["title_desc", "Название: Я–А"],
+            ]}
+          />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -711,6 +930,7 @@ export default async function TasksPage({
                   due: "any",
                   owner: "any",
                   q: "",
+                  sort: "created_desc",
                   page: 1,
                 })
               }
@@ -729,6 +949,70 @@ export default async function TasksPage({
         </div>
       </form>
 
+      {showBulkActions && (
+        <form
+          id="task-bulk-form"
+          action={bulkTaskAction}
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+        >
+          <input
+            type="hidden"
+            name="returnTo"
+            value={currentListHref}
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-slate-700">
+              Массовые действия
+            </span>
+
+            <TaskSelectAllButtons />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {view !== "archive" &&
+              canBulkUpdate && (
+                <>
+                  <BulkActionButton
+                    value="todo"
+                    label="К выполнению"
+                  />
+                  <BulkActionButton
+                    value="in_progress"
+                    label="В работу"
+                  />
+                  <BulkActionButton
+                    value="complete"
+                    label="Выполнить"
+                    emphasis="success"
+                  />
+                  <BulkActionButton
+                    value="cancel"
+                    label="Отменить"
+                  />
+                </>
+              )}
+
+            {view !== "archive" &&
+              canBulkArchive && (
+                <BulkActionButton
+                  value="archive"
+                  label="В архив"
+                />
+              )}
+
+            {view === "archive" &&
+              canBulkArchive && (
+                <BulkActionButton
+                  value="restore"
+                  label="Восстановить"
+                  emphasis="dark"
+                />
+              )}
+          </div>
+        </form>
+      )}
+
       {taskRows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
           <h2 className="text-lg font-semibold">
@@ -745,6 +1029,12 @@ export default async function TasksPage({
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
+                  {showBulkActions && (
+                    <TableHead>
+                      Выбор
+                    </TableHead>
+                  )}
+
                   <TableHead>
                     Задача
                   </TableHead>
@@ -759,6 +1049,9 @@ export default async function TasksPage({
                   </TableHead>
                   <TableHead>
                     Срок
+                  </TableHead>
+                  <TableHead>
+                    Планирование
                   </TableHead>
                   <TableHead>
                     Действия
@@ -779,6 +1072,28 @@ export default async function TasksPage({
                             "cancelled",
                       );
 
+                    const reminderDue =
+                      Boolean(
+                        task.reminderAt &&
+                          task.reminderAt <= now &&
+                          !task.reminderDismissedAt &&
+                          task.status !==
+                            "completed" &&
+                          task.status !==
+                            "cancelled",
+                      );
+
+                    const recurrenceLabel =
+                      task.recurrenceFrequency &&
+                      task.recurrenceFrequency !==
+                        "none"
+                        ? formatRecurrence(
+                            task.recurrenceFrequency,
+                            task.recurrenceInterval ??
+                              1,
+                          )
+                        : null;
+
                     const rowClassName =
                       isOverdue
                         ? "bg-red-50/60 transition hover:bg-red-50"
@@ -794,6 +1109,27 @@ export default async function TasksPage({
                           rowClassName
                         }
                       >
+                        {showBulkActions && (
+                          <td className="px-5 py-4 align-top">
+                            <input
+                              type="checkbox"
+                              name="taskIds"
+                              value={task.id}
+                              form="task-bulk-form"
+                              data-task-select="true"
+                              aria-label={`Выбрать задачу ${task.title}`}
+                              className="h-4 w-4 rounded border-slate-300"
+                            />
+
+                            <input
+                              type="hidden"
+                              name={`version:${task.id}`}
+                              value={task.version}
+                              form="task-bulk-form"
+                            />
+                          </td>
+                        )}
+
                         <td className="px-5 py-4">
                           <Link
                             href={`/crm/tasks/${task.id}`}
@@ -846,8 +1182,54 @@ export default async function TasksPage({
                           )}
                         </td>
 
+                        <td className="px-5 py-4 text-xs text-slate-600">
+                          <div className="min-w-40 space-y-1.5">
+                            {task.reminderAt ? (
+                              <div
+                                className={
+                                  reminderDue
+                                    ? "font-medium text-amber-700"
+                                    : "text-slate-500"
+                                }
+                              >
+                                Напомнить: {" "}
+                                <TaskDueAt
+                                  value={
+                                    task.reminderAt.toISOString()
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <div className="text-slate-400">
+                                Без напоминания
+                              </div>
+                            )}
+
+                            {recurrenceLabel && (
+                              <div className="font-medium text-blue-700">
+                                {recurrenceLabel}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
                         <td className="px-5 py-4">
                           <div className="flex min-w-56 flex-wrap gap-2">
+                            {reminderDue &&
+                              permissions.has(
+                                "tasks.update",
+                              ) &&
+                              task.scheduleVersion && (
+                                <ReminderDismissForm
+                                  taskId={task.id}
+                                  scheduleVersion={
+                                    task.scheduleVersion
+                                  }
+                                  returnTo={
+                                    currentListHref
+                                  }
+                                />
+                              )}
                             {!task.isArchived &&
                               permissions.has(
                                 "tasks.update",
@@ -1001,6 +1383,7 @@ function buildTasksHref({
   due,
   owner,
   q,
+  sort,
   page,
 }: TaskListQuery) {
   const params =
@@ -1043,6 +1426,15 @@ function buildTasksHref({
 
   if (q) {
     params.set("q", q);
+  }
+
+  if (
+    sort !== "created_desc"
+  ) {
+    params.set(
+      "sort",
+      sort,
+    );
   }
 
   if (page > 1) {
@@ -1126,6 +1518,71 @@ function FilterSelect({
   );
 }
 
+function ReminderDismissForm({
+  taskId,
+  scheduleVersion,
+  returnTo,
+}: {
+  taskId: string;
+  scheduleVersion: number;
+  returnTo: string;
+}) {
+  return (
+    <form
+      action={
+        dismissTaskReminder
+      }
+    >
+      <input
+        type="hidden"
+        name="taskId"
+        value={taskId}
+      />
+      <input
+        type="hidden"
+        name="scheduleVersion"
+        value={scheduleVersion}
+      />
+      <input
+        type="hidden"
+        name="returnTo"
+        value={returnTo}
+      />
+
+      <button
+        type="submit"
+        className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 transition hover:bg-amber-100"
+      >
+        Скрыть напоминание
+      </button>
+    </form>
+  );
+}
+
+function formatRecurrence(
+  frequency: string,
+  interval: number,
+) {
+  const unit =
+    frequency === "daily"
+      ? "дн."
+      : frequency === "weekly"
+        ? "нед."
+        : frequency === "monthly"
+          ? "мес."
+          : "г.";
+
+  return interval === 1
+    ? frequency === "daily"
+      ? "Повтор: ежедневно"
+      : frequency === "weekly"
+        ? "Повтор: еженедельно"
+        : frequency === "monthly"
+          ? "Повтор: ежемесячно"
+          : "Повтор: ежегодно"
+    : `Повтор: каждые ${interval} ${unit}`;
+}
+
 function TaskActionForm({
   action,
   taskId,
@@ -1168,6 +1625,43 @@ function TaskActionForm({
         {label}
       </button>
     </form>
+  );
+}
+
+function BulkActionButton({
+  value,
+  label,
+  emphasis = "default",
+}: {
+  value:
+    | "todo"
+    | "in_progress"
+    | "complete"
+    | "cancel"
+    | "archive"
+    | "restore";
+  label: string;
+  emphasis?:
+    | "default"
+    | "success"
+    | "dark";
+}) {
+  const className =
+    emphasis === "success"
+      ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+      : emphasis === "dark"
+        ? "border-slate-900 bg-slate-900 text-white hover:bg-slate-700"
+        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100";
+
+  return (
+    <button
+      type="submit"
+      name="bulkAction"
+      value={value}
+      className={`rounded-md border px-3 py-2 text-xs font-medium transition ${className}`}
+    >
+      {label}
+    </button>
   );
 }
 
