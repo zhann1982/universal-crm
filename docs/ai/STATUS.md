@@ -1,6 +1,28 @@
 # Universal CRM — Current Status
 
-Last updated: 2026-09-29
+Last updated: 2026-09-30
+
+## Current development update — 2026-09-30
+
+Published baseline: GitHub main `9569de6` contains Tasks, scheduling, comments and Task Activity Stage 2.
+The previous verification sections below describe the earlier stabilization baseline, not a new database/build run.
+
+Current branch changes:
+- Timeline SQL excludes comment events without `comments.read`, including events whose comment FK is null.
+- Member display names are not queried without `members.read`.
+- Comment archive/restore checks and locks a writable tenant parent in the same statement as the versioned comment update and activity event.
+- Archived parents disable comment controls even if an older caller passes `entityArchived=false`.
+
+Current verification: 62 unit/query-regression tests passed; Next type generation, TypeScript and ESLint passed.
+The new tests intercept database transport and verify SQL/permission behavior; they do not execute PostgreSQL or prove concurrent runtime behavior.
+Database integration, browser checks and production build were not rerun for this update.
+
+Product direction confirmed by the user: multiple independent companies (Organizations).
+Still open: atomic Task + Schedule + Activity writes, reliable recurrence, structured history,
+comment create/update parent-archive races, history pagination, database constraints,
+Organization selection/onboarding and cross-organization workflow coverage.
+
+---
 
 ## Source-of-truth note
 
@@ -543,9 +565,7 @@ F12 — OPEN
 
 # Major features not yet implemented
 
-- Tasks
-- Collaborative Notes
-- Activity Timeline
+- Activity rollout to Client / Company / Deal detail pages
 - Pipeline/Stage management UI
 - direct Deal contacts
 - Custom Fields
@@ -570,8 +590,8 @@ Priority:
 
 After sufficient stabilization:
 
-Tasks
-→ Collaborative Notes
-→ Activity Timeline
+Task/Activity reliability
+→ Organization selection and tenant workflow tests
+→ Activity rollout to other CRM entities
 → Pipeline management
 → direct Deal contacts

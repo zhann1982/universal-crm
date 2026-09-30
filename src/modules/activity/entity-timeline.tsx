@@ -1,19 +1,4 @@
 import {
-  and,
-  desc,
-  eq,
-  isNull,
-} from "drizzle-orm";
-
-import { db } from "@/db";
-import {
-  activityEvents,
-  comments,
-} from "@/db/activity-schema";
-import {
-  organizationMembers,
-} from "@/db/schema";
-import {
   getCurrentAccessContext,
 } from "@/lib/auth/permissions";
 import {
@@ -38,8 +23,7 @@ import {
   type ActivityEntityType,
 } from "./entity-types";
 
-const MAX_EVENTS = 50;
-const MAX_COMMENTS = 100;
+import { readTimelineRows } from "./read-timeline";
 
 export async function EntityTimeline({
   entityType,
@@ -92,7 +76,7 @@ export async function EntityTimeline({
     permissions.has(
       "comments.create",
     ) &&
-    !(entityArchived ??
+    !(entityArchived ||
       target.isArchived);
 
   if (
@@ -103,124 +87,12 @@ export async function EntityTimeline({
     return null;
   }
 
-  const eventRows =
-    canReadActivity
-      ? await db
-          .select({
-            id:
-              activityEvents.id,
-            actorMemberId:
-              activityEvents.actorMemberId,
-            actorDisplayName:
-              organizationMembers.displayName,
-            commentId:
-              activityEvents.commentId,
-            eventType:
-              activityEvents.eventType,
-            summary:
-              activityEvents.summary,
-            details:
-              activityEvents.details,
-            createdAt:
-              activityEvents.createdAt,
-          })
-          .from(activityEvents)
-          .leftJoin(
-            organizationMembers,
-            and(
-              eq(
-                activityEvents.actorMemberId,
-                organizationMembers.id,
-              ),
-              eq(
-                organizationMembers.organizationId,
-                organization.id,
-              ),
-            ),
-          )
-          .where(
-            and(
-              eq(
-                activityEvents.organizationId,
-                organization.id,
-              ),
-              eq(
-                activityEvents.entityType,
-                entityType,
-              ),
-              eq(
-                activityEvents.entityId,
-                entityId,
-              ),
-            ),
-          )
-          .orderBy(
-            desc(
-              activityEvents.createdAt,
-            ),
-          )
-          .limit(MAX_EVENTS)
-      : [];
-
-  const commentRows =
-    canReadComments
-      ? await db
-          .select({
-            id: comments.id,
-            authorMemberId:
-              comments.authorMemberId,
-            authorDisplayName:
-              organizationMembers.displayName,
-            body: comments.body,
-            isArchived:
-              comments.isArchived,
-            version:
-              comments.version,
-            createdAt:
-              comments.createdAt,
-            updatedAt:
-              comments.updatedAt,
-          })
-          .from(comments)
-          .leftJoin(
-            organizationMembers,
-            and(
-              eq(
-                comments.authorMemberId,
-                organizationMembers.id,
-              ),
-              eq(
-                organizationMembers.organizationId,
-                organization.id,
-              ),
-            ),
-          )
-          .where(
-            and(
-              eq(
-                comments.organizationId,
-                organization.id,
-              ),
-              eq(
-                comments.entityType,
-                entityType,
-              ),
-              eq(
-                comments.entityId,
-                entityId,
-              ),
-              isNull(
-                comments.deletedAt,
-              ),
-            ),
-          )
-          .orderBy(
-            desc(
-              comments.createdAt,
-            ),
-          )
-          .limit(MAX_COMMENTS)
-      : [];
+  const { eventRows, commentRows } = await readTimelineRows({
+    organizationId: organization.id,
+    entityType,
+    entityId,
+    permissions,
+  });
 
   const commentsById =
     new Map(
@@ -297,7 +169,7 @@ export async function EntityTimeline({
                 const canEdit = Boolean(
                   currentComment &&
                     !currentComment.isArchived &&
-                    !(entityArchived ??
+                    !(entityArchived ||
                       target.isArchived) &&
                     permissions.has(
                       "comments.update",
@@ -308,6 +180,7 @@ export async function EntityTimeline({
 
                 const canArchive = Boolean(
                   currentComment &&
+                    !(entityArchived || target.isArchived) &&
                     permissions.has(
                       "comments.archive",
                     ) &&

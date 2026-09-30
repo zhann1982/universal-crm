@@ -1,6 +1,6 @@
 # Universal CRM — Project Context
 
-Last updated: 2026-09-29
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -75,9 +75,8 @@ Current stabilization focus:
 - CI database isolation
 - production invitation delivery/admin UX
 
-After sufficient stabilization, the next major product module is:
-
-Tasks
+Tasks and Task Activity Stage 2 are implemented. Current work stabilizes their access and persistence.
+The user confirmed multiple independent companies as the target deployment model.
 
 ---
 
@@ -505,7 +504,7 @@ Different currencies remain separate in totals unless an explicit exchange-rate 
 
 # Testing state
 
-Latest locally verified baseline:
+Earlier stabilization verification baseline (see STATUS.md for the current branch):
 
 - 37 unit/regression tests
 - 23 PostgreSQL integration tests
@@ -530,46 +529,21 @@ Integration tests remain local until a dedicated non-production PostgreSQL CI en
 
 # Tasks
 
-Not implemented.
-
-Tasks remain the next major product module after stabilization.
-
-Likely relationships:
-
-- Deal
-- Client
-- Company
-- responsible Member
-
-Likely views:
-
-- today
-- overdue
-- mine
-- upcoming
-- completed
-- Deals without a next action
+Implemented: lifecycle and optimistic versions, owner assignment, Client/Company/Deal links,
+filters and pagination, bulk actions, reminders and recurring schedules.
+Task, schedule and event writes are not yet one atomic operation; recurrence recovery remains open.
 
 ---
 
-# Collaborative Notes / Activity
+# Collaborative Comments / Activity
 
-Current entity `notes` fields are descriptions only.
+Entity description fields remain separate from collaborative comments.
+Comments and activity tables exist. Task detail renders the timeline; Stage 2 records task changes.
+Event logging is currently best-effort and many changes lack structured old/new values.
 
-Future collaborative Notes are separate records.
-
-Activity Timeline is also separate and should record structured business events such as:
-
-- Deal created
-- Stage changed
-- Pipeline changed
-- owner changed
-- amount changed
-- archive/restore
-- Task created/completed
-- Note created/edited/deleted
-
-Activity is important for collaboration, debugging, analytics, automation and future AI summaries.
+Activity permission does not grant comment content access. Timeline queries must enforce
+both entity access and the content permission. Member directory data needs `members.read`.
+Archive/restore comment writes lock a writable parent; create/update lifecycle races remain open.
 
 ---
 

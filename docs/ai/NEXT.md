@@ -1,6 +1,21 @@
 # Universal CRM — Next Development Steps
 
-Last updated: 2026-09-29
+Last updated: 2026-09-30
+
+## Immediate development sequence — 2026-09-30
+
+Tasks and Task Activity Stage 2 are already published in `9569de6`; do not recreate them.
+User priority: multiple independent companies.
+
+1. Verify Activity access/archived-parent hardening against an isolated PostgreSQL database and browser workflows.
+2. Make Task + Schedule + Activity writes atomic, including version checks and reliable recurring task creation.
+3. Replace fixed `development` organization selection with validated active Membership-based selection; test two-company workflows and stale forms across tenant switches.
+4. Strengthen database tenant constraints and introduce dedicated integration CI.
+5. Roll Activity out to Client / Company / Deal using the stabilized event model.
+6. Add saved views and Pipeline management; custom fields and automation follow later.
+
+Comment creation/editing still need the same concurrent parent lifecycle protection as archive/restore.
+Activity pagination and structured old/new Task values remain open.
 
 ## Current cycle
 
@@ -243,50 +258,17 @@ Not every long-term production feature must be complete.
 
 ---
 
-# Next major product module — Tasks
+# Existing Tasks / Activity foundation
 
-After stabilization, Tasks remain the first major product module.
-
-Initial model should consider:
-
-- id
-- organizationId
-- title
-- description
-- dueAt
-- status
-- priority
-- ownerMemberId
-- createdByMemberId
-- completedAt
-- createdAt
-- updatedAt
-- deletedAt
-- version if collaborative edits require it
-
-Possible relationships:
-
-- Deal
-- Client
-- Company
-
-Initial views:
-
-- today
-- overdue
-- mine
-- upcoming
-- completed
-- Deals without a next action
-
-Authorization must use the same trusted tenant context and owner-assignment rules.
+Tasks already include CRM links, owners, filters, pagination, bulk actions, reminders and recurrence.
+Comments and task history are implemented. Existing scheduling and event writes require stabilization before further expansion.
 
 ---
 
 # After Tasks
 
-Collaborative Notes
-→ Activity Timeline
+Organization selection / tenant workflow verification
+→ Activity for Client / Company / Deal
 → Pipeline/Stage management UI
 → direct Deal contacts
 → saved views

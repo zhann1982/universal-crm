@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D047`
+`D048`
 
 ---
 
@@ -550,7 +550,7 @@ If a secret is committed, rotate it.
 
 ## Testing
 
-Latest locally verified baseline:
+Earlier stabilization baseline (current branch verification lives in docs/ai/STATUS.md):
 
 - `npm test` — 37 / 37
 - `npm run test:integration` — 23 / 23
@@ -615,17 +615,18 @@ Current stabilization priorities:
 5. dedicated CI PostgreSQL strategy
 6. production invitation email delivery/admin UX
 
-Next major product module:
+Tasks, collaborative Comments and Task Activity Stage 2 already exist.
+Do not recreate these modules. Stabilize atomic Task/Schedule/Activity persistence first.
 
-Tasks
+The user targets multiple independent companies. Replace the fixed development tenant with
+server-validated active Membership selection and cross-tenant workflow tests before production.
 
-Then:
+Then: Activity for Client/Company/Deal → Pipeline management → saved views → custom fields
+→ automation → read-first AI.
 
-Collaborative Notes
-→ Activity Timeline
-→ Pipeline management
-→ direct Deal contacts
-→ saved views
-→ custom fields
-→ automation
-→ read-first AI
+## Activity permissions
+
+Decision D048: `activity.read` never grants access to comment contents.
+Exclude comment events in SQL without `comments.read`, including events with a null comment FK.
+Do not query Member display names without `members.read`.
+Comment archive/restore must validate a writable tenant parent inside the mutation statement.

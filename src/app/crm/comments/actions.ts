@@ -30,6 +30,7 @@ import {
   updateCommentSchema,
   type CommentActionState,
 } from "@/lib/validation/comment";
+import { setCommentArchived } from "@/modules/activity/archive-comment";
 import {
   getEntityTarget,
 } from "@/modules/activity/entity-target";
@@ -586,7 +587,7 @@ async function changeCommentArchiveState({
         comment.entityId,
     });
 
-  if (!target) {
+  if (!target || target.isArchived) {
     return;
   }
 
@@ -597,53 +598,17 @@ async function changeCommentArchiveState({
     return;
   }
 
-  const eventId =
-    randomUUID();
-  const eventType = archive
-    ? "comment.archived"
-    : "comment.restored";
-  const summary = archive
-    ? "Комментарий архивирован"
-    : "Комментарий восстановлен";
-
   try {
-    await sql`
-      WITH changed_comment AS (
-        UPDATE comments
-        SET
-          is_archived = ${archive},
-          version = version + 1,
-          updated_at = now()
-        WHERE
-          id = ${comment.id}::uuid
-          AND organization_id =
-            ${organization.id}::uuid
-          AND version =
-            ${parsed.data.version}
-          AND deleted_at IS NULL
-        RETURNING id
-      )
-      INSERT INTO activity_events (
-        id,
-        organization_id,
-        entity_type,
-        entity_id,
-        actor_member_id,
-        comment_id,
-        event_type,
-        summary
-      )
-      SELECT
-        ${eventId}::uuid,
-        ${organization.id}::uuid,
-        ${entityType},
-        ${comment.entityId}::uuid,
-        ${member.id}::uuid,
-        changed_comment.id,
-        ${eventType},
-        ${summary}
-      FROM changed_comment
-    `;
+    const changed = await setCommentArchived({
+      organizationId: organization.id,
+      entityType,
+      entityId: comment.entityId,
+      commentId: comment.id,
+      actorMemberId: member.id,
+      expectedVersion: parsed.data.version,
+      archive,
+    });
+    if (!changed) return;
   } catch (error) {
     console.error(
       "Failed to change comment archive state:",

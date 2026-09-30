@@ -1,6 +1,6 @@
 # Universal CRM — Architecture Decisions
 
-Last updated: 2026-09-28
+Last updated: 2026-09-30
 
 ## Decision ID rule
 
@@ -612,3 +612,20 @@ Verification:
 Reason:
 
 Knowledge of an email address is not proof of ownership. CRM Membership is an authorization boundary and therefore requires authenticated, verified and transaction-safe acceptance of a credential bound to the intended identity.
+
+## D048 — Activity preserves underlying content permissions
+
+Date: 2026-09-30
+
+`activity.read` permits entity history, but does not imply `comments.read` or `members.read`.
+Without comment read permission, filter events with a comment ID or a `comment.` event type
+in SQL before pagination. The type check also covers comment FKs cleared by deletion.
+Do not load member directory names without member read permission.
+
+Comment archive/restore requires an active, non-deleted parent in the same Organization.
+Lock that parent within the statement that conditionally updates the versioned comment
+and inserts its event. Zero changed rows are not success.
+Creation/update parent locking and atomic Task history remain separate follow-up work.
+
+Query regressions cover permission combinations and mutation predicates. PostgreSQL concurrency
+verification is still required; query-level tests must not be described as integration coverage.
