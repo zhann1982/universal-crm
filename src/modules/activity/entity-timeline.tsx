@@ -1,3 +1,4 @@
+import { OrganizationForm } from "@/modules/access/organization-context";
 import {
   getCurrentAccessContext,
 } from "@/lib/auth/permissions";
@@ -354,7 +355,7 @@ function CommentLifecycleForm({
   label: string;
 }) {
   return (
-    <form action={action}>
+    <OrganizationForm action={action}>
       <input
         type="hidden"
         name="commentId"
@@ -372,6 +373,6 @@ function CommentLifecycleForm({
       >
         {label}
       </button>
-    </form>
+    </OrganizationForm>
   );
 }

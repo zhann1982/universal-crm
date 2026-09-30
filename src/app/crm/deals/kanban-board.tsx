@@ -1,5 +1,8 @@
 "use client";
 
+import { useOrganizationId } from "@/modules/access/organization-context";
+
+
 import Link from "next/link";
 import {
   useRouter,
@@ -84,6 +87,7 @@ export function KanbanBoard({
   canUpdate:
     boolean;
 }) {
+  const organizationScope = useOrganizationId();
   const router =
     useRouter();
 
@@ -168,6 +172,7 @@ export function KanbanBoard({
       async () => {
         const result =
           await moveDealOnBoard(
+        organizationScope,
             dealId,
             targetStageId,
             deal.version,

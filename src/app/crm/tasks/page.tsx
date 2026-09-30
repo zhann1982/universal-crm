@@ -1,3 +1,4 @@
+import { OrganizationForm } from "@/modules/access/organization-context";
 import {
   and,
   asc,
@@ -785,7 +786,7 @@ export default async function TasksPage({
         </TaskViewLink>
       </div>
 
-      <form
+      <OrganizationForm
         method="get"
         action="/crm/tasks"
         className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -947,10 +948,10 @@ export default async function TasksPage({
             </button>
           </div>
         </div>
-      </form>
+      </OrganizationForm>
 
       {showBulkActions && (
-        <form
+        <OrganizationForm
           id="task-bulk-form"
           action={bulkTaskAction}
           className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
@@ -1010,7 +1011,7 @@ export default async function TasksPage({
                 />
               )}
           </div>
-        </form>
+        </OrganizationForm>
       )}
 
       {taskRows.length === 0 ? (
@@ -1528,7 +1529,7 @@ function ReminderDismissForm({
   returnTo: string;
 }) {
   return (
-    <form
+    <OrganizationForm
       action={
         dismissTaskReminder
       }
@@ -1555,7 +1556,7 @@ function ReminderDismissForm({
       >
         Скрыть напоминание
       </button>
-    </form>
+    </OrganizationForm>
   );
 }
 
@@ -1601,7 +1602,7 @@ function TaskActionForm({
   className: string;
 }) {
   return (
-    <form action={action}>
+    <OrganizationForm action={action}>
       <input
         type="hidden"
         name="taskId"
@@ -1624,7 +1625,7 @@ function TaskActionForm({
       >
         {label}
       </button>
-    </form>
+    </OrganizationForm>
   );
 }
 

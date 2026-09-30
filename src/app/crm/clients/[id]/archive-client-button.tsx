@@ -1,5 +1,8 @@
 "use client";
 
+import { useOrganizationId } from "@/modules/access/organization-context";
+
+
 import { useTransition } from "react";
 
 import { archiveClient } from "../actions";
@@ -9,6 +12,7 @@ export function ArchiveClientButton({
 }: {
   clientId: string;
 }) {
+  const organizationScope = useOrganizationId();
   const [pending, startTransition] =
     useTransition();
 
@@ -23,7 +27,7 @@ export function ArchiveClientButton({
     }
 
     startTransition(() => {
-      void archiveClient(clientId);
+      void archiveClient(organizationScope, clientId);
     });
   }
 

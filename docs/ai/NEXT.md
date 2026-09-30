@@ -9,7 +9,7 @@ User priority: multiple independent companies.
 
 1. Verify Activity access/archived-parent hardening against an isolated PostgreSQL database and browser workflows.
 2. Task + Schedule + Activity atomic writes and recurrence are implemented; follow up with multi-session Neon concurrency and browser verification. Do not recreate the persistence layer.
-3. Replace fixed `development` organization selection with validated active Membership-based selection; test two-company workflows and stale forms across tenant switches.
+3. Organization selection and mutation scope checks are implemented (D050). Next add browser multi-tab verification and safe Organization provisioning with initial system roles/permissions.
 4. Strengthen database tenant constraints and introduce dedicated integration CI.
 5. Roll Activity out to Client / Company / Deal using the stabilized event model.
 6. Add saved views and Pipeline management; custom fields and automation follow later.
@@ -268,7 +268,7 @@ Comments and task history exist; structured history values and pagination remain
 
 # After Tasks
 
-Organization selection / tenant workflow verification
+Organization provisioning / browser tenant workflow verification
 → Activity for Client / Company / Deal
 → Pipeline/Stage management UI
 → direct Deal contacts

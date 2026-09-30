@@ -1,5 +1,8 @@
 "use client";
 
+import { useOrganizationId } from "@/modules/access/organization-context";
+
+
 import {
   useTransition,
 } from "react";
@@ -13,6 +16,7 @@ export function RestoreDealButton({
 }: {
   dealId: string;
 }) {
+  const organizationScope = useOrganizationId();
   const [
     pending,
     startTransition,
@@ -30,6 +34,7 @@ export function RestoreDealButton({
 
     startTransition(() => {
       void restoreDeal(
+        organizationScope,
         dealId,
       );
     });

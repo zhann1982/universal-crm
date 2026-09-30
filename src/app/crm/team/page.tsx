@@ -1,3 +1,4 @@
+import { OrganizationForm } from "@/modules/access/organization-context";
 import {
   and,
   asc,
@@ -349,7 +350,7 @@ export default async function TeamPage({
                 {canManage &&
                   !isCurrent && (
                     <>
-                      <form
+                      <OrganizationForm
                         action={
                           updateMemberRoles
                         }
@@ -403,9 +404,9 @@ export default async function TeamPage({
                         >
                           Сохранить роли
                         </button>
-                      </form>
+                      </OrganizationForm>
 
-                      <form
+                      <OrganizationForm
                         action={
                           updateMemberStatus
                         }
@@ -455,7 +456,7 @@ export default async function TeamPage({
                               : "Активировать"}
                           </button>
                         </div>
-                      </form>
+                      </OrganizationForm>
                     </>
                   )}
 

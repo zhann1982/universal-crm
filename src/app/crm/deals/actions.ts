@@ -21,7 +21,7 @@ import {
   pipelines,
 } from "@/db/schema";
 import {
-  requirePermission,
+  requireMutationPermission,
 } from "@/lib/auth/permissions";
 import {
   createDealSchema,
@@ -108,8 +108,9 @@ export async function createDeal(
     organization,
     member,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "deals.create",
+    formData,
   );
 
   if (
@@ -469,8 +470,9 @@ export async function moveDealToStage(
 ) {
   const {
     organization,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "deals.update",
+    formData,
   );
 
   const versionResult =
@@ -586,8 +588,9 @@ export async function updateDeal(
     organization,
     member,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "deals.update",
+    formData,
   );
 
   if (
@@ -1178,12 +1181,14 @@ export async function updateDeal(
 }
 
 export async function archiveDeal(
+  organizationScope: string,
   dealId: string,
 ) {
   const {
     organization,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "deals.archive",
+    organizationScope,
   );
 
   const idResult =
@@ -1338,12 +1343,14 @@ export async function archiveDeal(
 }
 
 export async function restoreDeal(
+  organizationScope: string,
   dealId: string,
 ) {
   const {
     organization,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "deals.archive",
+    organizationScope,
   );
 
   const idResult =

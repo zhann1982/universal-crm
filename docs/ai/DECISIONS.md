@@ -652,3 +652,27 @@ index remains the final conflict guard. Bulk atomicity is per Task, not across t
 The same SQL runs in PGlite tests using all checked-in migrations. Fault-injection tests cover
 rollback of task, schedule, successor and event writes. This enables isolated CI verification,
 but is not proof of multi-session Neon concurrency behavior; those tests remain necessary.
+
+
+## D050 — Organization selection and mutation scope are separate from authorization
+
+Date: 2026-09-30
+
+A verified session can choose among active Organizations with an active Membership.
+The HttpOnly, SameSite=Lax cookie is a preference; server lookups revalidate it on each request.
+No preference + one membership allows direct CRM entry. Multiple memberships require explicit
+selection. An invalid or revoked preference redirects to the chooser without implicit fallback.
+
+CRM forms carry `_organizationId` from their rendered OrganizationProvider. Imperative buttons
+and Kanban send the same scope explicitly. All CRM Server Actions use requireMutationPermission:
+authenticated/verified User → selected active Organization → active Membership → matching submitted
+scope → Permission. Client scope never replaces tenant authorization or entity tenant predicates.
+An old tab submitted after another tab switches organizations must fail before writes.
+
+Switching revalidates the CRM layout and returns to the dashboard. The provider is keyed by
+Organization ID to avoid retaining form state across organizations. Invitation acceptance opens
+the chooser. Provisioning a new Organization remains a separate workflow.
+
+Tests cover active memberships, multiple choices, forged/malformed selection, revocation,
+inactive Organizations, scope mismatch and server-rendered form fields. Multi-tab browser
+verification remains necessary; these tests do not claim full end-to-end coverage.

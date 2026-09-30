@@ -4,28 +4,29 @@ Last updated: 2026-09-30
 
 ## Current development update — 2026-09-30
 
-Baseline: main includes Task Activity Stage 2 and Activity permission hardening (`e801e93`).
+Baseline: main includes atomic Task/Schedule/Activity persistence (`b397f3a`).
 
-Task persistence stabilization:
-- Create/full edit save Task, Schedule and Activity in one SQL statement.
-- Task and schedule versions are checked before edits; an unchanged reminder preserves dismissal.
-- Completion and next recurring Task/Schedule/history commit or roll back together.
-- Individual and bulk completion share one operation; reopening/recompletion reuses an existing successor.
-- Status, archive/restore and reminder dismissal write their event atomically.
-- Bulk operations remain independent per Task, not one all-or-nothing batch.
-- Creating an already completed Task sets completedAt and handles recurrence.
-- Removed the unused best-effort event writer and partial-save UI message.
+Organization selection:
+- `/organizations` lists only the verified user's active memberships in active Organizations.
+- `/crm` uses a validated HttpOnly cookie preference; there is no fixed development-tenant fallback.
+- With no preference and exactly one accessible Organization, entry is automatic.
+- Multiple memberships require selection. Invalid/revoked selections go to the chooser without silently choosing another tenant.
+- CRM sidebar displays the selected Organization and links to the chooser.
+- Every CRM mutation uses `requireMutationPermission` with the organization rendered in its form/tab.
+- OrganizationForm covers forms; direct archive/restore buttons and Kanban pass the same scope explicitly.
+- Old forms after a tenant switch are rejected before writes. The client scope is compared against the server-authorized context; it never grants access.
+- Invitation acceptance opens the chooser; it does not leave the user in an unrelated previously selected tenant.
 
-Verification: 76 tests passed, including production SQL executed in isolated PGlite PostgreSQL
-with all repository migrations, fault injection and rollback checks. Next type generation,
-TypeScript and ESLint passed. PGlite tests run in the ordinary CI suite without external DB secrets.
-PGlite is single-connection; this does not replace multi-session Neon concurrency or browser tests.
-Production build and the existing external-database integration suite were not rerun.
-No schema migration is needed for these changes.
+Verification: 86 tests passed, including PGlite membership/selection/revocation tests and server-rendered
+form scope tests. Next type generation, TypeScript, ESLint and production build passed.
+Build used dummy configuration and did not connect to the working database.
+Browser multi-tab workflows and live multi-session Neon tests remain outstanding.
+No schema migration is required.
 
-User target: multiple independent companies. Next: Membership-validated Organization selection,
-stronger tenant database constraints, Neon concurrency tests, comment create/update parent-archive
-protection, structured old/new activity values and timeline pagination.
+Organization self-service creation/provisioning is not implemented. Membership and Organization records
+must already exist (invitation acceptance creates membership using the existing verified flow).
+Next: safe Organization provisioning with system roles/permissions, browser cross-tenant workflows,
+stronger database constraints, structured history and pagination.
 
 The later historical verification sections describe the earlier stabilization baseline.
 
@@ -205,7 +206,7 @@ PostgreSQL coverage verifies:
 - inactive Membership is rejected
 - active Membership remains allowed
 
-The current application still uses the fixed `development` Organization until real Organization selection is introduced.
+Organization selection now uses verified-session membership and a revalidated cookie preference (D050).
 
 F06:
 
@@ -598,7 +599,7 @@ Priority:
 After sufficient stabilization:
 
 Task/Activity reliability
-→ Organization selection and tenant workflow tests
+→ Organization provisioning and browser tenant workflow tests
 → Activity rollout to other CRM entities
 → Pipeline management
 → direct Deal contacts

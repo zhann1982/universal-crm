@@ -21,7 +21,7 @@ import {
   comments,
 } from "@/db/activity-schema";
 import {
-  requirePermission,
+  requireMutationPermission,
 } from "@/lib/auth/permissions";
 import {
   commentEntityTypeSchema,
@@ -88,8 +88,9 @@ export async function createComment(
     organization,
     member,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "comments.create",
+    formData,
   );
 
   const rawBody = String(
@@ -270,8 +271,9 @@ export async function updateComment(
     organization,
     member,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "comments.update",
+    formData,
   );
 
   const rawBody = String(
@@ -513,8 +515,9 @@ async function changeCommentArchiveState({
     organization,
     member,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "comments.archive",
+    formData,
   );
 
   const parsed =

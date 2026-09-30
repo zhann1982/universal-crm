@@ -1,5 +1,8 @@
 "use client";
 
+import { OrganizationForm } from "@/modules/access/organization-context";
+
+
 import {
   useActionState,
 } from "react";
@@ -38,7 +41,7 @@ export function CommentEditor({
         Редактировать
       </summary>
 
-      <form
+      <OrganizationForm
         action={formAction}
         className="mt-3"
       >
@@ -100,7 +103,7 @@ export function CommentEditor({
             ? "Сохранение..."
             : "Сохранить изменения"}
         </button>
-      </form>
+      </OrganizationForm>
     </details>
   );
 }

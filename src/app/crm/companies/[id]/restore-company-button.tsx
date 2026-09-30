@@ -1,5 +1,8 @@
 "use client";
 
+import { useOrganizationId } from "@/modules/access/organization-context";
+
+
 import {
   useTransition,
 } from "react";
@@ -18,6 +21,7 @@ export function RestoreCompanyButton({
     | "detail"
     | "list";
 }) {
+  const organizationScope = useOrganizationId();
   const [
     pending,
     startTransition,
@@ -35,6 +39,7 @@ export function RestoreCompanyButton({
 
     startTransition(() => {
       void restoreCompany(
+        organizationScope,
         companyId,
         returnTo,
       );

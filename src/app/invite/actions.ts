@@ -114,7 +114,7 @@ export async function acceptInvitationAction(
   switch (result.status) {
     case "accepted":
       redirect(
-        "/crm?joined=1",
+        "/organizations?joined=1",
       );
 
     case "email-unverified":

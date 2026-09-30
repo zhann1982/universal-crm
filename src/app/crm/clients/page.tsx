@@ -1,3 +1,4 @@
+import { OrganizationForm } from "@/modules/access/organization-context";
 import {
   and,
   count,
@@ -273,7 +274,7 @@ export default async function ClientsPage({
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <form
+        <OrganizationForm
           action="/crm/clients"
           method="get"
           className="flex flex-wrap items-end gap-4 border-b border-slate-200 p-4"
@@ -350,7 +351,7 @@ export default async function ClientsPage({
               Сбросить
             </Link>
           )}
-        </form>
+        </OrganizationForm>
 
         {(q ||
           status !== "all") && (

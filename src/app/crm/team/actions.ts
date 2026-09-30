@@ -6,7 +6,7 @@ import {
 import { redirect } from "next/navigation";
 
 import {
-  requirePermission,
+  requireMutationPermission,
 } from "@/lib/auth/permissions";
 import {
   createInvitation,
@@ -42,8 +42,9 @@ export async function inviteMember(
   const {
     organization,
     member: currentMember,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "members.manage",
+    formData,
   );
 
   const email = String(
@@ -159,8 +160,9 @@ export async function updateMemberStatus(
   const {
     organization,
     member: currentMember,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "members.manage",
+    formData,
   );
 
   const memberId = String(
@@ -234,8 +236,9 @@ export async function updateMemberRoles(
   const {
     organization,
     member: currentMember,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "members.manage",
+    formData,
   );
 
   const memberId = String(

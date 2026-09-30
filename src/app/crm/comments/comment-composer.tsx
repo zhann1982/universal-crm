@@ -1,5 +1,8 @@
 "use client";
 
+import { OrganizationForm } from "@/modules/access/organization-context";
+
+
 import {
   useActionState,
 } from "react";
@@ -35,7 +38,7 @@ export function CommentComposer({
   );
 
   return (
-    <form
+    <OrganizationForm
       action={formAction}
       className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4"
     >
@@ -107,6 +110,6 @@ export function CommentComposer({
             : "Добавить комментарий"}
         </button>
       </div>
-    </form>
+    </OrganizationForm>
   );
 }

@@ -1,13 +1,5 @@
-import {
-  headers,
-} from "next/headers";
-import {
-  redirect,
-} from "next/navigation";
-
-import {
-  auth,
-} from "@/lib/auth/auth";
+import { requireVerifiedSession } from "./verified-session";
+import { redirect } from "next/navigation";
 import {
   getCurrentOrganization,
 } from "@/lib/current-organization";
@@ -16,31 +8,7 @@ import {
 } from "@/modules/access/tenant-access";
 
 export async function getCurrentMember() {
-  const session =
-    await auth.api.getSession({
-      headers:
-        await headers(),
-    });
-
-  if (!session) {
-    redirect(
-      "/login",
-    );
-  }
-
-  /*
-   * Пользователь может иметь
-   * Better Auth account и Session,
-   * но CRM требует подтверждённое
-   * владение email.
-   */
-  if (
-    !session.user.emailVerified
-  ) {
-    redirect(
-      "/verify-email",
-    );
-  }
+  const session = await requireVerifiedSession();
 
   const organization =
     await getCurrentOrganization();
@@ -56,7 +24,7 @@ export async function getCurrentMember() {
     "active"
   ) {
     redirect(
-      "/no-access",
+      "/organizations?reason=unavailable",
     );
   }
 

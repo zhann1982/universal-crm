@@ -1,3 +1,4 @@
+import { OrganizationForm } from "@/modules/access/organization-context";
 import {
   and,
   asc,
@@ -575,7 +576,7 @@ export default async function CrmDashboardPage() {
                   {permissions.has(
                     "tasks.update",
                   ) && (
-                    <form
+                    <OrganizationForm
                       action={
                         dismissTaskReminder
                       }
@@ -604,7 +605,7 @@ export default async function CrmDashboardPage() {
                       >
                         Скрыть
                       </button>
-                    </form>
+                    </OrganizationForm>
                   )}
                 </div>
               ))}
@@ -705,7 +706,7 @@ export default async function CrmDashboardPage() {
                         {permissions.has(
                           "tasks.update",
                         ) && (
-                          <form
+                          <OrganizationForm
                             action={
                               completeTask
                             }
@@ -734,7 +735,7 @@ export default async function CrmDashboardPage() {
                             >
                               Выполнить
                             </button>
-                          </form>
+                          </OrganizationForm>
                         )}
                       </div>
                     </div>

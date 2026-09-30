@@ -1,3 +1,4 @@
+import { OrganizationForm } from "@/modules/access/organization-context";
 import {
   and,
   asc,
@@ -417,7 +418,7 @@ export default async function DealsPage({
       </div>
 
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <form
+        <OrganizationForm
           action="/crm/deals"
           method="get"
           className="flex flex-wrap items-end gap-4"
@@ -467,7 +468,7 @@ export default async function DealsPage({
           >
             Открыть
           </button>
-        </form>
+        </OrganizationForm>
 
         {selectedPipeline.description && (
           <p className="mt-4 text-sm text-slate-500">

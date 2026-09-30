@@ -1,3 +1,4 @@
+import { OrganizationForm } from "@/modules/access/organization-context";
 import {
   and,
   asc,
@@ -286,7 +287,7 @@ export default async function DealPage({
               текущей воронки.
             </p>
 
-            <form
+            <OrganizationForm
               action={moveAction}
               className="mt-5 flex flex-wrap items-end gap-3"
             >
@@ -333,7 +334,7 @@ export default async function DealPage({
               >
                 Переместить
               </button>
-            </form>
+            </OrganizationForm>
           </section>
         )}
 

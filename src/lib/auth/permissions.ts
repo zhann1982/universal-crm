@@ -1,3 +1,4 @@
+import { matchesOrganizationScope, ORGANIZATION_FIELD } from "@/modules/access/organization-selection";
 import {
   and,
   eq,
@@ -131,5 +132,16 @@ export async function requirePermission(
     redirect("/crm/forbidden");
   }
 
+  return context;
+}
+
+
+export async function requireMutationPermission(permission: PermissionKey, scope: FormData | string) {
+  const context = await getCurrentAccessContext();
+  const submitted = scope instanceof FormData ? scope.get(ORGANIZATION_FIELD) : scope;
+  if (!matchesOrganizationScope(context.organization.id, submitted)) {
+    redirect("/organizations?reason=context-changed");
+  }
+  if (!context.permissions.has(permission)) redirect("/crm/forbidden");
   return context;
 }

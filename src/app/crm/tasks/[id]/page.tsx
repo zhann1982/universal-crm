@@ -1,3 +1,4 @@
+import { OrganizationForm } from "@/modules/access/organization-context";
 import { EntityTimeline } from "@/modules/activity/entity-timeline";
 import {
   and,
@@ -805,7 +806,7 @@ function ReminderDismissForm({
   scheduleVersion: number;
 }) {
   return (
-    <form
+    <OrganizationForm
       action={
         dismissTaskReminder
       }
@@ -832,7 +833,7 @@ function ReminderDismissForm({
       >
         Скрыть напоминание
       </button>
-    </form>
+    </OrganizationForm>
   );
 }
 
@@ -878,7 +879,7 @@ function TaskMutationForm({
   className: string;
 }) {
   return (
-    <form action={action}>
+    <OrganizationForm action={action}>
       <input
         type="hidden"
         name="taskId"
@@ -897,7 +898,7 @@ function TaskMutationForm({
       >
         {label}
       </button>
-    </form>
+    </OrganizationForm>
   );
 }
 

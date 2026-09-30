@@ -1,5 +1,8 @@
 "use client";
 
+import { OrganizationForm } from "@/modules/access/organization-context";
+
+
 import Link from "next/link";
 import {
   useActionState,
@@ -147,7 +150,7 @@ export function EditDealForm({
         "";
 
   return (
-    <form
+    <OrganizationForm
       action={formAction}
       className="space-y-8"
     >
@@ -517,7 +520,7 @@ export function EditDealForm({
             : "Сохранить"}
         </button>
       </div>
-    </form>
+    </OrganizationForm>
   );
 }
 

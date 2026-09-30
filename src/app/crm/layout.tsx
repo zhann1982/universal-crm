@@ -1,3 +1,4 @@
+import { OrganizationProvider } from "@/modules/access/organization-context";
 import Link from "next/link";
 
 import { getCurrentAccessContext } from "@/lib/auth/permissions";
@@ -10,6 +11,7 @@ export default async function CrmLayout({
   children: React.ReactNode;
 }>) {
   const {
+    organization,
     member,
     user,
     permissions,
@@ -17,6 +19,7 @@ export default async function CrmLayout({
     await getCurrentAccessContext();
 
   return (
+    <OrganizationProvider key={organization.id} organizationId={organization.id}>
     <div className="min-h-screen bg-slate-100 text-slate-950">
       <div className="flex min-h-screen">
         <aside className="w-64 shrink-0 border-r border-slate-200 bg-white">
@@ -26,10 +29,13 @@ export default async function CrmLayout({
             </div>
 
             <div className="mt-1 text-xs text-slate-500">
-              Development CRM
+              {organization.name}
             </div>
           </div>
 
+          <Link href="/organizations" className="mx-4 mt-3 block rounded-lg border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50">
+            Сменить организацию
+          </Link>
           <nav className="space-y-1 p-4">
             <NavigationLink
               href="/crm"
@@ -128,6 +134,7 @@ export default async function CrmLayout({
         </div>
       </div>
     </div>
+    </OrganizationProvider>
   );
 }
 

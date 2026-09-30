@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D049`
+`D050`
 
 ---
 
@@ -109,11 +109,14 @@ session
 → Permissions
 → business operation
 
-Current development still uses:
+Organization selection is implemented (D050). The `crm-organization` cookie is a preference,
+not authorization. Revalidate active Organization + authenticated user's active Membership.
+Never silently fall back from an invalid/revoked selection to another tenant.
 
-`slug = development`
-
-Future Organization switching must validate active Membership server-side.
+All CRM mutations must use `requireMutationPermission` and supply the rendered organization scope.
+Use `OrganizationForm` for forms and `useOrganizationId` for imperative action callers.
+Never trust the client field as authorization; compare it against the server-selected context.
+Keep read-only permission checks separate from mutation-scope checks.
 
 Important access code:
 
@@ -617,10 +620,10 @@ Current stabilization priorities:
 
 Tasks, collaborative Comments and Task Activity Stage 2 already exist.
 Do not recreate these modules. Task/Schedule/Activity atomic persistence is implemented (D049).
-Prioritize Organization selection and multi-session tenant/concurrency verification next.
+Prioritize safe Organization provisioning and browser/multi-session tenant verification next.
 
-The user targets multiple independent companies. Replace the fixed development tenant with
-server-validated active Membership selection and cross-tenant workflow tests before production.
+The user targets multiple independent companies. Membership-based selection is implemented.
+Organization provisioning and browser cross-tenant workflow verification remain open.
 
 Then: Activity for Client/Company/Deal → Pipeline management → saved views → custom fields
 → automation → read-first AI.

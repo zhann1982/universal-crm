@@ -1,42 +1,13 @@
-import {
-  redirect,
-} from "next/navigation";
+import { cache } from "react";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { requireVerifiedSession } from "@/lib/auth/verified-session";
+import { ORGANIZATION_COOKIE, resolveSelectedOrganization } from "@/modules/access/organization-selection";
 
-import {
-  getOrganizationForAccessBySlug,
-} from "@/modules/access/tenant-access";
-
-export async function getCurrentOrganization() {
-  /*
-   * Пока CRM работает с одной
-   * development-организацией.
-   *
-   * В дальнейшем здесь появится
-   * выбор текущей организации
-   * пользователя.
-   */
-  const result =
-    await getOrganizationForAccessBySlug(
-      "development",
-    );
-
-  if (
-    result.status ===
-    "not-found"
-  ) {
-    throw new Error(
-      "Development organization not found",
-    );
-  }
-
-  if (
-    result.status ===
-    "inactive"
-  ) {
-    redirect(
-      "/no-access?reason=organization-inactive",
-    );
-  }
-
-  return result.organization;
-}
+export const getCurrentOrganization = cache(async () => {
+  const session = await requireVerifiedSession();
+  const selectedId = (await cookies()).get(ORGANIZATION_COOKIE)?.value;
+  const organization = await resolveSelectedOrganization(session.user.id, selectedId);
+  if (!organization) redirect("/organizations");
+  return organization;
+});

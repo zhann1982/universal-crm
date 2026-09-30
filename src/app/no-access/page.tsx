@@ -56,6 +56,9 @@ export default async function NoAccessPage({
         )}
 
         <div className="mt-7 flex flex-wrap justify-center gap-3">
+          <Link href="/organizations" className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-medium">
+            Выбрать организацию
+          </Link>
           <Link
             href="/auth-test"
             className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium transition hover:bg-slate-50"

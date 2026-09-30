@@ -99,11 +99,15 @@ session
 → Permissions
 → business operation
 
-Current development version still selects:
+Organization selection is implemented (D050). A cookie stores a preference only;
+each request validates the Organization and the authenticated user's active Membership.
+One membership without a saved preference opens directly; multiple memberships require `/organizations`.
+An invalid selection never silently falls back to another tenant.
 
-`slug = development`
-
-Future Organization switching must validate active Membership server-side.
+All CRM writes must include the rendered organization scope and use `requireMutationPermission`.
+Forms use `OrganizationForm`; imperative actions use `useOrganizationId`.
+The server compares this untrusted scope against its authorized selection before any mutation.
+Organization provisioning UI remains a separate feature.
 
 Shared tenant-access module:
 

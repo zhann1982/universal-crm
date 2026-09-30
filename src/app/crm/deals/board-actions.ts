@@ -5,7 +5,7 @@ import {
 } from "next/cache";
 
 import {
-  requirePermission,
+  requireMutationPermission,
 } from "@/lib/auth/permissions";
 import {
   transitionDeal,
@@ -21,14 +21,16 @@ export type MoveDealOnBoardResult =
     };
 
 export async function moveDealOnBoard(
+  organizationScope: string,
   dealId: string,
   stageId: string,
   expectedVersion: number,
 ): Promise<MoveDealOnBoardResult> {
   const {
     organization,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "deals.update",
+    organizationScope,
   );
 
   try {

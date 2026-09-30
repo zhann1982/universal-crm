@@ -1,3 +1,4 @@
+import { OrganizationForm } from "@/modules/access/organization-context";
 import {
   and,
   asc,
@@ -216,7 +217,7 @@ export async function ClientCompaniesSection({
 
                 {canManageRelations &&
                   !clientIsArchived && (
-                    <form
+                    <OrganizationForm
                       action={
                         unlinkClientFromCompany
                       }
@@ -243,7 +244,7 @@ export async function ClientCompaniesSection({
                       >
                         Удалить связь
                       </button>
-                    </form>
+                    </OrganizationForm>
                   )}
               </div>
             ),
@@ -260,7 +261,7 @@ export async function ClientCompaniesSection({
 
             {availableCompanies.length >
             0 ? (
-              <form
+              <OrganizationForm
                 action={
                   linkClientToCompany
                 }
@@ -326,7 +327,7 @@ export async function ClientCompaniesSection({
                 >
                   Добавить связь
                 </button>
-              </form>
+              </OrganizationForm>
             ) : (
               <p className="mt-3 text-sm text-slate-500">
                 Все доступные

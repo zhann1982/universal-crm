@@ -27,7 +27,7 @@ import {
   taskSchedules,
 } from "@/db/task-scheduling-schema";
 import {
-  requirePermission,
+  requireMutationPermission,
 } from "@/lib/auth/permissions";
 import {
   createTaskSchema,
@@ -307,8 +307,9 @@ export async function createTask(
     organization,
     member,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "tasks.create",
+    formData,
   );
 
   const values =
@@ -491,8 +492,9 @@ export async function updateTask(
     organization,
     member,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "tasks.update",
+    formData,
   );
 
   const idResult =
@@ -902,9 +904,10 @@ export async function completeTask(
   formData: FormData,
 ) {
   const { organization, member } =
-    await requirePermission(
+    await requireMutationPermission(
       "tasks.update",
-    );
+    formData,
+  );
 
   const parsed =
     parseTaskMutationForm(
@@ -952,9 +955,10 @@ export async function reopenTask(
   formData: FormData,
 ) {
   const { organization, member } =
-    await requirePermission(
+    await requireMutationPermission(
       "tasks.update",
-    );
+    formData,
+  );
 
   const parsed =
     parseTaskMutationForm(
@@ -998,9 +1002,10 @@ export async function archiveTask(
   formData: FormData,
 ) {
   const { organization, member } =
-    await requirePermission(
+    await requireMutationPermission(
       "tasks.archive",
-    );
+    formData,
+  );
 
   const parsed =
     parseTaskMutationForm(
@@ -1044,9 +1049,10 @@ export async function restoreTask(
   formData: FormData,
 ) {
   const { organization, member } =
-    await requirePermission(
+    await requireMutationPermission(
       "tasks.archive",
-    );
+    formData,
+  );
 
   const parsed =
     parseTaskMutationForm(
@@ -1123,10 +1129,11 @@ export async function bulkTaskAction(
   const {
     organization,
     member,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     needsArchivePermission
       ? "tasks.archive"
       : "tasks.update",
+    formData,
   );
 
   const returnTo =
@@ -1229,9 +1236,10 @@ export async function dismissTaskReminder(
   formData: FormData,
 ) {
   const { organization, member } =
-    await requirePermission(
+    await requireMutationPermission(
       "tasks.update",
-    );
+    formData,
+  );
 
   const idResult =
     taskIdSchema.safeParse(

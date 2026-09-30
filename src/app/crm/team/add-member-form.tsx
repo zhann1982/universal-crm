@@ -1,5 +1,8 @@
 "use client";
 
+import { OrganizationForm } from "@/modules/access/organization-context";
+
+
 import {
   useActionState,
 } from "react";
@@ -85,7 +88,7 @@ export function AddMemberForm({
         </div>
       )}
 
-      <form
+      <OrganizationForm
         action={formAction}
         className="mt-5 grid gap-4 md:grid-cols-[1fr_220px_auto]"
       >
@@ -132,7 +135,7 @@ export function AddMemberForm({
             ? "Создаём..."
             : "Создать приглашение"}
         </button>
-      </form>
+      </OrganizationForm>
     </section>
   );
 }

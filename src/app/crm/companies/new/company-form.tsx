@@ -1,5 +1,8 @@
 "use client";
 
+import { OrganizationForm } from "@/modules/access/organization-context";
+
+
 import {
   useActionState,
 } from "react";
@@ -38,7 +41,7 @@ export function CompanyForm({
   );
 
   return (
-    <form
+    <OrganizationForm
       action={formAction}
       className="space-y-8"
     >
@@ -306,7 +309,7 @@ export function CompanyForm({
             : "Создать компанию"}
         </button>
       </div>
-    </form>
+    </OrganizationForm>
   );
 }
 

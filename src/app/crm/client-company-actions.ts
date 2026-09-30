@@ -9,7 +9,7 @@ import {
 import { z } from "zod";
 
 import {
-  requirePermission,
+  requireMutationPermission,
 } from "@/lib/auth/permissions";
 import {
   linkClientCompany,
@@ -60,8 +60,9 @@ export async function linkClientToCompany(
   const {
     organization,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "clients.update",
+    formData,
   );
 
   if (
@@ -126,8 +127,9 @@ export async function unlinkClientFromCompany(
   const {
     organization,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "clients.update",
+    formData,
   );
 
   if (

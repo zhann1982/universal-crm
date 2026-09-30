@@ -10,7 +10,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { clients } from "@/db/schema";
-import { requirePermission } from "@/lib/auth/permissions";
+import { requireMutationPermission } from "@/lib/auth/permissions";
 import {
   clientIdSchema,
   createClientSchema,
@@ -61,8 +61,9 @@ export async function createClient(
 ): Promise<CreateClientState> {
 
   const { organization } =
-  await requirePermission(
+  await requireMutationPermission(
     "clients.create",
+    formData,
   );
   const values =
     getFormValues(formData);
@@ -138,9 +139,10 @@ export async function updateClient(
 ): Promise<UpdateClientState> {
 
   const { organization } =
-    await requirePermission(
+    await requireMutationPermission(
       "clients.update",
-    );
+    formData,
+  );
   const idResult =
     clientIdSchema.safeParse(clientId);
 
@@ -261,12 +263,14 @@ export async function updateClient(
 }
 
 export async function archiveClient(
+  organizationScope: string,
   clientId: string,
 ) {
   const { organization } =
-    await requirePermission(
+    await requireMutationPermission(
       "clients.archive",
-    );
+    organizationScope,
+  );
   const idResult =
     clientIdSchema.safeParse(clientId);
 
@@ -314,11 +318,13 @@ export async function archiveClient(
 }
 
 export async function restoreClient(
+  organizationScope: string,
   clientId: string,
 ) {
   const { organization } =
-  await requirePermission(
+  await requireMutationPermission(
     "clients.archive",
+    organizationScope,
   );
   const idResult =
     clientIdSchema.safeParse(clientId);

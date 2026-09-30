@@ -18,7 +18,7 @@ import {
   companies,
 } from "@/db/schema";
 import {
-  requirePermission,
+  requireMutationPermission,
 } from "@/lib/auth/permissions";
 import {
   companyIdSchema,
@@ -94,8 +94,9 @@ export async function createCompany(
     organization,
     member,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "companies.create",
+    formData,
   );
 
   const values =
@@ -305,8 +306,9 @@ export async function updateCompany(
     organization,
     member,
     permissions,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "companies.update",
+    formData,
   );
 
   const idResult =
@@ -632,12 +634,14 @@ export async function updateCompany(
 }
 
 export async function archiveCompany(
+  organizationScope: string,
   companyId: string,
 ) {
   const {
     organization,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "companies.archive",
+    organizationScope,
   );
 
   const idResult =
@@ -698,6 +702,7 @@ export async function archiveCompany(
 }
 
 export async function restoreCompany(
+  organizationScope: string,
   companyId: string,
   destination:
     | "detail"
@@ -705,8 +710,9 @@ export async function restoreCompany(
 ) {
   const {
     organization,
-  } = await requirePermission(
+  } = await requireMutationPermission(
     "companies.archive",
+    organizationScope,
   );
 
   const idResult =
