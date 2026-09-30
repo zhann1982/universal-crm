@@ -1,3 +1,4 @@
+import { user } from "./auth-schema";
 import {
   boolean,
   date,
@@ -1728,3 +1729,13 @@ export const tasks =
       ),
     ],
   );
+// Durable idempotency for organization onboarding; keys are scoped to the creator.
+export const organizationCreations = pgTable("organization_creations", {
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  requestId: uuid("request_id").notNull(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.requestId] }),
+  uniqueIndex("organization_creations_organization_unique").on(table.organizationId),
+]);

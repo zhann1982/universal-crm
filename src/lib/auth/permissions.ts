@@ -15,40 +15,8 @@ import {
 
 import { getCurrentMember } from "./current-member";
 
-export type PermissionKey =
-  | "clients.read"
-  | "clients.create"
-  | "clients.update"
-  | "clients.archive"
-  | "clients.delete"
-  | "companies.read"
-  | "companies.create"
-  | "companies.update"
-  | "companies.archive"
-  | "companies.delete"
-  | "deals.read"
-  | "deals.create"
-  | "deals.update"
-  | "deals.archive"
-  | "deals.delete"
-  | "tasks.read"
-  | "tasks.create"
-  | "tasks.update"
-  | "tasks.archive"
-  | "tasks.delete"
-  | "comments.read"
-  | "comments.create"
-  | "comments.update"
-  | "comments.archive"
-  | "comments.manage"
-  | "activity.read"
-  | "pipelines.read"
-  | "pipelines.manage"
-  | "members.read"
-  | "members.manage"
-  | "roles.read"
-  | "roles.manage"
-  | "settings.manage";
+export type { PermissionKey } from "@/modules/access/permission-catalog";
+import type { PermissionKey } from "@/modules/access/permission-catalog";
 
 export async function getCurrentAccessContext() {
   const current =

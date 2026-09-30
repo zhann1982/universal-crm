@@ -107,7 +107,10 @@ An invalid selection never silently falls back to another tenant.
 All CRM writes must include the rendered organization scope and use `requireMutationPermission`.
 Forms use `OrganizationForm`; imperative actions use `useOrganizationId`.
 The server compares this untrusted scope against its authorized selection before any mutation.
-Organization provisioning UI remains a separate feature.
+Organization provisioning is implemented (D051): any verified User can create an Organization
+through `/organizations/new`, becoming its initial Owner. Atomic provisioning supplies four
+system Roles, Permission bindings and a default Pipeline with six Stages. A per-user request UUID
+makes form retries idempotent. Colleagues still join through verified one-time invitations.
 
 Shared tenant-access module:
 
@@ -185,7 +188,8 @@ Current email identity lookup:
 
 Decision `D047` is implemented for the core authorization flow.
 
-Membership onboarding uses a verified one-time invitation.
+Membership onboarding for colleagues uses a verified one-time invitation; the initial creator
+becomes Owner through the atomic Organization provisioning operation (D051).
 
 Invitation stores/binds:
 

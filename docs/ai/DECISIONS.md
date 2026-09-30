@@ -676,3 +676,36 @@ the chooser. Provisioning a new Organization remains a separate workflow.
 Tests cover active memberships, multiple choices, forged/malformed selection, revocation,
 inactive Organizations, scope mismatch and server-rendered form fields. Multi-tab browser
 verification remains necessary; these tests do not claim full end-to-end coverage.
+
+
+## D051 — Verified self-service Organization creation is atomic and idempotent
+
+Date: 2026-09-30
+
+Any verified User may create an Organization. No existing tenant Membership is required.
+This operation bootstraps only the creator's Owner Membership; normal colleague onboarding
+continues through verified invitations. The User ID comes from the server session; the mutation
+rechecks email_verified in PostgreSQL and reads the creator's name/email from the auth table.
+Browser-supplied user IDs, emails and roles are never accepted.
+
+Organization, four system Roles, Permission bindings, Owner Membership/assignment, default Pipeline,
+six Stages and the durable request mapping commit in one Neon HTTP transaction. A data-modifying
+CTE handles provisioning. Failure rolls everything back; no compensating cleanup is needed.
+Permission keys and initial Roles/Stages share a catalog with the development seed. New tenants
+receive only catalogued permissions; arbitrary pre-existing global permission keys are not granted.
+Existing global Permission labels and existing tenant Roles are not overwritten by onboarding.
+
+Migration 0012 adds organization_creations with (user_id, request_id) as primary key, a unique
+organization_id, and foreign keys to the auth User and Organization. The form keeps its UUID and
+name on a recoverable error. A separate advisory-lock statement serializes the per-user request
+before the READ COMMITTED provisioning snapshot. Retrying a committed request returns the same
+Organization only while it and the creator's Membership remain active. It never recreates Member
+access or reassigns Owner. A fresh form/request represents a separate intended Organization.
+
+After creation the verified tenant preference is selected and CRM opens. Generated opaque slugs
+avoid name collisions and do not expose user-selected routing/identity fields.
+
+Isolated PGlite tests execute all migrations and production transaction SQL, covering defaults,
+auth identity, unverified/missing users, retries, separate creators, revoked access, changed roles,
+validation and fault-injected full rollback. This does not claim live multi-session Neon concurrency
+or end-to-end browser coverage. Apply the migration before using this feature in a deployed app.

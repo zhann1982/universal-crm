@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D050`
+`D051`
 
 ---
 
@@ -620,10 +620,10 @@ Current stabilization priorities:
 
 Tasks, collaborative Comments and Task Activity Stage 2 already exist.
 Do not recreate these modules. Task/Schedule/Activity atomic persistence is implemented (D049).
-Prioritize safe Organization provisioning and browser/multi-session tenant verification next.
+Organization provisioning is implemented (D051). Prioritize browser/multi-session tenant verification next.
 
 The user targets multiple independent companies. Membership-based selection is implemented.
-Organization provisioning and browser cross-tenant workflow verification remain open.
+Browser cross-tenant workflow verification remains open; do not recreate Organization provisioning.
 
 Then: Activity for Client/Company/Deal → Pipeline management → saved views → custom fields
 → automation → read-first AI.
@@ -645,3 +645,17 @@ Bulk operations are atomic per Task, not across the entire selection.
 The normal test suite includes isolated PGlite PostgreSQL rollback/migration tests.
 It does not need DATABASE_URL secrets; real multi-session Neon tests remain separate.
 Historical archive installers are not the source of truth and must not overwrite current source files.
+
+
+## Organization provisioning
+
+D051: verified users create their own Organizations through `/organizations/new`.
+This initial Owner bootstrap is separate from invitation-based onboarding of colleagues.
+Use `src/modules/organizations/create-organization.ts`; never create the Organization,
+Owner, Roles, Permission bindings and initial Pipeline in separate requests.
+The operation rechecks the verified auth User in PostgreSQL and derives identity there.
+The request UUID is an idempotency key scoped to that authenticated User, not an access token.
+Serialize it with a transaction advisory lock in a separate statement before the READ COMMITTED
+creation statement. Replay must never restore revoked Membership, Organization access or Owner roles.
+Shared Permission/Role/Stage defaults also serve the development seed; do not duplicate them.
+Migration `0012_long_cammi.sql` is required. Never run the development seed for production onboarding.

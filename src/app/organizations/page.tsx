@@ -2,6 +2,7 @@ import { requireVerifiedSession } from "@/lib/auth/verified-session";
 import { listAccessibleOrganizations } from "@/modules/access/organization-selection";
 import { LogoutButton } from "@/app/crm/logout-button";
 import { selectOrganization } from "./actions";
+import Link from "next/link";
 
 export default async function OrganizationsPage({ searchParams }: {
   searchParams: Promise<{ reason?: string; joined?: string }>;
@@ -24,7 +25,7 @@ export default async function OrganizationsPage({ searchParams }: {
       </p>}
       {query.joined === "1" && <p className="mt-5 text-sm text-emerald-700">Приглашение принято. Выберите организацию для работы.</p>}
       {organizations.length === 0 ? <p className="mt-6 text-slate-600">
-        У вас пока нет доступа к активным организациям. Попросите администратора прислать приглашение на ваш email.
+        У вас пока нет доступа к активным организациям. Создайте свою или попросите администратора прислать приглашение на ваш email.
       </p> : <div className="mt-6 space-y-3">
         {organizations.map((organization) => <form key={organization.id} action={selectOrganization}>
           <input type="hidden" name="organizationId" value={organization.id} />
@@ -33,6 +34,7 @@ export default async function OrganizationsPage({ searchParams }: {
           </button>
         </form>)}
       </div>}
+      <Link href="/organizations/new" className="mt-6 inline-block rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white">Создать организацию</Link>
     </section>
   </main>;
 }

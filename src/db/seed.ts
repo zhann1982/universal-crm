@@ -1,3 +1,5 @@
+import { PERMISSIONS } from "@/modules/access/permission-catalog";
+import { DEFAULT_ROLES, DEFAULT_STAGES } from "@/modules/organizations/defaults";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "./index";
@@ -12,140 +14,6 @@ import {
   roles,
 } from "./schema";
 
-const PERMISSIONS = [
-  {
-    key: "clients.read",
-    name: "Просмотр клиентов",
-  },
-  {
-    key: "clients.create",
-    name: "Создание клиентов",
-  },
-  {
-    key: "clients.update",
-    name: "Изменение клиентов",
-  },
-  {
-    key: "clients.archive",
-    name: "Архивация клиентов",
-  },
-  {
-    key: "clients.delete",
-    name: "Удаление клиентов",
-  },
-  {
-    key: "companies.read",
-    name: "Просмотр компаний",
-  },
-  {
-    key: "companies.create",
-    name: "Создание компаний",
-  },
-  {
-    key: "companies.update",
-    name: "Изменение компаний",
-  },
-  {
-    key: "companies.archive",
-    name: "Архивация компаний",
-  },
-  {
-    key: "companies.delete",
-    name: "Удаление компаний",
-  },
-  {
-    key: "deals.read",
-    name: "Просмотр сделок",
-  },
-  {
-    key: "deals.create",
-    name: "Создание сделок",
-  },
-  {
-    key: "deals.update",
-    name: "Изменение сделок",
-  },
-  {
-    key: "deals.archive",
-    name: "Архивация сделок",
-  },
-  {
-    key: "deals.delete",
-    name: "Удаление сделок",
-  },
-    {
-    key: "tasks.read",
-    name: "Просмотр задач",
-  },
-  {
-    key: "tasks.create",
-    name: "Создание задач",
-  },
-  {
-    key: "tasks.update",
-    name: "Изменение задач",
-  },
-  {
-    key: "tasks.archive",
-    name: "Архивация задач",
-  },
-  {
-    key: "tasks.delete",
-    name: "Удаление задач",
-  },
-  {
-    key: "comments.read",
-    name: "РџСЂРѕСЃРјРѕС‚СЂ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ",
-  },
-  {
-    key: "comments.create",
-    name: "РЎРѕР·РґР°РЅРёРµ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ",
-  },
-  {
-    key: "comments.update",
-    name: "РР·РјРµРЅРµРЅРёРµ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ",
-  },
-  {
-    key: "comments.archive",
-    name: "РђСЂС…РёРІР°С†РёСЏ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ",
-  },
-  {
-    key: "comments.manage",
-    name: "РЈРїСЂР°РІР»РµРЅРёРµ С‡СѓР¶РёРјРё РєРѕРјРјРµРЅС‚Р°СЂРёСЏРјРё",
-  },
-  {
-    key: "activity.read",
-    name: "РџСЂРѕСЃРјРѕС‚СЂ РёСЃС‚РѕСЂРёРё CRM",
-  },
-  {
-    key: "pipelines.read",
-    name: "Просмотр воронок",
-  },
-  {
-    key: "pipelines.manage",
-    name: "Управление воронками",
-  },
-  {
-    key: "members.read",
-    name: "Просмотр сотрудников",
-  },
-  {
-    key: "members.manage",
-    name: "Управление сотрудниками",
-  },
-  {
-    key: "roles.read",
-    name: "Просмотр ролей",
-  },
-  {
-    key: "roles.manage",
-    name: "Управление ролями",
-  },
-  {
-    key: "settings.manage",
-    name: "Управление настройками",
-  },
-] as const;
 
 async function main() {
   console.log("Starting seed...");
@@ -226,86 +94,7 @@ async function main() {
   // Roles
   // --------------------------------------------------
 
-  const roleDefinitions = [
-    {
-      name: "Owner",
-      systemKey: "owner",
-      description:
-        "Полный доступ к организации",
-
-      permissions:
-        PERMISSIONS.map(
-          (item) => item.key,
-        ),
-    },
-
-    {
-      name: "Admin",
-      systemKey: "admin",
-      description:
-        "Администрирование CRM",
-
-      permissions:
-        PERMISSIONS.map(
-          (item) => item.key,
-        ),
-    },
-
-    {
-      name: "Manager",
-      systemKey: "manager",
-      description:
-        "Работа с клиентами",
-
-      permissions: [
-        "clients.read",
-        "clients.create",
-        "clients.update",
-        "clients.archive",
-
-        "companies.read",
-        "companies.create",
-        "companies.update",
-        "companies.archive",
-
-        "deals.read",
-        "deals.create",
-        "deals.update",
-        "deals.archive",
-
-        "tasks.read",
-        "tasks.create",
-        "tasks.update",
-        "tasks.archive",
-        "comments.read",
-        "comments.create",
-        "comments.update",
-        "comments.archive",
-        "activity.read",
-
-
-        "pipelines.read",
-      ],
-    },
-
-    {
-      name: "Viewer",
-      systemKey: "viewer",
-      description:
-        "Только просмотр",
-
-      permissions: [
-        "clients.read",
-        "companies.read",
-        "deals.read",
-        "tasks.read",
-        "comments.read",
-        "activity.read",
-
-        "pipelines.read",
-      ],
-    },
-  ] as const;
+  const roleDefinitions = DEFAULT_ROLES;
 
   const roleMap =
     new Map<string, string>();
@@ -497,44 +286,7 @@ async function main() {
     );
   }
 
-  const defaultStages = [
-    {
-      name: "Новая",
-      type: "open",
-      position: 10,
-      probability: 10,
-    },
-    {
-      name: "Квалификация",
-      type: "open",
-      position: 20,
-      probability: 25,
-    },
-    {
-      name: "Предложение",
-      type: "open",
-      position: 30,
-      probability: 50,
-    },
-    {
-      name: "Переговоры",
-      type: "open",
-      position: 40,
-      probability: 75,
-    },
-    {
-      name: "Выиграна",
-      type: "won",
-      position: 50,
-      probability: 100,
-    },
-    {
-      name: "Проиграна",
-      type: "lost",
-      position: 60,
-      probability: 0,
-    },
-  ] as const;
+  const defaultStages = DEFAULT_STAGES;
 
   for (
     const stage of

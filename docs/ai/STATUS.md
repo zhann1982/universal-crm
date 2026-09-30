@@ -4,7 +4,7 @@ Last updated: 2026-09-30
 
 ## Current development update — 2026-09-30
 
-Baseline: main includes atomic Task/Schedule/Activity persistence (`b397f3a`).
+Baseline: main includes Organization selection and mutation scope checks (`d0cdbce`).
 
 Organization selection:
 - `/organizations` lists only the verified user's active memberships in active Organizations.
@@ -17,16 +17,26 @@ Organization selection:
 - Old forms after a tenant switch are rejected before writes. The client scope is compared against the server-authorized context; it never grants access.
 - Invitation acceptance opens the chooser; it does not leave the user in an unrelated previously selected tenant.
 
-Verification: 86 tests passed, including PGlite membership/selection/revocation tests and server-rendered
-form scope tests. Next type generation, TypeScript, ESLint and production build passed.
-Build used dummy configuration and did not connect to the working database.
-Browser multi-tab workflows and live multi-session Neon tests remain outstanding.
-No schema migration is required.
+Organization provisioning (D051):
+- `/organizations/new` is available to verified users, including those with no Membership yet.
+- Creation atomically adds Organization, Owner/Admin/Manager/Viewer roles, permission bindings,
+  creator Membership/Owner assignment, default Pipeline and six Stages.
+- The creator identity is read from the verified auth User; browser identity/role fields are not used.
+- Durable per-user request keys and a separate transaction lock make retries idempotent.
+- Replay does not restore revoked access or reassign Owner after a role change.
+- The form retains its name/request key after recoverable errors; successful creation opens CRM.
+- Shared permission/role/stage defaults serve onboarding and the development seed.
+- Migration `0012_long_cammi.sql` is required (`npm run db:migrate`). It was verified in isolated PGlite;
+  it has not been applied to the working/deployed database by this task.
 
-Organization self-service creation/provisioning is not implemented. Membership and Organization records
-must already exist (invitation acceptance creates membership using the existing verified flow).
-Next: safe Organization provisioning with system roles/permissions, browser cross-tenant workflows,
-stronger database constraints, structured history and pagination.
+Verification: 95 tests passed, including isolated PGlite onboarding, rollback, identity and retry tests.
+TypeScript, ESLint and production build passed. The build used dummy configuration and did not
+connect to the working database. Existing organization-selection tests remain in the normal suite.
+Browser onboarding/multi-tab workflows and live multi-session Neon tests remain outstanding.
+
+Next: browser cross-tenant/onboarding workflows, stronger database constraints, structured history
+and pagination. Organization provisioning exists; do not recreate it or use the development seed
+as a production onboarding mechanism.
 
 The later historical verification sections describe the earlier stabilization baseline.
 
@@ -599,7 +609,7 @@ Priority:
 After sufficient stabilization:
 
 Task/Activity reliability
-→ Organization provisioning and browser tenant workflow tests
+→ Organization onboarding and browser tenant workflow verification
 → Activity rollout to other CRM entities
 → Pipeline management
 → direct Deal contacts
