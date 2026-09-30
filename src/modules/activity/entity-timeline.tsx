@@ -370,6 +370,18 @@ export async function EntityTimeline({
                         </div>
                       )}
 
+                    {event.eventType !==
+                      "comment.created" &&
+                      event.eventType !==
+                        "comment.updated" &&
+                      event.details && (
+                        <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                          <span className="whitespace-pre-wrap">
+                            {event.details}
+                          </span>
+                        </div>
+                      )}
+
                     {isCommentCreated &&
                       currentComment && (
                         <div className="mt-3 flex flex-wrap items-start gap-3 border-t border-slate-100 pt-3">
@@ -426,7 +438,7 @@ export async function EntityTimeline({
           </div>
         ) : (
           <p className="mt-6 text-sm text-slate-400">
-            История пока пуста. Первое событие появится после добавления комментария.
+            История пока пуста. События появятся после изменений записи или добавления комментария.
           </p>
         )
       ) : canReadComments ? (

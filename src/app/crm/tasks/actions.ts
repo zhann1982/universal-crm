@@ -45,6 +45,16 @@ import {
   shouldCreateNextOccurrence,
 } from "@/modules/tasks/recurrence";
 
+import {
+  recordActivityEvents,
+} from "@/modules/activity/record-activity";
+import {
+  buildBulkTaskEvent,
+  buildTaskCreatedEvents,
+  buildTaskLifecycleEvent,
+  buildTaskUpdateEvents,
+} from "@/modules/activity/task-activity";
+
 function getFormValues(
   formData: FormData,
   fallback?: {
@@ -528,6 +538,26 @@ export async function createTask(
             : createdTask.id,
         recurrenceSequence: 1,
       });
+
+    await recordActivityEvents({
+      organizationId:
+        organization.id,
+      entityType: "task",
+      entityId:
+        createdTask.id,
+      actorMemberId:
+        member.id,
+      events:
+        buildTaskCreatedEvents({
+          status: data.status,
+          priority:
+            data.priority,
+          reminderAt:
+            data.reminderAt,
+          recurrenceFrequency:
+            data.recurrenceFrequency,
+        }),
+    });
   } catch (error) {
     console.error(
       "Failed to create task:",
@@ -634,8 +664,13 @@ export async function updateTask(
           tasks.companyId,
         dealId:
           tasks.dealId,
+        title: tasks.title,
+        description:
+          tasks.description,
         status:
           tasks.status,
+        priority:
+          tasks.priority,
         dueAt:
           tasks.dueAt,
         completedAt:
@@ -1039,6 +1074,83 @@ export async function updateTask(
         },
       });
 
+    await recordActivityEvents({
+      organizationId:
+        organization.id,
+      entityType: "task",
+      entityId:
+        existingTask.id,
+      actorMemberId:
+        member.id,
+      events: buildTaskUpdateEvents({
+        previous: {
+          title:
+            existingTask.title,
+          description:
+            existingTask.description,
+          status:
+            existingTask.status,
+          priority:
+            existingTask.priority,
+          ownerMemberId:
+            existingTask.ownerMemberId,
+          dueAt:
+            existingTask.dueAt,
+          clientId:
+            existingTask.clientId,
+          companyId:
+            existingTask.companyId,
+          dealId:
+            existingTask.dealId,
+        },
+        next: {
+          title: data.title,
+          description:
+            data.description,
+          status: data.status,
+          priority:
+            data.priority,
+          ownerMemberId:
+            data.ownerMemberId,
+          dueAt: data.dueAt,
+          clientId:
+            data.clientId,
+          companyId:
+            data.companyId,
+          dealId: data.dealId,
+        },
+        previousSchedule:
+          existingSchedule
+            ? {
+                reminderAt:
+                  existingSchedule.reminderAt,
+                recurrenceFrequency:
+                  existingSchedule.recurrenceFrequency,
+                recurrenceInterval:
+                  existingSchedule.recurrenceInterval,
+                recurrenceEndAt:
+                  existingSchedule.recurrenceEndAt,
+              }
+            : null,
+        nextSchedule: {
+          reminderAt:
+            data.reminderAt,
+          recurrenceFrequency:
+            data.recurrenceFrequency,
+          recurrenceInterval:
+            data.recurrenceFrequency ===
+            "none"
+              ? 1
+              : data.recurrenceInterval,
+          recurrenceEndAt:
+            data.recurrenceFrequency ===
+            "none"
+              ? null
+              : data.recurrenceEndAt,
+        },
+      }),
+    });
+
     if (
       existingTask.status !==
         "completed" &&
@@ -1050,6 +1162,8 @@ export async function updateTask(
           organization.id,
         taskId:
           existingTask.id,
+        actorMemberId:
+          member.id,
       });
     }
   } catch (error) {
@@ -1087,7 +1201,7 @@ export async function updateTask(
 export async function completeTask(
   formData: FormData,
 ) {
-  const { organization } =
+  const { organization, member } =
     await requirePermission(
       "tasks.update",
     );
@@ -1158,11 +1272,27 @@ export async function completeTask(
     );
   }
 
+  await recordActivityEvents({
+    organizationId:
+      organization.id,
+    entityType: "task",
+    entityId: updated.id,
+    actorMemberId:
+      member.id,
+    events: [
+      buildTaskLifecycleEvent(
+        "complete",
+      ),
+    ],
+  });
+
   await createNextRecurringOccurrence({
     organizationId:
       organization.id,
     taskId:
       updated.id,
+    actorMemberId:
+      member.id,
   });
 
   revalidateTaskPaths(
@@ -1178,7 +1308,7 @@ export async function completeTask(
 export async function reopenTask(
   formData: FormData,
 ) {
-  const { organization } =
+  const { organization, member } =
     await requirePermission(
       "tasks.update",
     );
@@ -1249,6 +1379,21 @@ export async function reopenTask(
     );
   }
 
+  await recordActivityEvents({
+    organizationId:
+      organization.id,
+    entityType: "task",
+    entityId:
+      updated.id,
+    actorMemberId:
+      member.id,
+    events: [
+      buildTaskLifecycleEvent(
+        "reopen",
+      ),
+    ],
+  });
+
   revalidateTaskPaths(
     updated.id,
   );
@@ -1262,7 +1407,7 @@ export async function reopenTask(
 export async function archiveTask(
   formData: FormData,
 ) {
-  const { organization } =
+  const { organization, member } =
     await requirePermission(
       "tasks.archive",
     );
@@ -1327,6 +1472,21 @@ export async function archiveTask(
     );
   }
 
+  await recordActivityEvents({
+    organizationId:
+      organization.id,
+    entityType: "task",
+    entityId:
+      archived.id,
+    actorMemberId:
+      member.id,
+    events: [
+      buildTaskLifecycleEvent(
+        "archive",
+      ),
+    ],
+  });
+
   revalidateTaskPaths(
     archived.id,
   );
@@ -1340,7 +1500,7 @@ export async function archiveTask(
 export async function restoreTask(
   formData: FormData,
 ) {
-  const { organization } =
+  const { organization, member } =
     await requirePermission(
       "tasks.archive",
     );
@@ -1407,6 +1567,21 @@ export async function restoreTask(
     );
   }
 
+  await recordActivityEvents({
+    organizationId:
+      organization.id,
+    entityType: "task",
+    entityId:
+      restored.id,
+    actorMemberId:
+      member.id,
+    events: [
+      buildTaskLifecycleEvent(
+        "restore",
+      ),
+    ],
+  });
+
   revalidateTaskPaths(
     restored.id,
   );
@@ -1451,6 +1626,7 @@ export async function bulkTaskAction(
 
   const {
     organization,
+    member,
   } = await requirePermission(
     needsArchivePermission
       ? "tasks.archive"
@@ -1692,12 +1868,31 @@ export async function bulkTaskAction(
       continue;
     }
 
+    const activityEvent =
+      buildBulkTaskEvent(action);
+
+    if (activityEvent) {
+      await recordActivityEvents({
+        organizationId:
+          organization.id,
+        entityType: "task",
+        entityId: updatedId,
+        actorMemberId:
+          member.id,
+        events: [
+          activityEvent,
+        ],
+      });
+    }
+
     if (action === "complete") {
       await createNextRecurringOccurrence({
         organizationId:
           organization.id,
         taskId:
           updatedId,
+        actorMemberId:
+          member.id,
       });
     }
 
@@ -1721,7 +1916,7 @@ export async function bulkTaskAction(
 export async function dismissTaskReminder(
   formData: FormData,
 ) {
-  const { organization } =
+  const { organization, member } =
     await requirePermission(
       "tasks.update",
     );
@@ -1793,6 +1988,21 @@ export async function dismissTaskReminder(
     );
   }
 
+  await recordActivityEvents({
+    organizationId:
+      organization.id,
+    entityType: "task",
+    entityId:
+      updated.taskId,
+    actorMemberId:
+      member.id,
+    events: [
+      buildTaskLifecycleEvent(
+        "reminder_dismissed",
+      ),
+    ],
+  });
+
   revalidateTaskPaths(
     updated.taskId,
   );
@@ -1803,9 +2013,11 @@ export async function dismissTaskReminder(
 async function createNextRecurringOccurrence({
   organizationId,
   taskId,
+  actorMemberId,
 }: {
   organizationId: string;
   taskId: string;
+  actorMemberId: string | null;
 }) {
   const [source] =
     await db
@@ -1980,6 +2192,36 @@ async function createNextRecurringOccurrence({
           source.recurrenceSequence +
           1,
       });
+
+    await recordActivityEvents({
+      organizationId,
+      entityType: "task",
+      entityId: nextTask.id,
+      actorMemberId,
+      events: [
+        {
+          eventType: "task.created",
+          summary: "Создана повторяющаяся задача",
+          details:
+            `Элемент серии №${source.recurrenceSequence + 1}`,
+        },
+      ],
+    });
+
+    await recordActivityEvents({
+      organizationId,
+      entityType: "task",
+      entityId: source.taskId,
+      actorMemberId,
+      events: [
+        {
+          eventType:
+            "task.recurrence_next_created",
+          summary:
+            "Создана следующая задача серии",
+        },
+      ],
+    });
 
     revalidateTaskPaths(
       nextTask.id,
