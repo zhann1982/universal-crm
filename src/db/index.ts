@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import * as crmSchema from "./schema";
 import * as authSchema from "./auth-schema";
 import * as taskSchedulingSchema from "./task-scheduling-schema";
+import * as activitySchema from "./activity-schema";
 
 const databaseUrl =
   process.env.DATABASE_URL;
@@ -29,6 +30,7 @@ const schema = {
   ...crmSchema,
   ...authSchema,
   ...taskSchedulingSchema,
+  ...activitySchema,
 };
 
 export const db = drizzle(sql, {

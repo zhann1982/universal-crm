@@ -16,6 +16,7 @@ export default defineConfig({
     "./src/db/schema.ts",
     "./src/db/auth-schema.ts",
     "./src/db/task-scheduling-schema.ts",
+    "./src/db/activity-schema.ts",
   ],
 
   out: "./drizzle",

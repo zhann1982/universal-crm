@@ -1,3 +1,4 @@
+import { EntityTimeline } from "@/modules/activity/entity-timeline";
 import {
   and,
   eq,
@@ -793,6 +794,11 @@ export default async function TaskPage({
           </section>
         </aside>
       </div>
+      <EntityTimeline
+        entityType="task"
+        entityId={task.id}
+        entityArchived={task.isArchived}
+      />
     </div>
   );
 }

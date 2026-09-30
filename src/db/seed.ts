@@ -94,6 +94,30 @@ const PERMISSIONS = [
     name: "Удаление задач",
   },
   {
+    key: "comments.read",
+    name: "РџСЂРѕСЃРјРѕС‚СЂ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ",
+  },
+  {
+    key: "comments.create",
+    name: "РЎРѕР·РґР°РЅРёРµ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ",
+  },
+  {
+    key: "comments.update",
+    name: "РР·РјРµРЅРµРЅРёРµ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ",
+  },
+  {
+    key: "comments.archive",
+    name: "РђСЂС…РёРІР°С†РёСЏ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ",
+  },
+  {
+    key: "comments.manage",
+    name: "РЈРїСЂР°РІР»РµРЅРёРµ С‡СѓР¶РёРјРё РєРѕРјРјРµРЅС‚Р°СЂРёСЏРјРё",
+  },
+  {
+    key: "activity.read",
+    name: "РџСЂРѕСЃРјРѕС‚СЂ РёСЃС‚РѕСЂРёРё CRM",
+  },
+  {
     key: "pipelines.read",
     name: "Просмотр воронок",
   },
@@ -253,6 +277,12 @@ async function main() {
         "tasks.create",
         "tasks.update",
         "tasks.archive",
+        "comments.read",
+        "comments.create",
+        "comments.update",
+        "comments.archive",
+        "activity.read",
+
 
         "pipelines.read",
       ],
@@ -269,6 +299,9 @@ async function main() {
         "companies.read",
         "deals.read",
         "tasks.read",
+        "comments.read",
+        "activity.read",
+
         "pipelines.read",
       ],
     },
