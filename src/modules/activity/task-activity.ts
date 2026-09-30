@@ -1,6 +1,6 @@
 import type {
   ActivityEventDraft,
-} from "./record-activity";
+} from "./event-draft";
 
 const STATUS_LABELS: Record<string, string> = {
   todo: "К выполнению",

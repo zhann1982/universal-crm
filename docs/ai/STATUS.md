@@ -4,23 +4,30 @@ Last updated: 2026-09-30
 
 ## Current development update — 2026-09-30
 
-Published baseline: GitHub main `9569de6` contains Tasks, scheduling, comments and Task Activity Stage 2.
-The previous verification sections below describe the earlier stabilization baseline, not a new database/build run.
+Baseline: main includes Task Activity Stage 2 and Activity permission hardening (`e801e93`).
 
-Current branch changes:
-- Timeline SQL excludes comment events without `comments.read`, including events whose comment FK is null.
-- Member display names are not queried without `members.read`.
-- Comment archive/restore checks and locks a writable tenant parent in the same statement as the versioned comment update and activity event.
-- Archived parents disable comment controls even if an older caller passes `entityArchived=false`.
+Task persistence stabilization:
+- Create/full edit save Task, Schedule and Activity in one SQL statement.
+- Task and schedule versions are checked before edits; an unchanged reminder preserves dismissal.
+- Completion and next recurring Task/Schedule/history commit or roll back together.
+- Individual and bulk completion share one operation; reopening/recompletion reuses an existing successor.
+- Status, archive/restore and reminder dismissal write their event atomically.
+- Bulk operations remain independent per Task, not one all-or-nothing batch.
+- Creating an already completed Task sets completedAt and handles recurrence.
+- Removed the unused best-effort event writer and partial-save UI message.
 
-Current verification: 62 unit/query-regression tests passed; Next type generation, TypeScript and ESLint passed.
-The new tests intercept database transport and verify SQL/permission behavior; they do not execute PostgreSQL or prove concurrent runtime behavior.
-Database integration, browser checks and production build were not rerun for this update.
+Verification: 76 tests passed, including production SQL executed in isolated PGlite PostgreSQL
+with all repository migrations, fault injection and rollback checks. Next type generation,
+TypeScript and ESLint passed. PGlite tests run in the ordinary CI suite without external DB secrets.
+PGlite is single-connection; this does not replace multi-session Neon concurrency or browser tests.
+Production build and the existing external-database integration suite were not rerun.
+No schema migration is needed for these changes.
 
-Product direction confirmed by the user: multiple independent companies (Organizations).
-Still open: atomic Task + Schedule + Activity writes, reliable recurrence, structured history,
-comment create/update parent-archive races, history pagination, database constraints,
-Organization selection/onboarding and cross-organization workflow coverage.
+User target: multiple independent companies. Next: Membership-validated Organization selection,
+stronger tenant database constraints, Neon concurrency tests, comment create/update parent-archive
+protection, structured old/new activity values and timeline pagination.
+
+The later historical verification sections describe the earlier stabilization baseline.
 
 ---
 

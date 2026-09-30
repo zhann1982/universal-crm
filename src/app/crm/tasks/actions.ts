@@ -1,11 +1,13 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { changeTaskState, dismissReminder, type TaskStateAction } from "@/modules/tasks/change-task-state";
+import { saveTask, completeTaskRecord } from "@/modules/tasks/save-task";
+
 import {
   and,
   eq,
   isNull,
-  ne,
-  sql,
 } from "drizzle-orm";
 import {
   revalidatePath,
@@ -39,19 +41,9 @@ import {
 import {
   resolveOwnerAssignment,
 } from "@/modules/members/owner-assignment";
-import {
-  getNextRecurrenceDueAt,
-  getNextReminderAt,
-  shouldCreateNextOccurrence,
-} from "@/modules/tasks/recurrence";
 
 import {
-  recordActivityEvents,
-} from "@/modules/activity/record-activity";
-import {
-  buildBulkTaskEvent,
   buildTaskCreatedEvents,
-  buildTaskLifecycleEvent,
   buildTaskUpdateEvents,
 } from "@/modules/activity/task-activity";
 
@@ -462,137 +454,22 @@ export async function createTask(
     };
   }
 
-  let createdTaskId:
-    | string
-    | null = null;
-
   try {
-    const [createdTask] =
-      await db
-        .insert(tasks)
-        .values({
-          organizationId:
-            organization.id,
-          ownerMemberId:
-            data.ownerMemberId,
-          createdByMemberId:
-            member.id,
-          clientId:
-            data.clientId,
-          companyId:
-            data.companyId,
-          dealId:
-            data.dealId,
-          title:
-            data.title,
-          description:
-            data.description,
-          status:
-            data.status,
-          priority:
-            data.priority,
-          dueAt:
-            data.dueAt,
-          completedAt: null,
-        })
-        .returning({
-          id: tasks.id,
-        });
-
-    if (!createdTask) {
-      throw new Error(
-        "Task insert returned no row",
-      );
-    }
-
-    createdTaskId =
-      createdTask.id;
-
-    await db
-      .insert(taskSchedules)
-      .values({
-        taskId:
-          createdTask.id,
-        organizationId:
-          organization.id,
-        reminderAt:
-          data.reminderAt,
-        reminderDismissedAt:
-          null,
-        recurrenceFrequency:
-          data.recurrenceFrequency,
-        recurrenceInterval:
-          data.recurrenceFrequency ===
-          "none"
-            ? 1
-            : data.recurrenceInterval,
-        recurrenceEndAt:
-          data.recurrenceFrequency ===
-          "none"
-            ? null
-            : data.recurrenceEndAt,
-        recurrenceSeriesId:
-          data.recurrenceFrequency ===
-          "none"
-            ? null
-            : createdTask.id,
-        recurrenceSequence: 1,
-      });
-
-    await recordActivityEvents({
-      organizationId:
-        organization.id,
-      entityType: "task",
-      entityId:
-        createdTask.id,
-      actorMemberId:
-        member.id,
-      events:
-        buildTaskCreatedEvents({
-          status: data.status,
-          priority:
-            data.priority,
-          reminderAt:
-            data.reminderAt,
-          recurrenceFrequency:
-            data.recurrenceFrequency,
-        }),
+    const created = await saveTask({
+      taskId: randomUUID(),
+      organizationId: organization.id,
+      actorMemberId: member.id,
+      expectedVersion: null,
+      expectedScheduleVersion: null,
+      task: data,
+      schedule: { ...data, recurrenceSeriesId: null, recurrenceSequence: 1 },
+      events: buildTaskCreatedEvents(data),
+      createNextOccurrence: data.status === "completed",
     });
+    if (!created) throw new Error("Task insert returned no row");
   } catch (error) {
-    console.error(
-      "Failed to create task:",
-      error,
-    );
-
-    if (createdTaskId) {
-      try {
-        await db
-          .delete(tasks)
-          .where(
-            and(
-              eq(
-                tasks.id,
-                createdTaskId,
-              ),
-              eq(
-                tasks.organizationId,
-                organization.id,
-              ),
-            ),
-          );
-      } catch (cleanupError) {
-        console.error(
-          "Failed to clean up task after schedule error:",
-          cleanupError,
-        );
-      }
-    }
-
-    return {
-      values,
-      message:
-        "Не удалось создать задачу. Попробуйте ещё раз.",
-    };
+    console.error("Failed to create task:", error);
+    return { values, message: "Не удалось создать задачу. Попробуйте ещё раз." };
   }
 
   revalidatePath("/crm");
@@ -724,6 +601,7 @@ export async function updateTask(
   const [existingSchedule] =
     await db
       .select({
+        version: taskSchedules.version,
         reminderAt:
           taskSchedules.reminderAt,
         reminderDismissedAt:
@@ -912,176 +790,19 @@ export async function updateTask(
     };
   }
 
-  const completedAt =
-    data.status === "completed"
-      ? existingTask.status ===
-          "completed" &&
-        existingTask.completedAt
-        ? existingTask.completedAt
-        : new Date()
-      : null;
-
-  let taskUpdateSucceeded =
-    false;
-
   try {
-    const updated =
-      await db
-        .update(tasks)
-        .set({
-          ownerMemberId:
-            data.ownerMemberId,
-          clientId:
-            data.clientId,
-          companyId:
-            data.companyId,
-          dealId:
-            data.dealId,
-          title:
-            data.title,
-          description:
-            data.description,
-          status:
-            data.status,
-          priority:
-            data.priority,
-          dueAt:
-            data.dueAt,
-          completedAt,
-          version:
-            sql`${tasks.version} + 1`,
-          updatedAt:
-            new Date(),
-        })
-        .where(
-          and(
-            eq(
-              tasks.id,
-              existingTask.id,
-            ),
-            eq(
-              tasks.organizationId,
-              organization.id,
-            ),
-            eq(
-              tasks.version,
-              versionResult.data,
-            ),
-            eq(
-              tasks.isArchived,
-              false,
-            ),
-            isNull(
-              tasks.deletedAt,
-            ),
-          ),
-        )
-        .returning({
-          id: tasks.id,
-        });
-
-    if (updated.length === 0) {
-      return {
-        values,
-        message:
-          "Задача была изменена другим действием. Обновите страницу и повторите попытку.",
-      };
-    }
-
-    taskUpdateSucceeded =
-      true;
-
-    const reminderChanged =
-      (existingSchedule?.reminderAt?.getTime() ??
-        null) !==
-      (data.reminderAt?.getTime() ??
-        null);
-
-    const recurrenceEnabled =
-      data.recurrenceFrequency !==
-      "none";
-
-    await db
-      .insert(taskSchedules)
-      .values({
-        taskId:
-          existingTask.id,
-        organizationId:
-          organization.id,
-        reminderAt:
-          data.reminderAt,
-        reminderDismissedAt:
-          reminderChanged
-            ? null
-            : existingSchedule?.reminderDismissedAt ??
-              null,
-        recurrenceFrequency:
-          data.recurrenceFrequency,
-        recurrenceInterval:
-          recurrenceEnabled
-            ? data.recurrenceInterval
-            : 1,
-        recurrenceEndAt:
-          recurrenceEnabled
-            ? data.recurrenceEndAt
-            : null,
-        recurrenceSeriesId:
-          recurrenceEnabled
-            ? existingSchedule?.recurrenceSeriesId ??
-              existingTask.id
-            : null,
-        recurrenceSequence:
-          recurrenceEnabled
-            ? existingSchedule?.recurrenceSequence ??
-              1
-            : 1,
-      })
-      .onConflictDoUpdate({
-        target:
-          taskSchedules.taskId,
-        set: {
-          reminderAt:
-            data.reminderAt,
-          reminderDismissedAt:
-            reminderChanged
-              ? null
-              : existingSchedule?.reminderDismissedAt ??
-                null,
-          recurrenceFrequency:
-            data.recurrenceFrequency,
-          recurrenceInterval:
-            recurrenceEnabled
-              ? data.recurrenceInterval
-              : 1,
-          recurrenceEndAt:
-            recurrenceEnabled
-              ? data.recurrenceEndAt
-              : null,
-          recurrenceSeriesId:
-            recurrenceEnabled
-              ? existingSchedule?.recurrenceSeriesId ??
-                existingTask.id
-              : null,
-          recurrenceSequence:
-            recurrenceEnabled
-              ? existingSchedule?.recurrenceSequence ??
-                1
-              : 1,
-          version:
-            sql`${taskSchedules.version} + 1`,
-          updatedAt:
-            new Date(),
-        },
-      });
-
-    await recordActivityEvents({
-      organizationId:
-        organization.id,
-      entityType: "task",
-      entityId:
-        existingTask.id,
-      actorMemberId:
-        member.id,
+    const updated = await saveTask({
+      taskId: existingTask.id,
+      organizationId: organization.id,
+      actorMemberId: member.id,
+      expectedVersion: versionResult.data,
+      expectedScheduleVersion: existingSchedule?.version ?? null,
+      task: data,
+      schedule: {
+        ...data,
+        recurrenceSeriesId: existingSchedule?.recurrenceSeriesId ?? null,
+        recurrenceSequence: existingSchedule?.recurrenceSequence ?? 1,
+      },
       events: buildTaskUpdateEvents({
         previous: {
           title:
@@ -1149,38 +870,17 @@ export async function updateTask(
               : data.recurrenceEndAt,
         },
       }),
+      createNextOccurrence: existingTask.status !== "completed" && data.status === "completed",
     });
-
-    if (
-      existingTask.status !==
-        "completed" &&
-      data.status ===
-        "completed"
-    ) {
-      await createNextRecurringOccurrence({
-        organizationId:
-          organization.id,
-        taskId:
-          existingTask.id,
-        actorMemberId:
-          member.id,
-      });
+    if (!updated) {
+      return { values, message: "Задача или её расписание были изменены. Обновите страницу и повторите попытку." };
     }
+    if (updated.nextTaskId) revalidateTaskPaths(updated.nextTaskId);
   } catch (error) {
     console.error(
       "Failed to update task:",
       error,
     );
-
-    if (taskUpdateSucceeded) {
-      revalidateTaskPaths(
-        existingTask.id,
-      );
-
-      redirect(
-        `/crm/tasks/${existingTask.id}?error=schedule-save`,
-      );
-    }
 
     return {
       values,
@@ -1218,48 +918,12 @@ export async function completeTask(
   const returnTo =
     getTaskReturnTo(formData);
 
-  const [updated] =
-    await db
-      .update(tasks)
-      .set({
-        status: "completed",
-        completedAt:
-          new Date(),
-        version:
-          sql`${tasks.version} + 1`,
-        updatedAt:
-          new Date(),
-      })
-      .where(
-        and(
-          eq(
-            tasks.id,
-            parsed.taskId,
-          ),
-          eq(
-            tasks.organizationId,
-            organization.id,
-          ),
-          eq(
-            tasks.version,
-            parsed.version,
-          ),
-          ne(
-            tasks.status,
-            "completed",
-          ),
-          eq(
-            tasks.isArchived,
-            false,
-          ),
-          isNull(
-            tasks.deletedAt,
-          ),
-        ),
-      )
-      .returning({
-        id: tasks.id,
-      });
+  const updated = await completeTaskRecord({
+    taskId: parsed.taskId,
+    organizationId: organization.id,
+    actorMemberId: member.id,
+    expectedVersion: parsed.version,
+  });
 
   if (!updated) {
     redirect(
@@ -1272,28 +936,7 @@ export async function completeTask(
     );
   }
 
-  await recordActivityEvents({
-    organizationId:
-      organization.id,
-    entityType: "task",
-    entityId: updated.id,
-    actorMemberId:
-      member.id,
-    events: [
-      buildTaskLifecycleEvent(
-        "complete",
-      ),
-    ],
-  });
-
-  await createNextRecurringOccurrence({
-    organizationId:
-      organization.id,
-    taskId:
-      updated.id,
-    actorMemberId:
-      member.id,
-  });
+  if (updated.nextTaskId) revalidateTaskPaths(updated.nextTaskId);
 
   revalidateTaskPaths(
     updated.id,
@@ -1325,48 +968,10 @@ export async function reopenTask(
   const returnTo =
     getTaskReturnTo(formData);
 
-  const [updated] =
-    await db
-      .update(tasks)
-      .set({
-        status:
-          "in_progress",
-        completedAt: null,
-        version:
-          sql`${tasks.version} + 1`,
-        updatedAt:
-          new Date(),
-      })
-      .where(
-        and(
-          eq(
-            tasks.id,
-            parsed.taskId,
-          ),
-          eq(
-            tasks.organizationId,
-            organization.id,
-          ),
-          eq(
-            tasks.version,
-            parsed.version,
-          ),
-          eq(
-            tasks.status,
-            "completed",
-          ),
-          eq(
-            tasks.isArchived,
-            false,
-          ),
-          isNull(
-            tasks.deletedAt,
-          ),
-        ),
-      )
-      .returning({
-        id: tasks.id,
-      });
+  const updated = await changeTaskState({
+    taskId: parsed.taskId, organizationId: organization.id,
+    actorMemberId: member.id, expectedVersion: parsed.version, action: "reopen",
+  });
 
   if (!updated) {
     redirect(
@@ -1378,21 +983,6 @@ export async function reopenTask(
         : `/crm/tasks/${parsed.taskId}?error=conflict`,
     );
   }
-
-  await recordActivityEvents({
-    organizationId:
-      organization.id,
-    entityType: "task",
-    entityId:
-      updated.id,
-    actorMemberId:
-      member.id,
-    events: [
-      buildTaskLifecycleEvent(
-        "reopen",
-      ),
-    ],
-  });
 
   revalidateTaskPaths(
     updated.id,
@@ -1424,42 +1014,10 @@ export async function archiveTask(
   const returnTo =
     getTaskReturnTo(formData);
 
-  const [archived] =
-    await db
-      .update(tasks)
-      .set({
-        isArchived: true,
-        version:
-          sql`${tasks.version} + 1`,
-        updatedAt:
-          new Date(),
-      })
-      .where(
-        and(
-          eq(
-            tasks.id,
-            parsed.taskId,
-          ),
-          eq(
-            tasks.organizationId,
-            organization.id,
-          ),
-          eq(
-            tasks.version,
-            parsed.version,
-          ),
-          eq(
-            tasks.isArchived,
-            false,
-          ),
-          isNull(
-            tasks.deletedAt,
-          ),
-        ),
-      )
-      .returning({
-        id: tasks.id,
-      });
+  const archived = await changeTaskState({
+    taskId: parsed.taskId, organizationId: organization.id,
+    actorMemberId: member.id, expectedVersion: parsed.version, action: "archive",
+  });
 
   if (!archived) {
     redirect(
@@ -1471,21 +1029,6 @@ export async function archiveTask(
         : `/crm/tasks/${parsed.taskId}?error=conflict`,
     );
   }
-
-  await recordActivityEvents({
-    organizationId:
-      organization.id,
-    entityType: "task",
-    entityId:
-      archived.id,
-    actorMemberId:
-      member.id,
-    events: [
-      buildTaskLifecycleEvent(
-        "archive",
-      ),
-    ],
-  });
 
   revalidateTaskPaths(
     archived.id,
@@ -1519,42 +1062,10 @@ export async function restoreTask(
   const returnTo =
     getTaskReturnTo(formData);
 
-  const [restored] =
-    await db
-      .update(tasks)
-      .set({
-        isArchived: false,
-        version:
-          sql`${tasks.version} + 1`,
-        updatedAt:
-          new Date(),
-      })
-      .where(
-        and(
-          eq(
-            tasks.id,
-            parsed.taskId,
-          ),
-          eq(
-            tasks.organizationId,
-            organization.id,
-          ),
-          eq(
-            tasks.version,
-            parsed.version,
-          ),
-          eq(
-            tasks.isArchived,
-            true,
-          ),
-          isNull(
-            tasks.deletedAt,
-          ),
-        ),
-      )
-      .returning({
-        id: tasks.id,
-      });
+  const restored = await changeTaskState({
+    taskId: parsed.taskId, organizationId: organization.id,
+    actorMemberId: member.id, expectedVersion: parsed.version, action: "restore",
+  });
 
   if (!restored) {
     redirect(
@@ -1566,21 +1077,6 @@ export async function restoreTask(
         : `/crm/tasks/${parsed.taskId}?error=conflict`,
     );
   }
-
-  await recordActivityEvents({
-    organizationId:
-      organization.id,
-    entityType: "task",
-    entityId:
-      restored.id,
-    actorMemberId:
-      member.id,
-    events: [
-      buildTaskLifecycleEvent(
-        "restore",
-      ),
-    ],
-  });
 
   revalidateTaskPaths(
     restored.id,
@@ -1689,211 +1185,27 @@ export async function bulkTaskAction(
       continue;
     }
 
-    const now =
-      new Date();
-
-    const lifecycleCondition =
-      action === "restore"
-        ? eq(
-            tasks.isArchived,
-            true,
-          )
-        : eq(
-            tasks.isArchived,
-            false,
-          );
-
-    const whereCondition =
-      and(
-        eq(
-          tasks.id,
-          taskId,
-        ),
-        eq(
-          tasks.organizationId,
-          organization.id,
-        ),
-        eq(
-          tasks.version,
-          versionResult.data,
-        ),
-        lifecycleCondition,
-        isNull(
-          tasks.deletedAt,
-        ),
-      );
-
-    let updatedId:
-      | string
-      | null = null;
-
-    if (
-      action === "todo"
-    ) {
-      const [updated] =
-        await db
-          .update(tasks)
-          .set({
-            status: "todo",
-            completedAt: null,
-            version:
-              sql`${tasks.version} + 1`,
-            updatedAt: now,
-          })
-          .where(
-            whereCondition,
-          )
-          .returning({
-            id: tasks.id,
-          });
-
-      updatedId =
-        updated?.id ?? null;
-    } else if (
-      action ===
-      "in_progress"
-    ) {
-      const [updated] =
-        await db
-          .update(tasks)
-          .set({
-            status:
-              "in_progress",
-            completedAt: null,
-            version:
-              sql`${tasks.version} + 1`,
-            updatedAt: now,
-          })
-          .where(
-            whereCondition,
-          )
-          .returning({
-            id: tasks.id,
-          });
-
-      updatedId =
-        updated?.id ?? null;
-    } else if (
-      action === "complete"
-    ) {
-      const [updated] =
-        await db
-          .update(tasks)
-          .set({
-            status:
-              "completed",
-            completedAt: now,
-            version:
-              sql`${tasks.version} + 1`,
-            updatedAt: now,
-          })
-          .where(
-            whereCondition,
-          )
-          .returning({
-            id: tasks.id,
-          });
-
-      updatedId =
-        updated?.id ?? null;
-    } else if (
-      action === "cancel"
-    ) {
-      const [updated] =
-        await db
-          .update(tasks)
-          .set({
-            status:
-              "cancelled",
-            completedAt: null,
-            version:
-              sql`${tasks.version} + 1`,
-            updatedAt: now,
-          })
-          .where(
-            whereCondition,
-          )
-          .returning({
-            id: tasks.id,
-          });
-
-      updatedId =
-        updated?.id ?? null;
-    } else if (
-      action === "archive"
-    ) {
-      const [updated] =
-        await db
-          .update(tasks)
-          .set({
-            isArchived: true,
-            version:
-              sql`${tasks.version} + 1`,
-            updatedAt: now,
-          })
-          .where(
-            whereCondition,
-          )
-          .returning({
-            id: tasks.id,
-          });
-
-      updatedId =
-        updated?.id ?? null;
-    } else if (
-      action === "restore"
-    ) {
-      const [updated] =
-        await db
-          .update(tasks)
-          .set({
-            isArchived: false,
-            version:
-              sql`${tasks.version} + 1`,
-            updatedAt: now,
-          })
-          .where(
-            whereCondition,
-          )
-          .returning({
-            id: tasks.id,
-          });
-
-      updatedId =
-        updated?.id ?? null;
+    if (action === "complete") {
+      const result = await completeTaskRecord({
+        taskId, organizationId: organization.id, actorMemberId: member.id,
+        expectedVersion: versionResult.data,
+      });
+      if (!result) { conflictCount += 1; continue; }
+      updatedCount += 1;
+      revalidateTaskPaths(result.id);
+      if (result.nextTaskId) revalidateTaskPaths(result.nextTaskId);
+      continue;
     }
+
+    const result = await changeTaskState({
+      taskId, organizationId: organization.id, actorMemberId: member.id,
+      expectedVersion: versionResult.data, action: action as TaskStateAction,
+    });
+    const updatedId = result?.id;
 
     if (!updatedId) {
       conflictCount += 1;
       continue;
-    }
-
-    const activityEvent =
-      buildBulkTaskEvent(action);
-
-    if (activityEvent) {
-      await recordActivityEvents({
-        organizationId:
-          organization.id,
-        entityType: "task",
-        entityId: updatedId,
-        actorMemberId:
-          member.id,
-        events: [
-          activityEvent,
-        ],
-      });
-    }
-
-    if (action === "complete") {
-      await createNextRecurringOccurrence({
-        organizationId:
-          organization.id,
-        taskId:
-          updatedId,
-        actorMemberId:
-          member.id,
-      });
     }
 
     updatedCount += 1;
@@ -1944,40 +1256,10 @@ export async function dismissTaskReminder(
     redirect(returnTo);
   }
 
-  const [updated] =
-    await db
-      .update(taskSchedules)
-      .set({
-        reminderDismissedAt:
-          new Date(),
-        version:
-          sql`${taskSchedules.version} + 1`,
-        updatedAt:
-          new Date(),
-      })
-      .where(
-        and(
-          eq(
-            taskSchedules.taskId,
-            idResult.data,
-          ),
-          eq(
-            taskSchedules.organizationId,
-            organization.id,
-          ),
-          eq(
-            taskSchedules.version,
-            versionResult.data,
-          ),
-          isNull(
-            taskSchedules.reminderDismissedAt,
-          ),
-        ),
-      )
-      .returning({
-        taskId:
-          taskSchedules.taskId,
-      });
+  const updated = await dismissReminder({
+    taskId: idResult.data, organizationId: organization.id,
+    actorMemberId: member.id, expectedVersion: versionResult.data,
+  });
 
   if (!updated) {
     redirect(
@@ -1988,274 +1270,11 @@ export async function dismissTaskReminder(
     );
   }
 
-  await recordActivityEvents({
-    organizationId:
-      organization.id,
-    entityType: "task",
-    entityId:
-      updated.taskId,
-    actorMemberId:
-      member.id,
-    events: [
-      buildTaskLifecycleEvent(
-        "reminder_dismissed",
-      ),
-    ],
-  });
-
   revalidateTaskPaths(
     updated.taskId,
   );
 
   redirect(returnTo);
-}
-
-async function createNextRecurringOccurrence({
-  organizationId,
-  taskId,
-  actorMemberId,
-}: {
-  organizationId: string;
-  taskId: string;
-  actorMemberId: string | null;
-}) {
-  const [source] =
-    await db
-      .select({
-        taskId: tasks.id,
-        ownerMemberId:
-          tasks.ownerMemberId,
-        createdByMemberId:
-          tasks.createdByMemberId,
-        clientId:
-          tasks.clientId,
-        companyId:
-          tasks.companyId,
-        dealId:
-          tasks.dealId,
-        title: tasks.title,
-        description:
-          tasks.description,
-        priority:
-          tasks.priority,
-        dueAt: tasks.dueAt,
-        recurrenceFrequency:
-          taskSchedules.recurrenceFrequency,
-        recurrenceInterval:
-          taskSchedules.recurrenceInterval,
-        recurrenceEndAt:
-          taskSchedules.recurrenceEndAt,
-        recurrenceSeriesId:
-          taskSchedules.recurrenceSeriesId,
-        recurrenceSequence:
-          taskSchedules.recurrenceSequence,
-        reminderAt:
-          taskSchedules.reminderAt,
-      })
-      .from(tasks)
-      .innerJoin(
-        taskSchedules,
-        and(
-          eq(
-            taskSchedules.taskId,
-            tasks.id,
-          ),
-          eq(
-            taskSchedules.organizationId,
-            tasks.organizationId,
-          ),
-        ),
-      )
-      .where(
-        and(
-          eq(
-            tasks.id,
-            taskId,
-          ),
-          eq(
-            tasks.organizationId,
-            organizationId,
-          ),
-          eq(
-            tasks.status,
-            "completed",
-          ),
-          isNull(
-            tasks.deletedAt,
-          ),
-        ),
-      )
-      .limit(1);
-
-  if (
-    !source ||
-    !source.dueAt ||
-    source.recurrenceFrequency ===
-      "none"
-  ) {
-    return;
-  }
-
-  const nextDueAt =
-    getNextRecurrenceDueAt({
-      dueAt: source.dueAt,
-      frequency:
-        source.recurrenceFrequency as
-          | "daily"
-          | "weekly"
-          | "monthly"
-          | "yearly",
-      interval:
-        source.recurrenceInterval,
-    });
-
-  if (
-    !shouldCreateNextOccurrence({
-      nextDueAt,
-      recurrenceEndAt:
-        source.recurrenceEndAt,
-    }) ||
-    !nextDueAt
-  ) {
-    return;
-  }
-
-  const nextReminderAt =
-    getNextReminderAt({
-      dueAt: source.dueAt,
-      reminderAt:
-        source.reminderAt,
-      nextDueAt,
-    });
-
-  let nextTaskId:
-    | string
-    | null = null;
-
-  try {
-    const [nextTask] =
-      await db
-        .insert(tasks)
-        .values({
-          organizationId,
-          ownerMemberId:
-            source.ownerMemberId,
-          createdByMemberId:
-            source.createdByMemberId,
-          clientId:
-            source.clientId,
-          companyId:
-            source.companyId,
-          dealId:
-            source.dealId,
-          title:
-            source.title,
-          description:
-            source.description,
-          status: "todo",
-          priority:
-            source.priority,
-          dueAt:
-            nextDueAt,
-          completedAt: null,
-        })
-        .returning({
-          id: tasks.id,
-        });
-
-    if (!nextTask) {
-      return;
-    }
-
-    nextTaskId = nextTask.id;
-
-    await db
-      .insert(taskSchedules)
-      .values({
-        taskId:
-          nextTask.id,
-        organizationId,
-        reminderAt:
-          nextReminderAt,
-        reminderDismissedAt:
-          null,
-        recurrenceFrequency:
-          source.recurrenceFrequency,
-        recurrenceInterval:
-          source.recurrenceInterval,
-        recurrenceEndAt:
-          source.recurrenceEndAt,
-        recurrenceSeriesId:
-          source.recurrenceSeriesId ??
-          source.taskId,
-        recurrenceSequence:
-          source.recurrenceSequence +
-          1,
-      });
-
-    await recordActivityEvents({
-      organizationId,
-      entityType: "task",
-      entityId: nextTask.id,
-      actorMemberId,
-      events: [
-        {
-          eventType: "task.created",
-          summary: "Создана повторяющаяся задача",
-          details:
-            `Элемент серии №${source.recurrenceSequence + 1}`,
-        },
-      ],
-    });
-
-    await recordActivityEvents({
-      organizationId,
-      entityType: "task",
-      entityId: source.taskId,
-      actorMemberId,
-      events: [
-        {
-          eventType:
-            "task.recurrence_next_created",
-          summary:
-            "Создана следующая задача серии",
-        },
-      ],
-    });
-
-    revalidateTaskPaths(
-      nextTask.id,
-    );
-  } catch (error) {
-    console.error(
-      "Failed to create next recurring task:",
-      error,
-    );
-
-    if (nextTaskId) {
-      try {
-        await db
-          .delete(tasks)
-          .where(
-            and(
-              eq(
-                tasks.id,
-                nextTaskId,
-              ),
-              eq(
-                tasks.organizationId,
-                organizationId,
-              ),
-            ),
-          );
-      } catch (cleanupError) {
-        console.error(
-          "Failed to clean up recurring task:",
-          cleanupError,
-        );
-      }
-    }
-  }
 }
 
 function getTaskReturnTo(

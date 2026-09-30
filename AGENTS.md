@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D048`
+`D049`
 
 ---
 
@@ -616,7 +616,8 @@ Current stabilization priorities:
 6. production invitation email delivery/admin UX
 
 Tasks, collaborative Comments and Task Activity Stage 2 already exist.
-Do not recreate these modules. Stabilize atomic Task/Schedule/Activity persistence first.
+Do not recreate these modules. Task/Schedule/Activity atomic persistence is implemented (D049).
+Prioritize Organization selection and multi-session tenant/concurrency verification next.
 
 The user targets multiple independent companies. Replace the fixed development tenant with
 server-validated active Membership selection and cross-tenant workflow tests before production.
@@ -630,3 +631,14 @@ Decision D048: `activity.read` never grants access to comment contents.
 Exclude comment events in SQL without `comments.read`, including events with a null comment FK.
 Do not query Member display names without `members.read`.
 Comment archive/restore must validate a writable tenant parent inside the mutation statement.
+
+## Task persistence
+
+D049: use `src/modules/tasks/save-task.ts` and `change-task-state.ts` for Task mutations.
+Do not write Task, Schedule and Activity in separate calls or reintroduce best-effort event logging.
+Completion, its successor and their events form one operation. Preserve optimistic Task/Schedule versions.
+Bulk operations are atomic per Task, not across the entire selection.
+
+The normal test suite includes isolated PGlite PostgreSQL rollback/migration tests.
+It does not need DATABASE_URL secrets; real multi-session Neon tests remain separate.
+Historical archive installers are not the source of truth and must not overwrite current source files.

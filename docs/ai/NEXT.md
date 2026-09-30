@@ -8,7 +8,7 @@ Tasks and Task Activity Stage 2 are already published in `9569de6`; do not recre
 User priority: multiple independent companies.
 
 1. Verify Activity access/archived-parent hardening against an isolated PostgreSQL database and browser workflows.
-2. Make Task + Schedule + Activity writes atomic, including version checks and reliable recurring task creation.
+2. Task + Schedule + Activity atomic writes and recurrence are implemented; follow up with multi-session Neon concurrency and browser verification. Do not recreate the persistence layer.
 3. Replace fixed `development` organization selection with validated active Membership-based selection; test two-company workflows and stale forms across tenant switches.
 4. Strengthen database tenant constraints and introduce dedicated integration CI.
 5. Roll Activity out to Client / Company / Deal using the stabilized event model.
@@ -261,7 +261,8 @@ Not every long-term production feature must be complete.
 # Existing Tasks / Activity foundation
 
 Tasks already include CRM links, owners, filters, pagination, bulk actions, reminders and recurrence.
-Comments and task history are implemented. Existing scheduling and event writes require stabilization before further expansion.
+Task writes and their events now share atomic SQL operations. PGlite tests verify rollback and stale versions.
+Comments and task history exist; structured history values and pagination remain open.
 
 ---
 

@@ -629,3 +629,26 @@ Creation/update parent locking and atomic Task history remain separate follow-up
 
 Query regressions cover permission combinations and mutation predicates. PostgreSQL concurrency
 verification is still required; query-level tests must not be described as integration coverage.
+
+
+## D049 — Task persistence and history commit together
+
+Date: 2026-09-30
+
+Task create/edit, completion with recurrence, lifecycle and reminder dismissal use focused,
+parameterized PostgreSQL statements with data-modifying CTEs. This works over Neon HTTP
+without interactive transactions. Errors propagate; no compensating hard-delete or best-effort
+history writer is used. A failed schedule/event/successor write rolls back the whole statement.
+
+Full edits lock the Task and existing Schedule, checking the expected versions before writing.
+The expected Schedule version is read by the action, while the Task version comes from the form.
+Reminder dismissal uses the same parent-first lock order and preserves the Task version.
+An unchanged reminder retains dismissal; a changed reminder resets it.
+
+Single and bulk completion share the same operation. An existing next series sequence is reused
+rather than duplicated when a Task is reopened and completed again. The existing unique series
+index remains the final conflict guard. Bulk atomicity is per Task, not across the selection.
+
+The same SQL runs in PGlite tests using all checked-in migrations. Fault-injection tests cover
+rollback of task, schedule, successor and event writes. This enables isolated CI verification,
+but is not proof of multi-session Neon concurrency behavior; those tests remain necessary.

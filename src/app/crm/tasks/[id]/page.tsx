@@ -546,12 +546,6 @@ export default async function TaskPage({
         </div>
       )}
 
-      {error === "schedule-save" && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Основные данные задачи сохранены, но настройки напоминания или повтора сохранить не удалось. Откройте редактирование и повторите сохранение планирования.
-        </div>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

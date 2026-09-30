@@ -531,7 +531,8 @@ Integration tests remain local until a dedicated non-production PostgreSQL CI en
 
 Implemented: lifecycle and optimistic versions, owner assignment, Client/Company/Deal links,
 filters and pagination, bulk actions, reminders and recurring schedules.
-Task, schedule and event writes are not yet one atomic operation; recurrence recovery remains open.
+Task, schedule and event writes share one atomic SQL statement. Completion includes the next recurrence.
+Lifecycle and reminder writes also persist their events atomically. Bulk actions are atomic per Task.
 
 ---
 
@@ -539,7 +540,7 @@ Task, schedule and event writes are not yet one atomic operation; recurrence rec
 
 Entity description fields remain separate from collaborative comments.
 Comments and activity tables exist. Task detail renders the timeline; Stage 2 records task changes.
-Event logging is currently best-effort and many changes lack structured old/new values.
+Task event logging is atomic with its mutation; many changes still lack structured old/new values.
 
 Activity permission does not grant comment content access. Timeline queries must enforce
 both entity access and the content permission. Member directory data needs `members.read`.
