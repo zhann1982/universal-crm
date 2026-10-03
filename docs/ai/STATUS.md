@@ -1,5 +1,17 @@
 # Universal CRM — Current Status
 
+## Presentation update — 2026-10-03
+
+CRM now uses reference-inspired styling: charcoal navigation with decorative SVG icons,
+compact white header, flat colored dashboard metrics, compact panels, tables and form controls.
+The stylesheet is scoped to `.crm-shell`; CRM pages retain their existing data, destinations,
+permission gates and mutation forms. Only CSS and presentation markup changed. Mobile navigation
+uses a horizontally scrollable row; dashboard metrics use two columns on narrow screens.
+
+Verification: 95 tests passed; TypeScript, ESLint and production build passed.
+Build used placeholder database/auth configuration. Authenticated browser visual comparison
+and mobile workflow verification have not been performed; exact pixel parity is not claimed.
+
 Last updated: 2026-09-30
 
 ## Current development update — 2026-09-30

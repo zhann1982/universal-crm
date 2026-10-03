@@ -1,0 +1,173 @@
+/* Reference-inspired CRM presentation. Scoped to the authenticated CRM shell. */
+.crm-shell {
+  --crm-accent: #2785a5;
+  background: #f7f7f7;
+  color: #444;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.crm-shell > .flex { min-height: 100vh; }
+.crm-shell aside {
+  width: 205px;
+  background: #333;
+  color: #ddd;
+  border: 0;
+}
+.crm-shell aside > div:first-child { padding: 18px 18px 22px; border-color: #464646; }
+.crm-brand { color: #2da9ce; font-size: 21px; letter-spacing: -.6px; }
+.crm-brand strong { color: #b2c727; font-style: italic; }
+.crm-shell aside > div:first-child .text-xs { color: #bbb; margin-top: 8px; overflow-wrap: anywhere; }
+.crm-shell aside > a {
+  margin: 14px 10px;
+  padding: 7px 10px;
+  border: 1px solid #525252;
+  background: #454545;
+  color: #ddd;
+  border-radius: 0;
+  font-size: 12px;
+}
+.crm-shell aside > a:hover { background: #505050; }
+.crm-shell nav { padding: 0; }
+.crm-shell nav > :is(a, div) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 15px;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 400;
+}
+.crm-shell nav > a { color: #e0e0e0; border-left: 3px solid transparent; }
+.crm-shell nav > a:hover { background: #454545; color: #fff; border-left-color: #00b9d8; }
+.crm-shell nav > div { color: #909090; }
+.crm-nav-icon { width: 15px; height: 15px; flex-shrink: 0; }
+.crm-shell header {
+  min-height: 45px;
+  padding: 8px 20px;
+  gap: 12px;
+  border-color: #eee;
+  background: #fff;
+}
+.crm-shell header > .font-medium { font-weight: 400; font-size: 14px; }
+.crm-shell header .text-sm { font-size: 12px; }
+.crm-shell header .text-xs { font-size: 11px; }
+.crm-shell main { padding: 18px 15px 30px; }
+.crm-shell main h1 { font-size: 23px; font-weight: 400; line-height: 1.3; }
+.crm-shell main h2 { font-size: 18px; font-weight: 400; }
+.crm-shell main h3 { font-size: 15px; }
+.crm-shell main :is(.text-slate-500, .text-slate-400) { color: #777; }
+.crm-shell main :is(.rounded-xl, .rounded-2xl, .rounded-lg, .rounded-md) { border-radius: 2px; }
+.crm-shell main :is(.shadow-sm, .shadow) { box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+.crm-shell main :is(.border-slate-200, .border-slate-100) { border-color: #e5e5e5; }
+.crm-shell main .bg-slate-50 { background-color: #fafafa; }
+.crm-shell main :is(section, .bg-white).p-6 { padding: 15px; }
+.crm-shell main .mb-8 { margin-bottom: 18px; }
+.crm-shell main .mt-8 { margin-top: 18px; }
+.crm-shell main .gap-6 { gap: 18px; }
+.crm-shell main .text-sm { font-size: 12px; }
+.crm-shell main a:not([class*="bg-"]):hover { color: #247c9b; }
+.crm-shell main :is(input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-radius: 2px;
+  border-color: #d8d8d8;
+  background-color: #fff;
+  font-size: 13px;
+  color: #444;
+}
+.crm-shell :is(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid #2785a5;
+  outline-offset: 3px;
+}
+.crm-shell main :is(button, a)[class*="bg-slate-950"],
+.crm-shell main :is(button, a)[class*="bg-blue-600"] {
+  background-color: #2588ab;
+  color: #fff;
+  border-radius: 2px;
+}
+.crm-shell main :is(button, a)[class*="bg-slate-950"]:hover,
+.crm-shell main :is(button, a)[class*="bg-blue-600"]:hover { background-color: #1d7190; }
+.crm-shell main table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.crm-shell main thead { background: #fff; }
+.crm-shell main th { color: #555; font-weight: 600; text-align: left; border-bottom: 2px solid #ddd; }
+.crm-shell main :is(th, td) { padding: 9px 10px; }
+.crm-shell main td { border-bottom: 1px solid #e7e7e7; }
+.crm-shell main tbody tr:hover { background: #fafafa; }
+.crm-shell main td a { color: #2785a5; }
+
+/* Keep existing metrics and destinations; only change their visual hierarchy. */
+.crm-metrics { gap: 22px; }
+.crm-metrics > :is(a, div) {
+  --metric-color: #ed6654;
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  min-height: 120px;
+  padding: 12px 12px 32px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 1px;
+  background: var(--metric-color);
+  color: #fff;
+  box-shadow: none;
+}
+.crm-metrics > :nth-child(4n + 2) { --metric-color: #00b8d8; }
+.crm-shell main .crm-metrics > .p-6 { padding: 12px 12px 32px; }
+.crm-metrics > :nth-child(4n + 3) { --metric-color: #f39b09; }
+.crm-metrics > :nth-child(4n + 4) { --metric-color: #00a65a; }
+.crm-metrics > :is(a, div)::before {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 25px;
+  width: 10px;
+  height: 44px;
+  background: rgb(0 0 0 / 12%);
+  box-shadow: -16px 12px 0 rgb(0 0 0 / 12%), 16px 6px 0 rgb(0 0 0 / 12%);
+  pointer-events: none;
+}
+.crm-metrics > :is(a, div)::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 23px;
+  background: rgb(0 0 0 / 10%);
+  pointer-events: none;
+}
+.crm-metrics > a::after { content: "Открыть →"; text-align: center; font-size: 11px; line-height: 23px; }
+.crm-metrics > :is(a, div) > .text-sm { color: #fff; font-size: 13px; }
+.crm-metrics > :is(a, div) > .text-2xl {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 3px;
+  font-size: 30px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.crm-metrics > :is(a, div):hover { color: #fff; box-shadow: none; }
+.crm-metrics > a:hover { filter: brightness(.96); }
+.crm-dashboard > section { border-color: #eee; }
+
+@media (max-width: 1000px) {
+  .crm-shell aside { width: 180px; }
+  .crm-metrics { gap: 15px; }
+}
+@media (max-width: 640px) {
+  .crm-shell > .flex { flex-direction: column; }
+  .crm-shell aside { width: 100%; }
+  .crm-shell aside > div:first-child { padding: 10px 15px; }
+  .crm-shell aside > div:first-child .text-xs { margin-top: 2px; }
+  .crm-shell aside > a { margin: 8px 15px; }
+  .crm-shell nav { display: flex; overflow-x: auto; padding-bottom: 4px; }
+  .crm-shell nav > :is(a, div) { flex-shrink: 0; padding: 10px 12px; gap: 6px; }
+  .crm-shell header { padding: 8px 12px; }
+  .crm-shell header > .font-medium { display: none; }
+  .crm-shell header > .flex { width: 100%; justify-content: space-between; }
+  .crm-shell header .text-right { text-align: left; }
+  .crm-shell main { padding: 15px 10px 25px; }
+  .crm-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .crm-metrics > :is(a, div) { min-height: 115px; }
+  .crm-metrics > :is(a, div) > .text-2xl { font-size: 24px; }
+}

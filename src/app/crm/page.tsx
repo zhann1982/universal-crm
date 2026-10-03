@@ -409,7 +409,7 @@ export default async function CrmDashboardPage() {
   const now = new Date();
 
   return (
-    <div>
+    <div className="crm-dashboard">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">
           Dashboard
@@ -420,7 +420,7 @@ export default async function CrmDashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <div className="crm-metrics grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {cards.map(
           (card) => {
             const content = (
