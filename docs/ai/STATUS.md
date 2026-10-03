@@ -1,5 +1,38 @@
 # Universal CRM — Current Status
 
+## Personal saved views — 2026-10-03
+
+D055 adds "Мои представления" to Client/Company lists and the Deal board. Users can name
+and save applied filters, open them by a link, archive and restore their personal views.
+Views are scoped to current Organization + Membership + entity; underlying read permissions
+and rendered mutation scope are enforced server-side. No shared views, editing/renaming,
+default selection or saved column/sort settings are implemented yet.
+
+Deal filters now include title, all/mine/unassigned ownership, open/won/lost state and
+close-date (all/overdue/next seven days/none). Client/Company filters keep their existing
+search/status/active-archive semantics. Page numbers are not saved. Archived or unavailable
+Pipeline links are disabled. Filters never store arbitrary URLs, tenant IDs or query expressions.
+
+Migration 0015 adds versioned personal saved_views, tenant Membership FK, validation checks,
+active-name uniqueness and lookup index. Production SQL serializes the 50-active-view limit
+and lifecycle with advisory locking. Reads bound active/history lists separately to 50 each.
+The Deal board now avoids querying hidden Company/Member names in SQL.
+
+Verification: 167 tests passed, TypeScript, ESLint and production build passed. Nine added
+isolated PostgreSQL tests cover production persistence SQL, identity/tenant/version boundaries,
+duplicate/limit rollback, canonical filters, Deal predicates and related-data query visibility.
+Migration 0015 was applied to connected Neon; all 16 migration hashes match, and there are
+zero saved-view Membership tenant mismatches. No seed or business record edits were performed.
+
+Browser checks under the existing verified Owner session confirmed Pipeline list/detail rendering,
+Organization switching between Development CRM and Secondary Corp, and stale Pipeline form
+rejection with context-changed feedback. Original Organization selection was restored.
+The Deal filter reduced four records to one; saving "Мои открытые сделки" and reopening its
+link restored the matching filters/result. Archive and restore of this view also passed through
+the browser UI. This useful personal preference remains in the Owner's Development CRM account.
+Full multi-role E2E, onboarding retries, Deal conflict browser tests,
+real multi-session configuration/limit races and scale checks remain open.
+
 ## Pipeline management — 2026-10-03
 
 Following the user's product priority, D054 adds `/crm/pipelines` and tenant-scoped detail

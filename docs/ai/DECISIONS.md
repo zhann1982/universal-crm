@@ -794,3 +794,34 @@ are unaffected. Guard rejection becomes conflict feedback for transitions and re
 Isolated PostgreSQL tests execute the production configuration SQL and migration, covering
 tenant/version boundaries, rollback, defaults, lifecycle, used Stage protection and valid/stale
 Deal state. They do not verify real multi-session Neon concurrency or browser workflows.
+
+## D055 — Saved views are personal tenant-scoped filter preferences
+
+Date: 2026-10-03
+
+Saved views belong to (Organization, Membership, entity). The current authenticated context
+supplies Organization/Member identity; forms supply only rendered scope, view identity and
+allowlisted filters. Entity read permission permits personal preference management, including
+for read-only CRM users. Deals additionally require `pipelines.read`. No new Roles/Permissions
+or sharing policy is introduced. Revoked tenant/module access remains enforced on every page/action.
+
+Filters are strictly validated structured JSON, not arbitrary URLs, SQL, tenant IDs or result
+snapshots. Client/Company filters reuse existing search/status/lifecycle behavior. Deal filters
+add title search, all/mine/unassigned ownership, Stage type and close-date conditions. "Mine"
+uses current Membership identity. "Week" means today through the next six days, calculated by
+PostgreSQL CURRENT_DATE; dates remain date-only. Page numbers and sorting are not persisted.
+Links reconstruct only local allowlisted CRM paths. Unavailable Pipeline views are disabled.
+
+Migration 0015 adds personal saved_views with a composite same-tenant Membership FK, entity/JSON
+checks, lookup index and unique active name per Member/entity. An advisory lock serializes
+active-limit/lifecycle writes with a fresh statement snapshot. At most 50 active views per
+Member/entity; archive frees a slot. Reads show up to 50 active and the latest 50 archived views.
+Archive/restore require expected versions and exact ownership/tenant/entity; zero rows fail closed.
+Creation request UUIDs prevent duplicate insertion; retries do not overwrite a view. Archived
+view name reuse is allowed; restore may conflict with a replacement name. No hard deletion.
+
+The Deal board no longer queries hidden Company or foreign Member names: SQL fields are built
+only when their respective read permissions exist; self display uses authorized current Member.
+Isolated PostgreSQL tests cover preference SQL, tenant/identity/version boundaries, limits,
+rollback and Deal predicates; SQL regression tests cover related-name visibility. Multi-session
+database races and a full multi-role browser suite remain separate follow-ups.

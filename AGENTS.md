@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D054`
+`D055`
 
 ---
 
@@ -648,6 +648,13 @@ and rendered Organization scope. Pipeline versions also protect Stage edits.
 Lock Organization configuration, then Pipeline rows; Deal writes share parent locks
 through migration 0014. Do not bypass used-Stage type or Pipeline archive protections.
 Stage archive/deletion and automatic position swapping remain follow-ups.
+
+Saved views are implemented (D055). They are private to the current Membership
+inside its Organization, not shared configuration. Read and write require the
+underlying entity read permission; writes also require rendered Organization scope.
+Use `src/modules/saved-views/persistence.ts` and allowlisted filter schemas.
+Never accept arbitrary stored URLs, Organization IDs or SQL/filter expressions.
+Deal references must not query Company/Member names without their read permissions.
 
 ## Activity permissions
 

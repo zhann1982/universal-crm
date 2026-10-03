@@ -18,7 +18,7 @@ test("Drizzle migration journal installs the complete schema and safely replays"
   const before = (await pg.query("SELECT * FROM member_roles")).rows;
   await migrate(db, { migrationsFolder: "drizzle" });
   assert.deepEqual((await pg.query("SELECT * FROM member_roles")).rows, before);
-  assert.equal((await pg.query("SELECT * FROM drizzle.__drizzle_migrations")).rows.length, 15);
+  assert.equal((await pg.query("SELECT * FROM drizzle.__drizzle_migrations")).rows.length, 16);
 });
 
 async function previousSchema(pg: PGlite) {

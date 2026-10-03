@@ -16,7 +16,27 @@ import {
   varchar,
   integer,
   numeric,
+  jsonb,
 } from "drizzle-orm/pg-core";
+
+export const savedViews = pgTable("saved_views", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  memberId: uuid("member_id").notNull(),
+  entity: varchar("entity", { length: 20 }).notNull(),
+  name: varchar("name", { length: 80 }).notNull(),
+  filters: jsonb("filters").notNull(),
+  version: integer("version").notNull().default(1),
+  isArchived: boolean("is_archived").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  foreignKey({ name: "saved_views_org_member_fk", columns: [table.organizationId, table.memberId], foreignColumns: [organizationMembers.organizationId, organizationMembers.id] }).onDelete("cascade"),
+  check("saved_views_entity_check", sql`${table.entity} IN ('clients','companies','deals')`),
+  check("saved_views_filters_check", sql`jsonb_typeof(${table.filters}) = 'object'`),
+  uniqueIndex("saved_views_active_name_unique").on(table.organizationId, table.memberId, table.entity, table.name).where(sql`NOT ${table.isArchived}`),
+  index("saved_views_member_entity_idx").on(table.organizationId, table.memberId, table.entity),
+]);
 
 /*
 |--------------------------------------------------------------------------

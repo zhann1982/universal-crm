@@ -1,4 +1,5 @@
 import { OrganizationForm } from "@/modules/access/organization-context";
+import { SavedViewsBar } from "@/modules/saved-views/bar";
 import {
   and,
   count,
@@ -62,6 +63,7 @@ export default async function ClientsPage({
 
   const {
     organization,
+    member,
     permissions: currentPermissions,
   } = await requirePermission(
     "clients.read",
@@ -273,9 +275,11 @@ export default async function ClientsPage({
         </Link>
       </div>
 
+    <SavedViewsBar organizationId={organization.id} memberId={member.id} entity="clients" filters={{q,status,view}} />
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <OrganizationForm
           action="/crm/clients"
+          key={JSON.stringify({q,status,view})}
           method="get"
           className="flex flex-wrap items-end gap-4 border-b border-slate-200 p-4"
         >

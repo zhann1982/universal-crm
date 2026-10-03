@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-03
 
+Saved views (D055) are personal Membership-scoped preferences within an Organization.
+Client/Company views persist search, status and active/archive filters. Deal views persist
+an active Pipeline, title search, all/mine/unassigned owner, Stage state and close-date filter.
+They store validated filter objects, never result snapshots or arbitrary URLs. Existing entity
+read permissions apply; there is no shared-view permission or sharing workflow yet.
+
 ## Goal
 
 Universal CRM is an industry-neutral configurable multi-tenant CRM platform.

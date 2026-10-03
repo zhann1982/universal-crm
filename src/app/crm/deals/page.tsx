@@ -1,4 +1,7 @@
 import { OrganizationForm } from "@/modules/access/organization-context";
+import { SavedViewsBar } from "@/modules/saved-views/bar";
+import { dealListConditions, dealReferenceFields } from "@/modules/deals/list-filter";
+import { dealFilters } from "@/modules/saved-views/filters";
 import {
   and,
   asc,
@@ -14,9 +17,7 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import {
-  companies,
   deals,
-  organizationMembers,
   pipelineStages,
   pipelines,
 } from "@/db/schema";
@@ -231,6 +232,13 @@ export default async function DealsPage({
         ),
       );
 
+  const filters = dealFilters.parse({
+    pipeline: selectedPipeline.id,
+    q: typeof rawSearchParams.q === "string" ? rawSearchParams.q.trim().slice(0,160) : "",
+    owner: z.enum(["all","mine","unassigned"]).catch("all").parse(rawSearchParams.owner),
+    state: z.enum(["all","open","won","lost"]).catch("all").parse(rawSearchParams.state),
+    close: z.enum(["all","overdue","week","none"]).catch("all").parse(rawSearchParams.close),
+  });
   const dealList =
     await db
       .select({
@@ -257,44 +265,13 @@ export default async function DealsPage({
         companyId:
           deals.companyId,
 
-        companyName:
-          companies.name,
 
         ownerMemberId:
           deals.ownerMemberId,
 
-        ownerDisplayName:
-          organizationMembers.displayName,
+        ...dealReferenceFields(permissions, organization.id),
       })
       .from(deals)
-      .leftJoin(
-        companies,
-        and(
-          eq(
-            deals.companyId,
-            companies.id,
-          ),
-
-          eq(
-            companies.organizationId,
-            organization.id,
-          ),
-        ),
-      )
-      .leftJoin(
-        organizationMembers,
-        and(
-          eq(
-            deals.ownerMemberId,
-            organizationMembers.id,
-          ),
-
-          eq(
-            organizationMembers.organizationId,
-            organization.id,
-          ),
-        ),
-      )
       .where(
         and(
           eq(
@@ -315,6 +292,7 @@ export default async function DealsPage({
           isNull(
             deals.deletedAt,
           ),
+          ...dealListConditions(filters, organization.id, member.id),
         ),
       )
       .orderBy(
@@ -375,7 +353,7 @@ export default async function DealsPage({
           canReadMembers ||
           deal.ownerMemberId ===
             member.id
-            ? deal.ownerDisplayName
+            ? (deal.ownerMemberId === member.id ? member.displayName : deal.ownerDisplayName)
             : deal.ownerMemberId
               ? "Сотрудник"
               : null,
@@ -417,9 +395,11 @@ export default async function DealsPage({
         </div>
       </div>
 
+      <SavedViewsBar organizationId={organization.id} memberId={member.id} entity="deals" filters={filters} />
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <OrganizationForm
           action="/crm/deals"
+          key={JSON.stringify(filters)}
           method="get"
           className="flex flex-wrap items-end gap-4"
         >
@@ -462,6 +442,10 @@ export default async function DealsPage({
             </select>
           </div>
 
+          <label className="text-sm">Поиск<input name="q" defaultValue={filters.q} maxLength={160} className="block rounded border p-2" /></label>
+          <label className="text-sm">Ответственный<select name="owner" defaultValue={filters.owner} className="block rounded border p-2"><option value="all">Все</option><option value="mine">Мои</option><option value="unassigned">Без ответственного</option></select></label>
+          <label className="text-sm">Состояние<select name="state" defaultValue={filters.state} className="block rounded border p-2"><option value="all">Все</option><option value="open">Открытые</option><option value="won">Успешные</option><option value="lost">Потерянные</option></select></label>
+          <label className="text-sm">Закрытие<select name="close" defaultValue={filters.close} className="block rounded border p-2"><option value="all">Любой срок</option><option value="week">Ближайшие 7 дней</option><option value="overdue">Просрочено</option><option value="none">Без срока</option></select></label>
           <button
             type="submit"
             className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
