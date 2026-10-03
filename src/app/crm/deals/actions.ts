@@ -14,6 +14,7 @@ import {
 } from "next/navigation";
 
 import { db } from "@/db";
+import { recordMutation } from "@/modules/activity/mutation-context";
 import {
   companies,
   deals,
@@ -400,7 +401,7 @@ export async function createDeal(
       "lost";
 
   try {
-    await db
+    await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
       .insert(deals)
       .values({
         organizationId:
@@ -436,7 +437,7 @@ export async function createDeal(
 
         notes:
           data.notes,
-      });
+      }));
   } catch (error) {
     console.error(
       "Failed to create deal:",
@@ -468,9 +469,7 @@ export async function moveDealToStage(
   dealId: string,
   formData: FormData,
 ) {
-  const {
-    organization,
-  } = await requireMutationPermission(
+  const { organization, member } = await requireMutationPermission(
     "deals.update",
     formData,
   );
@@ -507,6 +506,7 @@ export async function moveDealToStage(
   try {
     result =
       await transitionDeal({
+        actorMemberId: member.id,
         organizationId:
           organization.id,
 
@@ -1059,7 +1059,7 @@ export async function updateDeal(
      * обязательно оставляем.
      */
     const updated =
-      await db
+      await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
         .update(
           deals,
         )
@@ -1131,7 +1131,7 @@ export async function updateDeal(
 
           version:
             deals.version,
-        });
+        }));
 
     /*
      * 0 строк означает, что Deal
@@ -1184,9 +1184,7 @@ export async function archiveDeal(
   organizationScope: string,
   dealId: string,
 ) {
-  const {
-    organization,
-  } = await requireMutationPermission(
+  const { organization, member } = await requireMutationPermission(
     "deals.archive",
     organizationScope,
   );
@@ -1255,7 +1253,7 @@ export async function archiveDeal(
    * осталась прежней.
    */
   const [archived] =
-    await db
+    await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
       .update(
         deals,
       )
@@ -1305,7 +1303,7 @@ export async function archiveDeal(
 
         version:
           deals.version,
-      });
+      }));
 
   /*
    * 0 rows:
@@ -1346,9 +1344,7 @@ export async function restoreDeal(
   organizationScope: string,
   dealId: string,
 ) {
-  const {
-    organization,
-  } = await requireMutationPermission(
+  const { organization, member } = await requireMutationPermission(
     "deals.archive",
     organizationScope,
   );
@@ -1412,7 +1408,7 @@ export async function restoreDeal(
    * которую мы только что прочитали.
    */
   const [restored] =
-    await db
+    await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
       .update(
         deals,
       )
@@ -1463,7 +1459,7 @@ export async function restoreDeal(
         const failure = error as { code?: string; cause?: { code?: string } };
         if ((failure.cause?.code ?? failure.code) === "23514") return [];
         throw error;
-      });
+      }));
 
   if (!restored) {
     redirect(

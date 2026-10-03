@@ -825,3 +825,31 @@ only when their respective read permissions exist; self display uses authorized 
 Isolated PostgreSQL tests cover preference SQL, tenant/identity/version boundaries, limits,
 rollback and Deal predicates; SQL regression tests cover related-name visibility. Multi-session
 database races and a full multi-role browser suite remain separate follow-ups.
+
+---
+
+## D056 — Atomic Client / Company / Deal Activity
+
+Client, Company and Deal detail cards reuse EntityTimeline. All primary business writes
+run `recordMutation` after server-side authorization with the selected Organization and
+authenticated Member. AsyncLocalStorage carries only this server-derived identity for one
+awaited Drizzle INSERT/UPDATE. The Neon adapter installs transaction-local settings and
+executes the original statement in one HTTP transaction, preserving Drizzle result modes.
+Migration 0016 AFTER triggers compare actual PostgreSQL OLD/NEW and insert Activity within
+that same transaction. An event insertion failure rolls back the business statement.
+Shared `transitionDeal` accepts authorized actorMemberId; selector and Kanban reuse it.
+No independent Stage-transition implementation or best-effort logging is added.
+
+Creation, allowlisted field changes and archive/restore use safe fixed labels, actor and time.
+No related names, contact contents, notes, amounts or old/new values are copied into history.
+Technical version/timestamp-only updates and zero affected rows add no events. A Stage no-op
+keeps its existing behavior. Trigger actor validation requires same-tenant active Membership
+and active Organization; existing application permission checks remain mandatory.
+Task/Comment raw atomic SQL is unchanged. Seeds/maintenance without actor context are
+intentionally unaudited; this is application history rather than an immutable complete audit.
+Migration must precede application rollout; existing records are not backfilled.
+
+PGlite tests execute the production adapter and actual migration, including rollback faults,
+result mapping, tenant/access denial, lifecycle, shared Deal conflict behavior and read permissions.
+Full multi-role/multi-session browser mutations, cursor pagination, relationship events and
+permission-safe structured values remain follow-ups.

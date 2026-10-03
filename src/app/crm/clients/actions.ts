@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
+import { recordMutation } from "@/modules/activity/mutation-context";
 import { clients } from "@/db/schema";
 import { requireMutationPermission } from "@/lib/auth/permissions";
 import {
@@ -60,7 +61,7 @@ export async function createClient(
   formData: FormData,
 ): Promise<CreateClientState> {
 
-  const { organization } =
+  const { organization, member } =
   await requireMutationPermission(
     "clients.create",
     formData,
@@ -84,7 +85,7 @@ export async function createClient(
   }
 
   try {
-    await db.insert(clients).values({
+    await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db.insert(clients).values({
       organizationId:
         organization.id,
 
@@ -111,7 +112,7 @@ export async function createClient(
 
       notes:
         result.data.notes,
-    });
+    }));
   } catch (error) {
     console.error(
       "Failed to create client:",
@@ -138,7 +139,7 @@ export async function updateClient(
   formData: FormData,
 ): Promise<UpdateClientState> {
 
-  const { organization } =
+  const { organization, member } =
     await requireMutationPermission(
       "clients.update",
     formData,
@@ -173,7 +174,7 @@ export async function updateClient(
 
   try {
     const updated =
-      await db
+      await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
         .update(clients)
         .set({
           firstName:
@@ -226,7 +227,7 @@ export async function updateClient(
         )
         .returning({
           id: clients.id,
-        });
+        }));
 
     if (updated.length === 0) {
       return {
@@ -266,7 +267,7 @@ export async function archiveClient(
   organizationScope: string,
   clientId: string,
 ) {
-  const { organization } =
+  const { organization, member } =
     await requireMutationPermission(
       "clients.archive",
     organizationScope,
@@ -278,7 +279,7 @@ export async function archiveClient(
     redirect("/crm/clients");
   }
 
-  await db
+  await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
     .update(clients)
     .set({
       isArchived: true,
@@ -305,7 +306,7 @@ export async function archiveClient(
           clients.deletedAt,
         ),
       ),
-    );
+    ));
 
   revalidatePath("/crm");
   revalidatePath("/crm/clients");
@@ -321,7 +322,7 @@ export async function restoreClient(
   organizationScope: string,
   clientId: string,
 ) {
-  const { organization } =
+  const { organization, member } =
   await requireMutationPermission(
     "clients.archive",
     organizationScope,
@@ -333,7 +334,7 @@ export async function restoreClient(
     redirect("/crm/clients?view=archive");
   }
 
-  await db
+  await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
     .update(clients)
     .set({
       isArchived: false,
@@ -360,7 +361,7 @@ export async function restoreClient(
           clients.deletedAt,
         ),
       ),
-    );
+    ));
 
   revalidatePath("/crm");
   revalidatePath("/crm/clients");

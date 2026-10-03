@@ -4,13 +4,19 @@ Last updated: 2026-10-03
 
 ## Current update — 2026-10-03
 
+Client/Company/Deal Activity rollout is implemented (D056 / migration 0016).
+Do not recreate the timeline or event persistence. Next: verify real multi-session/browser
+mutations for all roles, add cursor pagination beyond the latest 50 events, and decide
+permission-safe structured old/new values only when needed. Client ↔ Company relationship
+events remain a separate follow-up. Continue stabilization before custom fields/automation/AI.
+
 Navigation loading feedback and active CRM sidebar sections are implemented and browser-checked.
 Use the shared AppLink for new navigation links so pending feedback remains consistent.
 
 Personal saved views for Client/Company lists and the Deal board are implemented (D055).
 Do not recreate them. Next: sharing/default/editing semantics only with a concrete product need;
 archive pagination beyond the latest 50, broader multi-role browser checks and scale coverage.
-Continue with Client/Company/Deal Activity rollout, then custom fields after stabilization.
+Client/Company/Deal Activity exists; custom fields follow stabilization.
 
 Pipeline management is implemented at `/crm/pipelines` (D054), following the user's product
 priority. Migration 0014 is applied to the connected database; configuration and Deal guard
@@ -29,7 +35,7 @@ Continue with browser onboarding and multi-tab tenant checks, related-data visib
 Deal conflict coverage. Comment create/edit lifecycle protection is implemented (D053); verify
 real multi-session/browser behavior rather than recreating the persistence operation. Task/Comment/Activity database
 references still need tenant constraints. F12 scaling and dedicated PostgreSQL CI remain open.
-Activity rollout follows stabilization; Pipeline management exists. Do not begin AI integration yet.
+Activity rollout and Pipeline management exist. Do not begin AI integration yet.
 
 ## Immediate development sequence — 2026-09-30
 
@@ -40,7 +46,7 @@ User priority: multiple independent companies.
 2. Task + Schedule + Activity atomic writes and recurrence are implemented; follow up with multi-session Neon concurrency and browser verification. Do not recreate the persistence layer.
 3. Organization selection/scope (D050) and self-service provisioning (D051) are implemented. Next verify onboarding, retries, tenant switches and stale forms in the browser; add live multi-session Neon creation/retry tests.
 4. Verify core database constraints (0013) in other deployment environments; extend tenant constraints to Task/Comment/Activity and introduce dedicated integration CI.
-5. Roll Activity out to Client / Company / Deal using the stabilized event model.
+5. Verify existing Client / Company / Deal Activity (D056): live browser/role checks and pagination.
 6. Verify existing Pipeline management and saved views; custom fields and automation follow later.
 
 Comment creation/editing now share parent lifecycle protection with archive/restore (D053).
@@ -304,7 +310,7 @@ Comments and task history exist; structured history values and pagination remain
 # After Tasks
 
 Organization provisioning / browser tenant workflow verification
-→ Activity for Client / Company / Deal
+→ Verify existing Activity for Client / Company / Deal (D056)
 → Pipeline/Stage management UI
 → direct Deal contacts
 → saved views

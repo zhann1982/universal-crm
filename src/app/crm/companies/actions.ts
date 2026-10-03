@@ -14,6 +14,7 @@ import {
 } from "next/navigation";
 
 import { db } from "@/db";
+import { recordMutation } from "@/modules/activity/mutation-context";
 import {
   companies,
 } from "@/db/schema";
@@ -231,7 +232,7 @@ export async function createCompany(
   }
 
   try {
-    await db
+    await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
       .insert(companies)
       .values({
         organizationId:
@@ -269,7 +270,7 @@ export async function createCompany(
 
         notes:
           data.notes,
-      });
+      }));
   } catch (error) {
     console.error(
       "Failed to create company:",
@@ -524,7 +525,7 @@ export async function updateCompany(
 
   try {
     const updated =
-      await db
+      await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
         .update(
           companies,
         )
@@ -590,7 +591,7 @@ export async function updateCompany(
         .returning({
           id:
             companies.id,
-        });
+        }));
 
     if (
       updated.length === 0
@@ -637,9 +638,7 @@ export async function archiveCompany(
   organizationScope: string,
   companyId: string,
 ) {
-  const {
-    organization,
-  } = await requireMutationPermission(
+  const { organization, member } = await requireMutationPermission(
     "companies.archive",
     organizationScope,
   );
@@ -655,7 +654,7 @@ export async function archiveCompany(
     );
   }
 
-  await db
+  await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
     .update(companies)
     .set({
       isArchived: true,
@@ -684,7 +683,7 @@ export async function archiveCompany(
           companies.deletedAt,
         ),
       ),
-    );
+    ));
 
   revalidatePath("/crm");
 
@@ -708,9 +707,7 @@ export async function restoreCompany(
     | "detail"
     | "list" = "detail",
 ) {
-  const {
-    organization,
-  } = await requireMutationPermission(
+  const { organization, member } = await requireMutationPermission(
     "companies.archive",
     organizationScope,
   );
@@ -726,7 +723,7 @@ export async function restoreCompany(
     );
   }
 
-  await db
+  await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
     .update(companies)
     .set({
       isArchived: false,
@@ -755,7 +752,7 @@ export async function restoreCompany(
           companies.deletedAt,
         ),
       ),
-    );
+    ));
 
   revalidatePath(
     "/crm",

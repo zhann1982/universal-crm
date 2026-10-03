@@ -6,6 +6,7 @@ import {
 import { z } from "zod";
 
 import { db } from "@/db";
+import { recordMutation } from "@/modules/activity/mutation-context";
 import {
   deals,
   pipelineStages,
@@ -43,6 +44,7 @@ export type TransitionDealResult =
     };
 
 type TransitionDealInput = {
+  actorMemberId: string;
   organizationId: string;
   dealId: string;
   targetStageId: string;
@@ -50,6 +52,7 @@ type TransitionDealInput = {
 };
 
 export async function transitionDeal({
+  actorMemberId,
   organizationId,
   dealId,
   targetStageId,
@@ -278,7 +281,7 @@ export async function transitionDeal({
    * - lifecycle state
    */
   const updated =
-    await db
+    await recordMutation({ organizationId, memberId: actorMemberId }, () => db
       .update(
         deals,
       )
@@ -354,7 +357,7 @@ export async function transitionDeal({
         // rejects stale lifecycle/type semantics without changing the Deal.
         if ((failure.cause?.code ?? failure.code) === "23514") return [];
         throw error;
-      });
+      }));
 
   /*
    * Если UPDATE изменил 0 строк,

@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D055`
+`D056`
 
 ---
 
@@ -639,7 +639,7 @@ Organization provisioning is implemented (D051). Prioritize browser/multi-sessio
 The user targets multiple independent companies. Membership-based selection is implemented.
 Browser cross-tenant workflow verification remains open; do not recreate Organization provisioning.
 
-Then: Activity for Client/Company/Deal → Pipeline management → saved views → custom fields
+Activity for Client/Company/Deal, Pipeline management and saved views exist. Then: custom fields
 → automation → read-first AI.
 
 Pipeline management is implemented (D054), following the user's product priority.
@@ -657,6 +657,17 @@ Never accept arbitrary stored URLs, Organization IDs or SQL/filter expressions.
 Deal references must not query Company/Member names without their read permissions.
 
 ## Activity permissions
+
+D056: Client/Company/Deal business writes use `recordMutation` from
+`src/modules/activity/mutation-context.ts` around one awaited Drizzle INSERT/UPDATE,
+after `requireMutationPermission`, with the server-selected Organization and Member.
+The Neon adapter sets transaction-local actor/scope and migration 0016 triggers insert
+Activity in the same transaction. Do not add separate/best-effort logging. Shared Deal
+transition requires `actorMemberId` from authorized context; both selector and Kanban use it.
+Only allowlisted field labels enter these events; do not copy related names or private
+old/new values into history. Task/Comment atomic SQL remains unchanged. Maintenance/seed
+writes without context are intentionally unaudited; this is application history, not a
+complete immutable database audit. Existing records are not backfilled.
 
 Decision D048: `activity.read` never grants access to comment contents.
 Exclude comment events in SQL without `comments.read`, including events with a null comment FK.

@@ -1,3 +1,4 @@
+import { EntityTimeline } from "@/modules/activity/entity-timeline";
 import Link from "@/components/app-link";
 import { notFound } from "next/navigation";
 
@@ -303,6 +304,7 @@ export default async function ClientPage({
           </p>
         )}
       </section>
+      <EntityTimeline entityType="client" entityId={client.id} entityArchived={client.isArchived} />
     </div>
   );
 }

@@ -562,7 +562,12 @@ Lifecycle and reminder writes also persist their events atomically. Bulk actions
 # Collaborative Comments / Activity
 
 Entity description fields remain separate from collaborative comments.
-Comments and activity tables exist. Task detail renders the timeline; Stage 2 records task changes.
+Comments and activity tables exist. Task, Client, Company and Deal details render the timeline.
+Task Stage 2 records task changes. D056 records Client/Company/Deal creation, actual field changes,
+archive/restore and shared Deal Stage transitions atomically through the Neon adapter and
+transaction-local actor triggers. Safe field/action labels are stored without private old/new
+values or related names. History starts with new application writes; no backfill is performed.
+Maintenance writes without actor context are intentionally outside this application history.
 Task event logging is atomic with its mutation; many changes still lack structured old/new values.
 
 Activity permission does not grant comment content access. Timeline queries must enforce

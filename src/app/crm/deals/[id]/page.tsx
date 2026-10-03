@@ -1,3 +1,4 @@
+import { EntityTimeline } from "@/modules/activity/entity-timeline";
 import { OrganizationForm } from "@/modules/access/organization-context";
 import {
   and,
@@ -503,6 +504,7 @@ export default async function DealPage({
           </p>
         )}
       </section>
+      <EntityTimeline entityType="deal" entityId={deal.id} entityArchived={deal.isArchived} />
     </div>
   );
 }

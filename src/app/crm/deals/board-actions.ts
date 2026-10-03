@@ -26,9 +26,7 @@ export async function moveDealOnBoard(
   stageId: string,
   expectedVersion: number,
 ): Promise<MoveDealOnBoardResult> {
-  const {
-    organization,
-  } = await requireMutationPermission(
+  const { organization, member } = await requireMutationPermission(
     "deals.update",
     organizationScope,
   );
@@ -36,6 +34,7 @@ export async function moveDealOnBoard(
   try {
     const result =
       await transitionDeal({
+        actorMemberId: member.id,
         organizationId:
           organization.id,
 

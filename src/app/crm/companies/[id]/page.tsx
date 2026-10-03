@@ -1,3 +1,4 @@
+import { EntityTimeline } from "@/modules/activity/entity-timeline";
 import {
   and,
   eq,
@@ -366,6 +367,7 @@ export default async function CompanyPage({
           </p>
         )}
       </section>
+      <EntityTimeline entityType="company" entityId={company.id} entityArchived={company.isArchived} />
     </div>
   );
 }

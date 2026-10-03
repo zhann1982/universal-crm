@@ -1,5 +1,33 @@
 # Universal CRM — Current Status
 
+## Client / Company / Deal history — 2026-10-03
+
+Detail cards now include the shared EntityTimeline with existing Activity/Comment permissions.
+Creation, actual allowlisted field changes, archive/restore and both Deal Stage interfaces
+record actor, time and a safe field/action label. A technical timestamp/version-only update,
+an unmatched conditional update and a same-stage transition do not create history events.
+No backfill or copied old/new values; existing records begin accumulating history from now.
+Client ↔ Company link events and pagination beyond the latest 50 remain open.
+
+D056 uses AsyncLocalStorage only for a server-derived actor around one awaited business
+statement. The Neon adapter submits transaction-local settings and the original Drizzle
+statement together; PostgreSQL AFTER triggers compare actual OLD/NEW and insert Activity.
+An event insertion error rolls back the record mutation. Existing Deal version, lifecycle,
+Stage semantics, permission checks and Task/Comment atomic operations are preserved.
+Triggers reject mismatched actor/Organization and inactive Membership/Organization. Seeds
+and direct maintenance writes without context intentionally produce no invented history.
+This is application history, not a complete database audit or old-value ledger.
+
+Verification: 177/177 normal tests, TypeScript, ESLint and production build pass. New PGlite
+tests execute the production adapter, trigger migration and shared Deal transition, covering
+RETURNING mappings, no-op/stale writes, lifecycle, tenant/access denial, transaction-local
+context, async actor isolation, history failure rollback and restricted timeline reads.
+All 17 migration journal hashes match the connected database; migration 0016 is applied and
+all three Activity triggers are enabled. Read-only browser checks with the existing Owner
+session verified the shared history block on Client, Company and Deal cards. Business record
+mutations were tested in isolated PGlite, not against the connected application's records;
+full multi-role/multi-session browser mutation workflows remain open.
+
 ## Navigation feedback — 2026-10-03
 
 All application Next.js links use `src/components/app-link.tsx`, which forwards Link props
@@ -733,7 +761,7 @@ F12 — OPEN
 
 # Major features not yet implemented
 
-- Activity rollout to Client / Company / Deal detail pages
+- Client / Company / Deal Activity browser/role verification and pagination (D056 implemented)
 - Pipeline/Stage management UI
 - direct Deal contacts
 - Custom Fields
@@ -760,6 +788,6 @@ After sufficient stabilization:
 
 Task/Activity reliability
 → Organization onboarding and browser tenant workflow verification
-→ Activity rollout to other CRM entities
+→ Verify existing Activity for Client / Company / Deal (D056)
 → Pipeline management
 → direct Deal contacts

@@ -55,6 +55,7 @@ test("stage transitions enforce the page version and the conditional write", asy
       });
 
       const result = await transitionDeal({
+        actorMemberId: "00000000-0000-4000-8000-000000000001",
         organizationId, dealId, targetStageId: scenario.target,
         expectedVersion: scenario.expected as number,
       });
