@@ -1,6 +1,6 @@
 # Universal CRM — Architecture Decisions
 
-Last updated: 2026-09-30
+Last updated: 2026-10-03
 
 ## Decision ID rule
 
@@ -158,9 +158,10 @@ Stage type is `open`, `won`, or `lost`. Do not maintain an independent won/lost 
 
 ## D019 — Deal stores Pipeline and Stage
 
-Status: accepted with strengthening planned
+Status: accepted; composite constraints implemented in migration 0013
 
-Deal stores `pipelineId` and `stageId`. Application validation exists; stronger database consistency is planned.
+Deal stores `pipelineId` and `stageId`. Application validation remains required. D052 adds composite
+database foreign keys for Organization/Pipeline/Stage consistency; deployment is tracked in STATUS.
 
 ---
 
@@ -709,3 +710,35 @@ Isolated PGlite tests execute all migrations and production transaction SQL, cov
 auth identity, unverified/missing users, retries, separate creators, revoked access, changed roles,
 validation and fault-injected full rollback. This does not claim live multi-session Neon concurrency
 or end-to-end browser coverage. Apply the migration before using this feature in a deployed app.
+
+## D052 — Core relationships enforce tenant identity in PostgreSQL
+
+Date: 2026-10-03
+
+Core relationships use composite foreign keys containing Organization identity, with Pipeline
+identity included in the Deal-to-Stage key. Referenced tables expose matching composite UNIQUE
+constraints. PostgreSQL rejects invalid direct inserts, updates and moves of referenced parents.
+This supplements server authorization, permission policies, lifecycle and optimistic locking.
+
+Member/Role assignments gain a required `organization_id`, backfilled from the existing Membership.
+All assignment writers derive it from their authorized context or created Membership. Two composite
+foreign keys bind the assignment to a Member and Role of that same Organization. No trigger supplies
+missing scope and no default is used; omitting scope fails closed.
+
+Nullable core owners and Deal Company retain their single-column SET NULL foreign keys plus composite
+NO ACTION tenant checks. This preserves deletion semantics without nulling the record's Organization.
+Inactive Membership is permitted as an existing reference; new-assignment policy remains in application code.
+
+CHECK constraints limit Stage type/probability and enforce finite non-negative Deal amount with currency.
+Currency is absent or an uppercase three-letter code; amount may be absent with currency, matching the form.
+Default Pipeline uniqueness remains deferred until that product rule is confirmed.
+
+Migration 0013 adds the assignment column nullable, backfills it, sets NOT NULL, creates UNIQUE keys
+before foreign keys and validates existing rows. A read-only audit produces counts without personal
+data. Invalid legacy relationships cause transactional migration failure; deliberate repair is separate.
+No existing applied migration is edited. Release requires pausing writes while migrating and activating
+the matching application because old assignment writers omit the new column.
+
+Verification includes populated upgrade, full Drizzle journal/replay, direct invalid writes, parent moves,
+nullable deletion, inactive owners and actual invitation/Owner-guard SQL with fault-injected rollback
+in isolated PGlite PostgreSQL. This is not proof of live multi-session Neon or browser behavior.

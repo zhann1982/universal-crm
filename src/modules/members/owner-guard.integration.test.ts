@@ -92,23 +92,28 @@ async function createFixture(): Promise<Fixture> {
 
     txn`
       INSERT INTO member_roles (
+        organization_id,
         member_id,
         role_id
       )
       VALUES
         (
+          ${organizationId}::uuid,
           ${memberAId}::uuid,
           ${ownerRoleId}::uuid
         ),
         (
+          ${organizationId}::uuid,
           ${memberAId}::uuid,
           ${managerRoleId}::uuid
         ),
         (
+          ${organizationId}::uuid,
           ${memberBId}::uuid,
           ${ownerRoleId}::uuid
         ),
         (
+          ${organizationId}::uuid,
           ${memberBId}::uuid,
           ${managerRoleId}::uuid
         )

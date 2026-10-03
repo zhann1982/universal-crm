@@ -1,13 +1,17 @@
 import { user } from "./auth-schema";
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   index,
+  foreignKey,
   pgTable,
   primaryKey,
   text,
   timestamp,
   uniqueIndex,
+  unique,
   uuid,
   varchar,
   integer,
@@ -165,6 +169,7 @@ export const organizationMembers =
         .notNull(),
     },
     (table) => [
+      unique("organization_members_org_id_unique").on(table.organizationId, table.id),
       uniqueIndex(
         "organization_members_org_user_unique",
       ).on(
@@ -265,6 +270,7 @@ export const roles =
         .notNull(),
     },
     (table) => [
+      unique("roles_org_id_unique").on(table.organizationId, table.id),
       uniqueIndex(
         "roles_org_name_unique",
       ).on(
@@ -422,6 +428,7 @@ export const memberRoles =
   pgTable(
     "member_roles",
     {
+      organizationId: uuid("organization_id").notNull(),
       memberId: uuid(
         "member_id",
       )
@@ -448,6 +455,16 @@ export const memberRoles =
         ),
     },
     (table) => [
+      foreignKey({
+        name: "member_roles_org_member_fk",
+        columns: [table.organizationId, table.memberId],
+        foreignColumns: [organizationMembers.organizationId, organizationMembers.id],
+      }).onDelete("cascade"),
+      foreignKey({
+        name: "member_roles_org_role_fk",
+        columns: [table.organizationId, table.roleId],
+        foreignColumns: [roles.organizationId, roles.id],
+      }).onDelete("cascade"),
       primaryKey({
         columns: [
           table.memberId,
@@ -738,6 +755,13 @@ export const clients =
       ),
     },
     (table) => [
+      unique("clients_org_id_unique").on(table.organizationId, table.id),
+      // Keep the single-column SET NULL FK for owner deletion. This FK checks tenant identity.
+      foreignKey({
+        name: "clients_org_owner_fk",
+        columns: [table.organizationId, table.ownerMemberId],
+        foreignColumns: [organizationMembers.organizationId, organizationMembers.id],
+      }),
       index(
         "clients_organization_idx",
       ).on(
@@ -918,6 +942,12 @@ export const companies =
       ),
     },
     (table) => [
+      unique("companies_org_id_unique").on(table.organizationId, table.id),
+      foreignKey({
+        name: "companies_org_owner_fk",
+        columns: [table.organizationId, table.ownerMemberId],
+        foreignColumns: [organizationMembers.organizationId, organizationMembers.id],
+      }),
       index(
         "companies_organization_idx",
       ).on(
@@ -1031,6 +1061,16 @@ export const clientCompanies =
         .notNull(),
     },
     (table) => [
+      foreignKey({
+        name: "client_companies_org_client_fk",
+        columns: [table.organizationId, table.clientId],
+        foreignColumns: [clients.organizationId, clients.id],
+      }).onDelete("cascade"),
+      foreignKey({
+        name: "client_companies_org_company_fk",
+        columns: [table.organizationId, table.companyId],
+        foreignColumns: [companies.organizationId, companies.id],
+      }).onDelete("cascade"),
       primaryKey({
         columns: [
           table.clientId,
@@ -1129,6 +1169,7 @@ export const pipelines =
         .notNull(),
     },
     (table) => [
+      unique("pipelines_org_id_unique").on(table.organizationId, table.id),
       uniqueIndex(
         "pipelines_org_name_unique",
       ).on(
@@ -1244,6 +1285,14 @@ export const pipelineStages =
         .notNull(),
     },
     (table) => [
+      unique("pipeline_stages_org_pipeline_id_unique").on(table.organizationId, table.pipelineId, table.id),
+      foreignKey({
+        name: "pipeline_stages_org_pipeline_fk",
+        columns: [table.organizationId, table.pipelineId],
+        foreignColumns: [pipelines.organizationId, pipelines.id],
+      }).onDelete("cascade"),
+      check("pipeline_stages_type_check", sql`${table.type} IN ('open', 'won', 'lost')`),
+      check("pipeline_stages_probability_check", sql`${table.probability} BETWEEN 0 AND 100`),
       uniqueIndex(
         "pipeline_stages_pipeline_position_unique",
       ).on(
@@ -1440,6 +1489,27 @@ export const deals =
       ),
     },
     (table) => [
+      foreignKey({
+        name: "deals_org_pipeline_fk",
+        columns: [table.organizationId, table.pipelineId],
+        foreignColumns: [pipelines.organizationId, pipelines.id],
+      }).onDelete("restrict"),
+      foreignKey({
+        name: "deals_org_pipeline_stage_fk",
+        columns: [table.organizationId, table.pipelineId, table.stageId],
+        foreignColumns: [pipelineStages.organizationId, pipelineStages.pipelineId, pipelineStages.id],
+      }).onDelete("restrict"),
+      foreignKey({
+        name: "deals_org_company_fk",
+        columns: [table.organizationId, table.companyId],
+        foreignColumns: [companies.organizationId, companies.id],
+      }),
+      foreignKey({
+        name: "deals_org_owner_fk",
+        columns: [table.organizationId, table.ownerMemberId],
+        foreignColumns: [organizationMembers.organizationId, organizationMembers.id],
+      }),
+      check("deals_amount_currency_check", sql`(${table.amount} IS NULL OR (${table.amount} >= 0 AND ${table.amount} <> 'NaN'::numeric AND ${table.currency} IS NOT NULL)) AND (${table.currency} IS NULL OR ${table.currency} ~ '^[A-Z]{3}$')`),
       index(
         "deals_organization_idx",
       ).on(

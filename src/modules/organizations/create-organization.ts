@@ -49,10 +49,10 @@ export async function createOrganization(userId: string, draft: z.infer<typeof o
       ), created_member AS (
         INSERT INTO organization_members (organization_id, user_id, display_name, email, status)
         SELECT o.id, u.id, left(u.name, 160), lower(trim(u.email)), 'active' FROM created_org o CROSS JOIN verified_user u
-        RETURNING id
+        RETURNING id, organization_id
       ), owner_binding AS (
-        INSERT INTO member_roles (member_id, role_id)
-        SELECT m.id, r.id FROM created_member m CROSS JOIN created_roles r WHERE r.system_key = 'owner'
+        INSERT INTO member_roles (organization_id, member_id, role_id)
+        SELECT m.organization_id, m.id, r.id FROM created_member m CROSS JOIN created_roles r WHERE r.system_key = 'owner'
         RETURNING member_id
       ), created_pipeline AS (
         INSERT INTO pipelines (organization_id, name, is_default)

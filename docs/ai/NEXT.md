@@ -1,6 +1,18 @@
 # Universal CRM — Next Development Steps
 
-Last updated: 2026-09-30
+Last updated: 2026-10-03
+
+## Current update — 2026-10-03
+
+Core database tenant integrity is implemented (D052 / migration 0013). Do not recreate these
+constraints or role-assignment scope. The connected database audit found no violations; the
+migration was verified in isolated PostgreSQL and has not been applied to the deployed database.
+Use `DATABASE_INTEGRITY.md` for the coordinated audit/migration/application release.
+
+Continue with browser onboarding and multi-tab tenant checks, related-data visibility regressions,
+Deal conflict coverage and Comment create/edit lifecycle protection. Task/Comment/Activity database
+references still need tenant constraints. F12 scaling and dedicated PostgreSQL CI remain open.
+Activity rollout and Pipeline management follow stabilization; do not begin AI integration yet.
 
 ## Immediate development sequence — 2026-09-30
 
@@ -10,7 +22,7 @@ User priority: multiple independent companies.
 1. Verify Activity access/archived-parent hardening against an isolated PostgreSQL database and browser workflows.
 2. Task + Schedule + Activity atomic writes and recurrence are implemented; follow up with multi-session Neon concurrency and browser verification. Do not recreate the persistence layer.
 3. Organization selection/scope (D050) and self-service provisioning (D051) are implemented. Next verify onboarding, retries, tenant switches and stale forms in the browser; add live multi-session Neon creation/retry tests.
-4. Strengthen database tenant constraints and introduce dedicated integration CI.
+4. Deploy tested core database constraints (0013); extend tenant constraints to Task/Comment/Activity and introduce dedicated integration CI.
 5. Roll Activity out to Client / Company / Deal using the stabilized event model.
 6. Add saved views and Pipeline management; custom fields and automation follow later.
 
@@ -97,6 +109,10 @@ inspect data
 → verify against PostgreSQL
 
 Priority invariants:
+
+Items 1–7 below are implemented and isolated-PostgreSQL-tested in 0013, including core owner and
+Deal Company references. They still need deployment. Item 8 remains unconfirmed. Task/Comment/Activity
+references and invitation reference constraints remain future work; do not call all database integrity complete.
 
 1. Pipeline Stage belongs to same Organization as Pipeline
 2. Deal Organization + Pipeline + Stage remain consistent

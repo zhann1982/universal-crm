@@ -245,10 +245,12 @@ export async function replaceMemberRolesWithOwnerGuard(input: {
 
           inserted AS (
             INSERT INTO member_roles (
+              organization_id,
               member_id,
               role_id
             )
             SELECT
+              ${organizationId}::uuid,
               ${memberId}::uuid,
               valid_roles.id
             FROM valid_roles

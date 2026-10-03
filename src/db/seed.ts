@@ -417,6 +417,7 @@ async function main() {
   await db
     .insert(memberRoles)
     .values({
+      organizationId: organization.id,
       memberId:
         member.id,
 
@@ -530,6 +531,7 @@ async function main() {
     await db
       .insert(memberRoles)
       .values({
+        organizationId: organization.id,
         memberId:
           developmentMember.id,
 

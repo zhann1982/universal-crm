@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D051`
+`D052`
 
 ---
 
@@ -475,7 +475,7 @@ Already protected:
 
 Application validation remains required.
 
-Priority PostgreSQL invariants:
+Implemented PostgreSQL invariants (D052, migration `0013_tenant_integrity.sql`):
 
 - Stage Organization + Pipeline consistency
 - Deal Organization + Pipeline + Stage consistency
@@ -484,7 +484,21 @@ Priority PostgreSQL invariants:
 - Stage probability bounds
 - Stage type values
 - Deal amount/currency consistency
-- default Pipeline uniqueness if confirmed
+
+Core relationship invariants use composite foreign keys, not independent ID checks.
+`member_roles.organizationId` is required on every assignment write; derive it from the
+authorized server context or the created Membership, never from unvalidated browser data.
+Retain existing nullable owner/company SET NULL deletion behavior and inactive-owner semantics.
+Amount may be absent with a valid currency; a non-null amount requires a valid currency.
+
+Run `npm run db:audit-integrity` before deploying migration 0013. The audit is read-only.
+The migration backfills role-assignment tenant identity from Membership; it does not repair
+invalid relationships. Invalid rows must cause transactional failure, never silent reassignment.
+Deploy with CRM writes paused: old assignment writers omit the required new column.
+The migration is tested in isolated PostgreSQL; do not describe it as applied to Neon without verification.
+
+Remaining invariants include Task/Comment/Activity references and default Pipeline uniqueness
+if the product rule is confirmed. Database constraints do not replace authorization or lifecycle checks.
 
 Do not casually edit already-applied migrations.
 

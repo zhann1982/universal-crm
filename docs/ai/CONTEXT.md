@@ -1,6 +1,6 @@
 # Universal CRM — Project Context
 
-Last updated: 2026-09-30
+Last updated: 2026-10-03
 
 ## Goal
 
@@ -399,7 +399,8 @@ Stage types:
 
 Pipeline/Stage management UI is not yet implemented.
 
-Database constraints still need stronger Organization/Pipeline/Stage consistency.
+Migration 0013 adds composite Organization/Pipeline/Stage foreign keys and Stage type/probability
+checks. The migration is verified in isolated PGlite PostgreSQL; it has not been applied to Neon.
 
 ---
 
@@ -476,7 +477,8 @@ Stale edit paths are rejected rather than silently overwriting newer data.
 
 Current application-level protection is implemented.
 
-More PostgreSQL/browser conflict coverage remains valuable.
+More PostgreSQL/browser conflict coverage remains valuable. Composite database constraints protect
+Deal Organization/Pipeline/Stage, Company and owner identity independently of application checks.
 
 ---
 
@@ -505,6 +507,9 @@ Deal amount uses:
 PostgreSQL `numeric(14,2)`
 
 Currency is separate.
+
+Migration 0013 enforces non-negative finite amounts and uppercase three-letter currency codes.
+A non-null amount requires currency; amount may be absent with a valid currency, matching the form.
 
 Different currencies remain separate in totals unless an explicit exchange-rate feature is introduced.
 
@@ -580,7 +585,7 @@ Major remaining areas:
 
 - related-data visibility regression tests
 - Deal optimistic-conflict PostgreSQL/browser verification
-- stronger PostgreSQL invariants
+- remaining PostgreSQL invariants for Task/Comment/Activity references; deploy tested core migration 0013
 - F12 unbounded loading / scaling
 - dedicated CI PostgreSQL strategy
 - production invitation email delivery/admin UX
@@ -588,3 +593,15 @@ Major remaining areas:
 F01–F11 are materially addressed at their documented current scope.
 
 F12 remains open.
+
+## Core database integrity (D052)
+
+The schema includes composite foreign keys for core Stage/Deal relationships, Client/Company links,
+nullable responsible Members, and Member/Role assignments. Assignment writers now include the
+server-derived `member_roles.organizationId`. Existing inactive owners remain valid references;
+deleting an owner or Deal Company retains SET NULL behavior through existing single-column FKs.
+
+`npm run db:audit-integrity` checks existing data without returning personal records or modifying rows.
+Migration 0013 backfills assignment scope from Membership before enabling constraints. It fails
+transactionally on invalid legacy relationships; repairs must be reviewed explicitly.
+Default Pipeline uniqueness has not been introduced without a confirmed product rule.

@@ -322,11 +322,13 @@ export async function acceptInvitation(
           inserted_role AS (
             INSERT INTO
               member_roles (
+                organization_id,
                 member_id,
                 role_id
               )
 
             SELECT
+              decision.organization_id,
               inserted_member.id,
               decision.role_id
 

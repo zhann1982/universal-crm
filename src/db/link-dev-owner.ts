@@ -189,6 +189,7 @@ async function main() {
       memberRoles,
     )
     .values({
+      organizationId: organization.id,
       memberId:
         realMember.id,
 

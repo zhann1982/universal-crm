@@ -1,5 +1,34 @@
 # Universal CRM — Current Status
 
+## Core database integrity update — 2026-10-03
+
+Decision D052 / migration `0013_tenant_integrity.sql`:
+- Composite foreign keys protect Stage Organization/Pipeline, Deal Organization/Pipeline/Stage,
+  Client/Company relationships, core owner references, Deal Company and Member/Role assignments.
+- Stage type and probability, Deal non-negative finite amount and currency consistency have CHECK constraints.
+- Role assignments carry required Organization identity. Provisioning, invitation acceptance,
+  Owner-guard writes and development helpers supply the server-derived scope.
+- Existing nullable-reference deletion and inactive-owner semantics are preserved.
+- A read-only audit command reports counts for 12 invariants; the connected database had zero
+  violations on 2026-10-03. No connected database rows or schema were modified.
+- The new migration backfills existing assignments from Membership, adds referenced UNIQUE keys
+  before foreign keys, and fails transactionally on inconsistent legacy data.
+
+Verification: 118 tests pass (23 new PostgreSQL migration/constraint/assignment tests), TypeScript,
+ESLint and production build pass. New tests use isolated PGlite PostgreSQL and actual production
+assignment SQL, including invitation rollback and last-Owner protection. The Drizzle migrator
+installs the entire journal and can replay safely. Generated schema has no further migration drift.
+These checks do not claim browser or live multi-session Neon concurrency coverage.
+The normal test runner limits file concurrency to two to bound PGlite memory use;
+an unrestricted run alongside the production build exhausted Node memory on this Windows host.
+
+Deployment: migration 0013 has NOT been applied to the connected/deployed database.
+Audit and apply migrations with CRM writes paused, then activate matching application code;
+old assignment writers omit the new required column. See `docs/ai/DATABASE_INTEGRITY.md`.
+
+Remaining: browser tenant/onboarding verification, related-data regression coverage, Deal conflicts,
+Task/Comment/Activity relationship constraints, F12 scaling and dedicated PostgreSQL CI.
+
 ## Presentation update — 2026-10-03
 
 CRM now uses reference-inspired styling: charcoal navigation with decorative SVG icons,
@@ -12,7 +41,7 @@ Verification: 95 tests passed; TypeScript, ESLint and production build passed.
 Build used placeholder database/auth configuration. Authenticated browser visual comparison
 and mobile workflow verification have not been performed; exact pixel parity is not claimed.
 
-Last updated: 2026-09-30
+Last updated: 2026-10-03
 
 ## Current development update — 2026-09-30
 
@@ -76,9 +105,9 @@ The modular-monolith architecture remains appropriate.
 
 ---
 
-# Verification
+# Historical stabilization verification
 
-Latest complete local verification:
+Earlier stabilization verification (current results are in the dated updates above):
 
 - `npm test` — 37 tests passed
 - `npm run test:integration` — 23 tests passed
@@ -341,7 +370,8 @@ Not implemented:
 - Pipeline management UI
 - Stage management UI
 
-Database relationship constraints still need strengthening.
+Core Stage/Deal tenant relationship constraints are implemented in migration 0013.
+Applying them to the connected/deployed database remains an operational step.
 
 ---
 
@@ -379,7 +409,8 @@ F04:
 
 FIXED AT APPLICATION LEVEL
 
-Database-level composite invariant remains future work.
+Database-level composite invariant is implemented and isolated-PostgreSQL-tested in migration 0013.
+The migration has not been applied to the connected/deployed database.
 
 F10:
 
