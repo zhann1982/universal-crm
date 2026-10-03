@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "@/db";
 import type { ActivityEntityType } from "./entity-types";
-
-const ENTITY_TABLES: Record<ActivityEntityType, string> = {
-  client: "clients", company: "companies", deal: "deals", task: "tasks",
-};
+import { writableCommentTargetSql } from "./comment-target";
 
 // Authorization and comment ownership are checked by the Server Action.
 // Lock the parent in the same statement as the comment/event write: a stale
@@ -18,16 +15,8 @@ export async function setCommentArchived(input: {
   expectedVersion: number;
   archive: boolean;
 }): Promise<boolean> {
-  if (!Object.hasOwn(ENTITY_TABLES, input.entityType)) {
-    throw new Error("Unsupported comment entity type");
-  }
   const rows = await sql.query(`
-    WITH writable_target AS (
-      SELECT id FROM ${ENTITY_TABLES[input.entityType]}
-      WHERE id = $1::uuid AND organization_id = $2::uuid
-        AND is_archived = false AND deleted_at IS NULL
-      FOR UPDATE
-    ), changed_comment AS (
+    WITH writable_target AS (${writableCommentTargetSql(input.entityType)}), changed_comment AS (
       UPDATE comments SET is_archived = $3, version = version + 1, updated_at = now()
       FROM writable_target
       WHERE comments.id = $4::uuid AND comments.organization_id = $2::uuid

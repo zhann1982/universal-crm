@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D052`
+`D053`
 
 ---
 
@@ -648,6 +648,12 @@ Decision D048: `activity.read` never grants access to comment contents.
 Exclude comment events in SQL without `comments.read`, including events with a null comment FK.
 Do not query Member display names without `members.read`.
 Comment archive/restore must validate a writable tenant parent inside the mutation statement.
+
+D053: comment create/edit must use `src/modules/activity/save-comment.ts`.
+All comment writes share `comment-target.ts` for tenant/lifecycle predicates and parent-first locking.
+Keep comment + Activity event atomic; no independent writes or best-effort event logging.
+Edit checks expected version and author/`comments.manage` in SQL as well as the Server Action.
+Parent pre-checks are UX only. Zero changed rows are a conflict/unavailable target, never success.
 
 ## Task persistence
 

@@ -13,10 +13,7 @@ import {
   revalidatePath,
 } from "next/cache";
 
-import {
-  db,
-  sql,
-} from "@/db";
+import { db } from "@/db";
 import {
   comments,
 } from "@/db/activity-schema";
@@ -30,6 +27,7 @@ import {
   updateCommentSchema,
   type CommentActionState,
 } from "@/lib/validation/comment";
+import { saveComment } from "@/modules/activity/save-comment";
 import { setCommentArchived } from "@/modules/activity/archive-comment";
 import {
   getEntityTarget,
@@ -174,59 +172,24 @@ export async function createComment(
 
   const commentId =
     randomUUID();
-  const eventId =
-    randomUUID();
 
   try {
-    const rows = await sql`
-      WITH inserted_comment AS (
-        INSERT INTO comments (
-          id,
-          organization_id,
-          entity_type,
-          entity_id,
-          author_member_id,
-          body
-        )
-        VALUES (
-          ${commentId}::uuid,
-          ${organization.id}::uuid,
-          ${data.entityType},
-          ${data.entityId}::uuid,
-          ${member.id}::uuid,
-          ${data.body}
-        )
-        RETURNING id
-      )
-      INSERT INTO activity_events (
-        id,
-        organization_id,
-        entity_type,
-        entity_id,
-        actor_member_id,
-        comment_id,
-        event_type,
-        summary,
-        details
-      )
-      SELECT
-        ${eventId}::uuid,
-        ${organization.id}::uuid,
-        ${data.entityType},
-        ${data.entityId}::uuid,
-        ${member.id}::uuid,
-        inserted_comment.id,
-        'comment.created',
-        'Добавлен комментарий',
-        ${data.body}
-      FROM inserted_comment
-      RETURNING id
-    `;
+    const changed = await saveComment({
+      organizationId: organization.id,
+      entityType: data.entityType,
+      entityId: data.entityId,
+      commentId,
+      actorMemberId: member.id,
+      body: data.body,
+      expectedVersion: null,
+      canManage: false,
+    });
 
-    if (rows.length === 0) {
-      throw new Error(
-        "Comment insert returned no rows",
-      );
+    if (!changed) {
+      return {
+        values: { body: data.body },
+        message: "CRM-запись недоступна или уже находится в архиве. Обновите страницу.",
+      };
     }
   } catch (error) {
     console.error(
@@ -416,58 +379,25 @@ export async function updateComment(
     };
   }
 
-  const eventId =
-    randomUUID();
-
   try {
-    const rows = await sql`
-      WITH updated_comment AS (
-        UPDATE comments
-        SET
-          body = ${data.body},
-          version = version + 1,
-          updated_at = now()
-        WHERE
-          id = ${comment.id}::uuid
-          AND organization_id =
-            ${organization.id}::uuid
-          AND version = ${data.version}
-          AND is_archived = false
-          AND deleted_at IS NULL
-        RETURNING id
-      )
-      INSERT INTO activity_events (
-        id,
-        organization_id,
-        entity_type,
-        entity_id,
-        actor_member_id,
-        comment_id,
-        event_type,
-        summary,
-        details
-      )
-      SELECT
-        ${eventId}::uuid,
-        ${organization.id}::uuid,
-        ${entityType},
-        ${comment.entityId}::uuid,
-        ${member.id}::uuid,
-        updated_comment.id,
-        'comment.updated',
-        'Комментарий изменён',
-        ${data.body}
-      FROM updated_comment
-      RETURNING id
-    `;
+    const changed = await saveComment({
+      organizationId: organization.id,
+      entityType,
+      entityId: comment.entityId,
+      commentId: comment.id,
+      actorMemberId: member.id,
+      body: data.body,
+      expectedVersion: data.version,
+      canManage,
+    });
 
-    if (rows.length === 0) {
+    if (!changed) {
       return {
         values: {
           body: data.body,
         },
         message:
-          "Комментарий уже был изменён. Обновите страницу.",
+          "Комментарий или CRM-запись уже изменены либо находятся в архиве. Обновите страницу.",
       };
     }
   } catch (error) {

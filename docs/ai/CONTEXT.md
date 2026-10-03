@@ -558,7 +558,12 @@ Task event logging is atomic with its mutation; many changes still lack structur
 
 Activity permission does not grant comment content access. Timeline queries must enforce
 both entity access and the content permission. Member directory data needs `members.read`.
-Archive/restore comment writes lock a writable parent; create/update lifecycle races remain open.
+All comment writes lock a writable tenant parent inside the mutation statement (D053).
+Create/edit use `save-comment.ts`; archive/restore reuse the same parent-lock SQL helper.
+Comment and Activity event commit atomically. Editing rechecks version, parent identity, archive/deletion
+and authorship/manage permission in SQL. Earlier parent reads provide UX messages only.
+Isolated PostgreSQL tests cover rollback and denied writes for all four entity types;
+live multi-session and browser verification remain open.
 
 ---
 

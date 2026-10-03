@@ -628,6 +628,8 @@ Lock that parent within the statement that conditionally updates the versioned c
 and inserts its event. Zero changed rows are not success.
 Creation/update parent locking and atomic Task history remain separate follow-up work.
 
+Follow-up: D049 implements atomic Task history; D053 implements comment creation/update parent locking.
+
 Query regressions cover permission combinations and mutation predicates. PostgreSQL concurrency
 verification is still required; query-level tests must not be described as integration coverage.
 
@@ -742,3 +744,22 @@ the matching application because old assignment writers omit the new column.
 Verification includes populated upgrade, full Drizzle journal/replay, direct invalid writes, parent moves,
 nullable deletion, inactive owners and actual invitation/Owner-guard SQL with fault-injected rollback
 in isolated PGlite PostgreSQL. This is not proof of live multi-session Neon or browser behavior.
+
+## D053 — Comment persistence shares parent locking and atomic history
+
+Date: 2026-10-03
+
+Creating/editing comments uses `save-comment.ts`. Its parameterized statement locks the active,
+non-deleted parent in the authorized Organization before the comment write and Activity insertion.
+Archive/restore reuse `comment-target.ts` so all four operations have the same parent predicates.
+Only allowlisted entity table names enter SQL; record identity and content remain bound parameters.
+
+Server Actions keep verified tenant scope, comment permissions, parent read and ownership checks.
+Editing additionally rechecks the comment's tenant/parent/type, expected version, active lifecycle
+and author or server-granted manage permission within SQL. Zero changed rows are not success.
+Earlier parent reads are UX pre-checks and cannot authorize a write past concurrent archival.
+Event insertion failure rolls back the comment mutation; do not introduce separate/best-effort logging.
+
+Thirty added isolated PGlite PostgreSQL tests run production SQL for all four entity types,
+covering successful writes, conflict/lifecycle/tenant policy and fault-injected rollback.
+This verifies SQL behavior; real multi-session Neon races and browser workflows remain separate checks.

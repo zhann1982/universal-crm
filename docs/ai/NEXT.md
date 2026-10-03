@@ -11,7 +11,8 @@ with missing migration 0012 after an Organization creation error. Other environm
 Use `DATABASE_INTEGRITY.md` for the coordinated audit/migration/application release.
 
 Continue with browser onboarding and multi-tab tenant checks, related-data visibility regressions,
-Deal conflict coverage and Comment create/edit lifecycle protection. Task/Comment/Activity database
+Deal conflict coverage. Comment create/edit lifecycle protection is implemented (D053); verify
+real multi-session/browser behavior rather than recreating the persistence operation. Task/Comment/Activity database
 references still need tenant constraints. F12 scaling and dedicated PostgreSQL CI remain open.
 Activity rollout and Pipeline management follow stabilization; do not begin AI integration yet.
 
@@ -27,7 +28,8 @@ User priority: multiple independent companies.
 5. Roll Activity out to Client / Company / Deal using the stabilized event model.
 6. Add saved views and Pipeline management; custom fields and automation follow later.
 
-Comment creation/editing still need the same concurrent parent lifecycle protection as archive/restore.
+Comment creation/editing now share parent lifecycle protection with archive/restore (D053).
+All four entity types have isolated PostgreSQL rollback/lifecycle tests; multi-session/browser checks remain.
 Activity pagination and structured old/new Task values remain open.
 
 ## Current cycle

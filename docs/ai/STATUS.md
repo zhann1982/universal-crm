@@ -1,5 +1,24 @@
 # Universal CRM — Current Status
 
+## Comment persistence stabilization — 2026-10-03
+
+D053 closes the earlier create/edit parent lifecycle pre-check gap. `save-comment.ts` locks an
+active, non-deleted parent in the same Organization before creating/editing the comment and
+its Activity event in one SQL statement. Editing revalidates comment parent/type, version,
+active lifecycle and author or server-derived manage permission. Empty results are not success.
+Archive/restore share `comment-target.ts` for the same parent predicates/locking.
+Server Actions retain mutation-scope, module read, comment permission and ownership checks.
+
+Verification: 148 tests passed, TypeScript, ESLint and production build passed. Thirty added
+PGlite PostgreSQL tests execute production comment SQL for Client, Company, Deal and Task,
+including foreign tenant/parent, stale version, non-author/manage policy, archive/deletion,
+successful restore and fault-injected rollback of create/edit/archive when event insertion fails.
+These tests do not claim real multi-session concurrency or browser coverage.
+No schema migration or changes to connected database records were required.
+
+Next: browser Organization onboarding/multi-tab scope, related-data visibility regression coverage,
+Deal conflict verification, F12 scaling and structured/paginated history. Do not recreate comment persistence.
+
 ## Connected database migration recovery — 2026-10-03
 
 The user reported Organization creation failing with `42P01`: `organization_creations` was absent.
