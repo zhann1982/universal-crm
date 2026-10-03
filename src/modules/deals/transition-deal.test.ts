@@ -21,6 +21,7 @@ test("stage transitions enforce the page version and the conditional write", asy
     { name: "stale no-op is also a conflict", version: 8, expected: 7, target: stageId, rows: true, code: "conflict", reads: 1, writes: 0 },
     { name: "current version moves the deal", version: 7, expected: 7, target: targetStageId, rows: true, code: null, reads: 2, writes: 1 },
     { name: "change after lookup returns conflict", version: 7, expected: 7, target: targetStageId, rows: false, code: "conflict", reads: 2, writes: 1 },
+    { name: "configuration guard rejection returns conflict", version: 7, expected: 7, target: targetStageId, rows: false, code: "conflict", reads: 2, writes: 1, guardFailure: true },
     { name: "current no-op does not write", version: 7, expected: 7, target: stageId, rows: true, code: null, reads: 2, writes: 0 },
     { name: "missing page version cannot use the latest version", version: 7, expected: undefined, target: targetStageId, rows: true, code: "invalid-input", reads: 0, writes: 0 },
     { name: "invalid version is rejected", version: 7, expected: 0, target: targetStageId, rows: true, code: "invalid-input", reads: 0, writes: 0 },
@@ -45,9 +46,10 @@ test("stage transitions enforce the page version and the conditional write", asy
           changes = values;
           return { where: (condition: SQL) => {
             predicate = condition;
-            return { returning: async () => scenario.rows
-              ? [{ id: dealId, pipelineId, stageId: scenario.target, version: scenario.version + 1 }]
-              : [] };
+            return { returning: async () => {
+              if ("guardFailure" in scenario) throw { cause: { code: "23514" } };
+              return scenario.rows ? [{ id: dealId, pipelineId, stageId: scenario.target, version: scenario.version + 1 }] : [];
+            } };
           } };
         } };
       });

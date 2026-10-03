@@ -4,6 +4,13 @@ Last updated: 2026-10-03
 
 ## Current update — 2026-10-03
 
+Pipeline management is implemented at `/crm/pipelines` (D054), following the user's product
+priority. Migration 0014 is applied to the connected database; configuration and Deal guard
+SQL are covered by isolated PostgreSQL tests. Next verify authorized/read-only browser flows,
+stale forms and real multi-session configuration/Deal races. Do not rebuild the module.
+Stage archive/deletion, automatic order swapping and global default uniqueness remain open.
+Saved views follow the remaining stabilization/browser verification work.
+
 Core database tenant integrity is implemented (D052 / migration 0013). Do not recreate these
 constraints or role-assignment scope. The connected database audit found no violations; the
 migration was verified in isolated PostgreSQL and applied to the connected Neon database on 2026-10-03
@@ -14,7 +21,7 @@ Continue with browser onboarding and multi-tab tenant checks, related-data visib
 Deal conflict coverage. Comment create/edit lifecycle protection is implemented (D053); verify
 real multi-session/browser behavior rather than recreating the persistence operation. Task/Comment/Activity database
 references still need tenant constraints. F12 scaling and dedicated PostgreSQL CI remain open.
-Activity rollout and Pipeline management follow stabilization; do not begin AI integration yet.
+Activity rollout follows stabilization; Pipeline management exists. Do not begin AI integration yet.
 
 ## Immediate development sequence — 2026-09-30
 
@@ -26,7 +33,7 @@ User priority: multiple independent companies.
 3. Organization selection/scope (D050) and self-service provisioning (D051) are implemented. Next verify onboarding, retries, tenant switches and stale forms in the browser; add live multi-session Neon creation/retry tests.
 4. Verify core database constraints (0013) in other deployment environments; extend tenant constraints to Task/Comment/Activity and introduce dedicated integration CI.
 5. Roll Activity out to Client / Company / Deal using the stabilized event model.
-6. Add saved views and Pipeline management; custom fields and automation follow later.
+6. Verify existing Pipeline management, then add saved views; custom fields and automation follow later.
 
 Comment creation/editing now share parent lifecycle protection with archive/restore (D053).
 All four entity types have isolated PostgreSQL rollback/lifecycle tests; multi-session/browser checks remain.

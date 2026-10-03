@@ -397,7 +397,10 @@ Stage types:
 - won
 - lost
 
-Pipeline/Stage management UI is not yet implemented.
+Pipeline/Stage management UI is implemented at `/crm/pipelines` (D054).
+`pipelines.read` permits configuration viewing; `pipelines.manage` permits changes.
+Stages support name, type, probability, numeric order and optional hexadecimal color.
+Pipeline archive/restore and default selection are available. Stage deletion/archive is not implemented.
 
 Migration 0013 adds composite Organization/Pipeline/Stage foreign keys and Stage type/probability
 checks. The migration is verified in isolated PGlite PostgreSQL and was applied to the connected

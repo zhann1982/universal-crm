@@ -1459,6 +1459,10 @@ export async function restoreDeal(
 
         version:
           deals.version,
+      }).catch((error: unknown) => {
+        const failure = error as { code?: string; cause?: { code?: string } };
+        if ((failure.cause?.code ?? failure.code) === "23514") return [];
+        throw error;
       });
 
   if (!restored) {

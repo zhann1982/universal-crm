@@ -1,5 +1,30 @@
 # Universal CRM — Current Status
 
+## Pipeline management — 2026-10-03
+
+Following the user's product priority, D054 adds `/crm/pipelines` and tenant-scoped detail
+pages. Configuration viewing uses `pipelines.read`; creation, metadata, default selection,
+archive/restore and Stage editing/creation use `pipelines.manage` and rendered tenant scope.
+Stage fields are name, type, probability, unique numeric position and optional hex color.
+Shared defaults create six stages. Existing Deal/Stage identities and history are preserved.
+
+The domain operation serializes configuration and checks Pipeline versions. It rejects
+stale forms, duplicate names/positions, foreign Stage IDs, used Stage type changes,
+removal of the last open Stage, and archive of default/last active/actively used Pipelines.
+Migration 0014 adds versions and a Deal parent-lock/lifecycle guard, with conflict feedback
+for stale Stage transitions and restoration into archived Pipelines.
+
+Verification: 158 tests pass; TypeScript, ESLint and production build pass.
+Ten added isolated PostgreSQL/unit checks execute configuration SQL, rollback, tenant/version
+guards, lifecycle and valid/stale Deal semantics. Migration 0014 was applied to the connected
+Neon database after a read-only preflight found zero inconsistent Deal Stage states.
+No development seed or business-data repair was run. Other databases require their own migration.
+Authenticated browser/manual workflows and real multi-session Neon concurrency remain unverified.
+Stage archive/deletion, automatic order swapping and database-wide default uniqueness remain open.
+
+Next: browser Pipeline/Organization workflows and stale forms, remaining authorization/Deal
+conflict coverage, then saved views. Do not recreate Pipeline management.
+
 ## Comment persistence stabilization — 2026-10-03
 
 D053 closes the earlier create/edit parent lifecycle pre-check gap. `save-comment.ts` locks an

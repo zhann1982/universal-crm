@@ -1109,6 +1109,7 @@ export const pipelines =
   pgTable(
     "pipelines",
     {
+      version: integer("version").notNull().default(1),
       id: uuid("id")
         .defaultRandom()
         .primaryKey(),

@@ -763,3 +763,34 @@ Event insertion failure rolls back the comment mutation; do not introduce separa
 Thirty added isolated PGlite PostgreSQL tests run production SQL for all four entity types,
 covering successful writes, conflict/lifecycle/tenant policy and fault-injected rollback.
 This verifies SQL behavior; real multi-session Neon races and browser workflows remain separate checks.
+
+## D054 — Tenant-scoped Pipeline configuration and lifecycle protection
+
+Date: 2026-10-03
+
+The user prioritized Pipeline management as the next product increment. `/crm/pipelines`
+provides read-only configuration with `pipelines.read`; writes require `pipelines.manage`
+and the rendered Organization scope. Shared provisioning defaults create the initial stages.
+
+`manage-pipeline.ts` serializes configuration by an Organization advisory lock, then locks
+its Pipeline rows in ID order in a separate statement. Pipeline `version` guards every
+configuration mutation, including Stage changes. Duplicate names/order roll back all writes.
+Default switching atomically clears other defaults and selects an active expected target.
+This enforces the rule for application management writes; a global unique default constraint
+is still deferred, and direct SQL/legacy defaults are not automatically repaired.
+
+A default/last active Pipeline or one with active non-deleted Deals cannot be archived.
+Archived Deals retain their history; restoring them requires restoring their Pipeline first.
+Changing a Stage type is prohibited while non-deleted Deals (including archived) reference it.
+At least one open Stage remains. Stage IDs are stable; deletion/archive of Stages is deferred.
+Numeric Stage positions remain unique; an occupied position is rejected rather than swapped.
+
+Migration 0014 adds Pipeline versions and a focused Deal trigger. Insert, relationship change
+and restore share Pipeline/Stage locks and revalidate active Pipeline and Stage/closedAt
+consistency. It rejects stale configuration rather than implementing Stage transitions;
+`transition-deal.ts` remains the shared application operation. Existing metadata/archive writes
+are unaffected. Guard rejection becomes conflict feedback for transitions and restore.
+
+Isolated PostgreSQL tests execute the production configuration SQL and migration, covering
+tenant/version boundaries, rollback, defaults, lifecycle, used Stage protection and valid/stale
+Deal state. They do not verify real multi-session Neon concurrency or browser workflows.

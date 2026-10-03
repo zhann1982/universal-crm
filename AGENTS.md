@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D053`
+`D054`
 
 ---
 
@@ -641,6 +641,13 @@ Browser cross-tenant workflow verification remains open; do not recreate Organiz
 
 Then: Activity for Client/Company/Deal → Pipeline management → saved views → custom fields
 → automation → read-first AI.
+
+Pipeline management is implemented (D054), following the user's product priority.
+Use `src/modules/pipelines/manage-pipeline.ts`; mutations require `pipelines.manage`
+and rendered Organization scope. Pipeline versions also protect Stage edits.
+Lock Organization configuration, then Pipeline rows; Deal writes share parent locks
+through migration 0014. Do not bypass used-Stage type or Pipeline archive protections.
+Stage archive/deletion and automatic position swapping remain follow-ups.
 
 ## Activity permissions
 

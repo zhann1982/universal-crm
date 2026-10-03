@@ -348,6 +348,12 @@ export async function transitionDeal({
 
         version:
           deals.version,
+      }).catch((error: unknown) => {
+        const failure = error as { code?: string; cause?: { code?: string } };
+        // Configuration may change after the target lookup. The database guard
+        // rejects stale lifecycle/type semantics without changing the Deal.
+        if ((failure.cause?.code ?? failure.code) === "23514") return [];
+        throw error;
       });
 
   /*
