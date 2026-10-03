@@ -4,7 +4,7 @@ import {
   asc,
   eq,
 } from "drizzle-orm";
-import Link from "next/link";
+import Link from "@/components/app-link";
 import {
   notFound,
 } from "next/navigation";

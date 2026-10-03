@@ -42,6 +42,13 @@
 }
 .crm-shell nav > a { color: #e0e0e0; border-left: 3px solid transparent; }
 .crm-shell nav > a:hover { background: #454545; color: #fff; border-left-color: #00b9d8; }
+.crm-shell nav > a[aria-current="page"] {
+  background: #454545;
+  color: #fff;
+  border-left-color: #00b9d8;
+  font-weight: 600;
+}
+.crm-shell nav > a[aria-current="page"] .crm-nav-icon { color: #00b9d8; }
 .crm-shell nav > div { color: #909090; }
 .crm-nav-icon { width: 15px; height: 15px; flex-shrink: 0; }
 .crm-shell header {

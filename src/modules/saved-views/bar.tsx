@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/app-link";
 import { randomUUID } from "node:crypto";
 import { readViews } from "./persistence";
 import { filtersHref, parseFilters, type ViewEntity } from "./filters";

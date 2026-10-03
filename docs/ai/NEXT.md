@@ -4,6 +4,9 @@ Last updated: 2026-10-03
 
 ## Current update — 2026-10-03
 
+Navigation loading feedback and active CRM sidebar sections are implemented and browser-checked.
+Use the shared AppLink for new navigation links so pending feedback remains consistent.
+
 Personal saved views for Client/Company lists and the Deal board are implemented (D055).
 Do not recreate them. Next: sharing/default/editing semantics only with a concrete product need;
 archive pagination beyond the latest 50, broader multi-role browser checks and scale coverage.

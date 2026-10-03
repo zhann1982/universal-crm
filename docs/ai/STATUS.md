@@ -1,5 +1,23 @@
 # Universal CRM — Current Status
 
+## Navigation feedback — 2026-10-03
+
+All application Next.js links use `src/components/app-link.tsx`, which forwards Link props
+and displays a top progress bar from the real `useLinkStatus` pending state. The indicator
+uses a body portal to avoid clipping by cards; no document click interception, timers or
+navigation completion guesses are used. Cached instant navigation does not force a delay.
+Root/CRM loading boundaries show an accessible spinner and loading text while streaming.
+Reduced-motion preferences disable animation. Page authorization/data operations are unchanged.
+
+CRM sidebar links use pathname matching and `aria-current="page"`: Dashboard is exact,
+other sections include nested routes with a slash boundary. Active styling includes accent
+border, background, icon color and font weight. Permission-driven sidebar visibility stays server-side.
+
+Verification: TypeScript, ESLint and production build pass. Browser checks verified pending
+feedback on sidebar and Deal-detail links, cleanup on completion, active Deals/Tasks, and
+section preservation on `/crm/tasks/new` and a Deal detail. No new schema or database writes.
+The existing 167-test business baseline was not rerun for this presentation-only change.
+
 ## Personal saved views — 2026-10-03
 
 D055 adds "Мои представления" to Client/Company lists and the Deal board. Users can name

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import Link from "next/link";
+import Link from "@/components/app-link";
 import { requireVerifiedSession } from "@/lib/auth/verified-session";
 import { CreateOrganizationForm } from "./form";
 

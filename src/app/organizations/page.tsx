@@ -2,7 +2,7 @@ import { requireVerifiedSession } from "@/lib/auth/verified-session";
 import { listAccessibleOrganizations } from "@/modules/access/organization-selection";
 import { LogoutButton } from "@/app/crm/logout-button";
 import { selectOrganization } from "./actions";
-import Link from "next/link";
+import Link from "@/components/app-link";
 
 export default async function OrganizationsPage({ searchParams }: {
   searchParams: Promise<{ reason?: string; joined?: string }>;

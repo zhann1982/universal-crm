@@ -1,9 +1,10 @@
 import { OrganizationProvider } from "@/modules/access/organization-context";
-import Link from "next/link";
+import Link from "@/components/app-link";
 
 import { getCurrentAccessContext } from "@/lib/auth/permissions";
 
 import { LogoutButton } from "./logout-button";
+import { NavigationLink as ActiveNavigationLink } from "./navigation-link";
 import "./crm-theme.css";
 
 export default async function CrmLayout({
@@ -148,13 +149,12 @@ function NavigationLink({
   label: string;
 }) {
   return (
-    <Link
+    <ActiveNavigationLink
       href={href}
-      className="block rounded-lg px-4 py-3 text-sm font-medium transition hover:bg-slate-100"
+      label={label}
     >
       <NavigationIcon label={label} />
-      {label}
-    </Link>
+    </ActiveNavigationLink>
   );
 }
 

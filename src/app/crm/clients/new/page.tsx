@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/app-link";
 
 import { ClientForm } from "./client-form";
 import { requirePermission } from "@/lib/auth/permissions";
