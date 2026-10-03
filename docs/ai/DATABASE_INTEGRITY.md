@@ -40,5 +40,8 @@ invalid direct writes and assignment workflow SQL against isolated PGlite Postgr
 Live multi-session PostgreSQL and browser workflow checks remain separate. Task/Comment/Activity
 and invitation reference constraints are outside this migration; default Pipeline uniqueness is deferred.
 
-On 2026-10-03 the connected database's read-only preflight passed. This task did not apply migrations
-to that database; isolated verification must not be reported as a deployed schema update.
+On 2026-10-03 the connected database's read-only preflight passed. A follow-up recovery applied
+missing migrations 0012 and 0013 through drizzle-kit after Organization creation failed on the
+absent `organization_creations` table. All 14 journal hashes matched local migrations, required
+schema was verified and the post-migration audit passed. Browser creation still requires a retry;
+other deployment environments have not been verified by this recovery.

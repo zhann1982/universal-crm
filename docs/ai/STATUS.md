@@ -1,5 +1,16 @@
 # Universal CRM — Current Status
 
+## Connected database migration recovery — 2026-10-03
+
+The user reported Organization creation failing with `42P01`: `organization_creations` was absent.
+Read-only inspection confirmed the connected database migration journal stopped at 0011.
+After a clean integrity preflight, `drizzle-kit migrate` applied 0012 and 0013 successfully.
+Post-migration verification confirmed all 14 journal entries/hashes match checked-in migrations,
+the Organization creation table exists, assignment scope is NOT NULL, role assignments are consistent
+and all 12 integrity audit counts are zero. No development seed or data repair was run.
+This verifies the connected database schema; browser Organization creation still needs user retry.
+Other deployment databases must be inspected/migrated separately.
+
 ## Core database integrity update — 2026-10-03
 
 Decision D052 / migration `0013_tenant_integrity.sql`:
@@ -22,7 +33,8 @@ These checks do not claim browser or live multi-session Neon concurrency coverag
 The normal test runner limits file concurrency to two to bound PGlite memory use;
 an unrestricted run alongside the production build exhausted Node memory on this Windows host.
 
-Deployment: migration 0013 has NOT been applied to the connected/deployed database.
+Deployment: the initial implementation did not apply migration 0013; the recovery update above
+confirms 0012/0013 are now applied to the connected database.
 Audit and apply migrations with CRM writes paused, then activate matching application code;
 old assignment writers omit the new required column. See `docs/ai/DATABASE_INTEGRITY.md`.
 
@@ -68,7 +80,7 @@ Organization provisioning (D051):
 - The form retains its name/request key after recoverable errors; successful creation opens CRM.
 - Shared permission/role/stage defaults serve onboarding and the development seed.
 - Migration `0012_long_cammi.sql` is required (`npm run db:migrate`). It was verified in isolated PGlite;
-  it has not been applied to the working/deployed database by this task.
+  it was applied to the connected database during the 2026-10-03 recovery described above.
 
 Verification: 95 tests passed, including isolated PGlite onboarding, rollback, identity and retry tests.
 TypeScript, ESLint and production build passed. The build used dummy configuration and did not
@@ -371,7 +383,7 @@ Not implemented:
 - Stage management UI
 
 Core Stage/Deal tenant relationship constraints are implemented in migration 0013.
-Applying them to the connected/deployed database remains an operational step.
+They are applied to the connected database; other deployment environments require separate verification.
 
 ---
 
@@ -410,7 +422,7 @@ F04:
 FIXED AT APPLICATION LEVEL
 
 Database-level composite invariant is implemented and isolated-PostgreSQL-tested in migration 0013.
-The migration has not been applied to the connected/deployed database.
+The migration is applied to the connected database; browser conflict verification remains separate.
 
 F10:
 

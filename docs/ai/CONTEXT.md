@@ -400,7 +400,8 @@ Stage types:
 Pipeline/Stage management UI is not yet implemented.
 
 Migration 0013 adds composite Organization/Pipeline/Stage foreign keys and Stage type/probability
-checks. The migration is verified in isolated PGlite PostgreSQL; it has not been applied to Neon.
+checks. The migration is verified in isolated PGlite PostgreSQL and was applied to the connected
+Neon database on 2026-10-03 together with the previously missing Organization provisioning migration 0012.
 
 ---
 
@@ -585,7 +586,7 @@ Major remaining areas:
 
 - related-data visibility regression tests
 - Deal optimistic-conflict PostgreSQL/browser verification
-- remaining PostgreSQL invariants for Task/Comment/Activity references; deploy tested core migration 0013
+- remaining PostgreSQL invariants for Task/Comment/Activity references; verify 0013 in other deployment environments
 - F12 unbounded loading / scaling
 - dedicated CI PostgreSQL strategy
 - production invitation email delivery/admin UX
