@@ -31,6 +31,9 @@ requires migration 0019 before using the working application. A full browser/mul
 custom-field workflow was not performed against the old working schema. Broader real role/session,
 mail delivery and Neon throughput checks remain deployment validation. Custom filtering/imports,
 select-option edits and dedicated non-production real PostgreSQL CI are not implemented here.
+Package is published on `codex/custom-fields` without merging main. CI now checks `codex/**`
+pushes as well as main/PRs. Draft PR creation through the connector was denied (403); no
+stored credentials were extracted after automatic approval review rejected that fallback.
 
 ## Five-point stabilization implementation — 2026-10-04
 
