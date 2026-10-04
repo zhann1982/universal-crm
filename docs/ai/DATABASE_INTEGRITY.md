@@ -1,5 +1,10 @@
 # Database integrity rollout (D052)
 
+Latest connected rollout (2026-10-04): user-authorized encrypted backup/isolated restore and
+paused local writes preceded normal application of 0017/0018/0019. Journal verifies 20/20
+hashes/timestamps; post-rollout 23-counter audit is clean. Local CRM restarted and Owner read-only
+browser checks passed. Other environments must follow the procedure below independently.
+
 Migration: `drizzle/0013_tenant_integrity.sql`. Application and migration must ship together.
 
 ## Before rollout

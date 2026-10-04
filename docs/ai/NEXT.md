@@ -2,6 +2,15 @@
 
 Last updated: 2026-10-04
 
+## Connected rollout completed — 2026-10-04
+
+Main now contains D062 and migrations through 0019. With explicit user authorization, a local
+encrypted backup was verified by isolated restoration, local writes paused, 0017–0019 applied
+through the normal runner and the dev server restarted. Journal: 20/20 matching, audit: 23 zero
+counters. Owner browser Dashboard/settings/board smoke checks passed. Do not rerun applied
+migrations or recreate fields. Remaining rollout verification: custom-value browser mutations,
+broader role/session races, production mail settings/delivery and measured Neon throughput.
+
 ## Latest custom-field package — 2026-10-04
 
 D062 implements Client/Company/Deal custom fields. Do not rebuild this module. Read

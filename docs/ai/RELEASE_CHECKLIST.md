@@ -1,9 +1,14 @@
 # Deployment package — 2026-10-04
 
-Working-database writes/migrations were explicitly deferred by the user. Read-only verification
-found 17 applied migration hashes matching the repository; pending: 0017, 0018 and 0019.
-Code must not be activated against the old schema. A running local development server also
-needs the new schema before using the updated record pages.
+Connected rollout completed with explicit user authorization: encrypted backup verified against
+all 24 restored tables, local dev server paused, 0017–0019 applied through drizzle-kit, 20/20
+matching migration hashes/timestamps and zero post-rollout audit violations. Local server was
+restarted; authenticated Dashboard/settings/board read-only smoke checks pass. Backup and its
+Windows CurrentUser DPAPI-protected AES key are under ignored `.local-backups/` on this computer.
+No raw backup, key, connection credentials or auth records are committed. Keep these files private.
+
+For another database/environment, follow the sequence below; do not activate code against the
+old schema. Real mail configuration and broader role/session workflows still require validation.
 
 ## Before applying
 

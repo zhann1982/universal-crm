@@ -1,5 +1,22 @@
 # Universal CRM — Current Status
 
+## Main and connected migration rollout — 2026-10-04
+
+The user explicitly authorized merging all changes into main, pausing/restarting the local
+CRM server, exporting an encrypted full backup (including auth tables), verifying isolated
+restoration and applying migrations 0017–0019. This supersedes the earlier isolated-only choice.
+An AES-256-GCM backup of 24 tables/17-migration schema was restored and compared in PGlite.
+Source TimeZone was used for exact temporal comparison; no business values entered output.
+Its key is Windows CurrentUser DPAPI-protected; both files and verification source remain only
+under ignored `.local-backups/`, never committed. Local dev server was paused during rollout.
+
+Normal drizzle-kit migration succeeded. Connected journal now has 20/20 matching hashes and
+timestamps, with no pending migrations. Post-migration audit: all 23 invariant counters zero.
+Server restarted on localhost:3000. Existing authenticated Owner browser session loaded
+Dashboard, custom-field settings and Deal board without the missing-column error. No business
+record/configuration mutation was performed for this smoke check. Broader role/session/custom
+mutation workflows remain separate; email transport is still unconfigured.
+
 ## Custom fields and deployment preparation — 2026-10-04
 
 D062 adds `/crm/settings/custom-fields` for settings.manage. Client/Company/Deal definitions
