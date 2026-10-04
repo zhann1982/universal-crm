@@ -1,4 +1,5 @@
 "use server";
+import { creationValues } from "@/modules/custom-fields/persistence";
 import { changeDealLifecycle } from "@/modules/deals/change-deal-lifecycle";
 
 import { redirectWithNotice } from "@/modules/notifications/redirect";
@@ -238,11 +239,23 @@ export async function createDeal(
 
   const isClosed = stage.type === "won" || stage.type === "lost";
 
+  let customData;
+  try {
+    customData = await creationValues(organization.id, "deal", formData);
+  } catch (error) {
+    const known = error instanceof Error && !("code" in error) &&
+      /^(Заполните поле|Поле «|Настройка полей|Неизвестное поле|Некорректные значения)/.test(error.message);
+    return {
+      values,
+      message: known ? error.message : "Не удалось проверить пользовательские поля.",
+    };
+  }
   try {
     await recordMutation(
       { organizationId: organization.id, memberId: member.id },
       () =>
         db.insert(deals).values({
+      ...customData,
           organizationId: organization.id,
 
           pipelineId: pipeline.id,

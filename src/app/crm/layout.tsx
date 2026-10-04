@@ -104,9 +104,7 @@ export default async function CrmLayout({
             )}
 
             {permissions.has("pipelines.read") && <NavigationLink href="/crm/pipelines" label="Воронки" />}
-            <DisabledNavigation
-              label="Настройки"
-            />
+            {permissions.has("settings.manage") && <NavigationLink href="/crm/settings/custom-fields" label="Пользовательские поля" />}
           </nav>
         </aside>
 
@@ -176,6 +174,7 @@ function DisabledNavigation({
 
 function NavigationIcon({ label }: { label: string }) {
   const paths: Record<string, string> = {
+    "Пользовательские поля": "M4 5h16M4 12h16M4 19h16M8 3v4M16 10v4M10 17v4",
     Воронки: "M3 4h18l-7 8v7l-4 2v-9z",
     Dashboard: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9",
     Клиенты: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M17 3a4 4 0 0 1 0 8M22 21v-2a4 4 0 0 0-3-3.87",

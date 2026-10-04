@@ -1,5 +1,37 @@
 # Universal CRM — Current Status
 
+## Custom fields and deployment preparation — 2026-10-04
+
+D062 adds `/crm/settings/custom-fields` for settings.manage. Client/Company/Deal definitions
+support text/number/calendar-date/boolean/fixed-select, required, order, rename, archive/restore,
+immutable type/options and 50-active / 150-total limits per tenant/entity. Values appear in
+creation forms and detail cards with a separate editor. Base entity read/update permissions
+govern access; settings permission alone does not grant record access. Core edits retain custom
+values. Required applies on creation/explicit value save, without backfilling old records.
+
+Migration 0019 stores values on parents with rendered configuration revision and custom version.
+Configuration locks Organization; value saves lock Organization then parent, check active actor,
+scope/lifecycle/version and update Deal's main version. PostgreSQL validates UUID allowlist,
+types/calendar/required/limits and preserves archived values. A fixed safe Activity event is
+atomic with changes; no copied field names/private values. Controlled drafts survive errors;
+their version advances only after their own confirmed save.
+
+Verification: 221/221 full local tests passed. New coverage executes production PostgreSQL SQL
+and actual migrations, creation, all types/invalid values, tenant/entity/version boundaries,
+revoked actors, field limits/failed restore rollback, archived parents/definitions and forced
+Activity failure rollback. Policy/SSR tests cover parent permissions and escaped required/select
+controls; journal preflight detects pending/altered hashes. TypeScript, ESLint and final production
+build passed. Drizzle generation reports no schema changes after snapshot verification.
+
+Read-only connected journal verification: 17/20 hashes/timestamps match, pending 0017/0018/0019.
+The user explicitly selected isolated verification because no backup/write pause is prepared.
+No working-database migration or business write occurred in this package; no real email provider
+is configured. See RELEASE_CHECKLIST.md, CUSTOM_FIELDS.md and EMAIL_DELIVERY.md. Updated code
+requires migration 0019 before using the working application. A full browser/multi-session
+custom-field workflow was not performed against the old working schema. Broader real role/session,
+mail delivery and Neon throughput checks remain deployment validation. Custom filtering/imports,
+select-option edits and dedicated non-production real PostgreSQL CI are not implemented here.
+
 ## Five-point stabilization implementation — 2026-10-04
 
 D058–D061 implement permission-safe Deal details; rendered-version lifecycle mutations;

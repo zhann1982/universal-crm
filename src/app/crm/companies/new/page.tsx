@@ -1,3 +1,5 @@
+import { CustomFieldInputs } from "@/modules/custom-fields/inputs";
+import { readDefinitions } from "@/modules/custom-fields/persistence";
 import { and, asc, sql, eq } from "drizzle-orm";
 import Link from "@/components/app-link";
 
@@ -60,6 +62,7 @@ export default async function NewCompanyPage() {
     ];
   }
 
+  const customConfig=await readDefinitions(organization.id,"company");
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
@@ -77,7 +80,7 @@ export default async function NewCompanyPage() {
         </p>
       </div>
 
-      <CompanyForm members={members} />
+      <CompanyForm members={members}><CustomFieldInputs fields={customConfig.fields} revision={customConfig.revision}/></CompanyForm>
     </div>
   );
 }

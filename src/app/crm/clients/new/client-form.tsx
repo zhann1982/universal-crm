@@ -9,7 +9,7 @@ import type { CreateClientState } from "@/lib/validation/client";
 
 const initialState: CreateClientState = {};
 
-export function ClientForm() {
+export function ClientForm({children}:{children?:React.ReactNode}) {
   const [state, formAction, pending] =
     useToastActionState(
       createClient,
@@ -182,6 +182,7 @@ export function ClientForm() {
         </div>
       </section>
 
+      {children}
       <div className="flex justify-end">
         <button
           type="submit"

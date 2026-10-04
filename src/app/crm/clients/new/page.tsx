@@ -1,12 +1,15 @@
+import { CustomFieldInputs } from "@/modules/custom-fields/inputs";
+import { readDefinitions } from "@/modules/custom-fields/persistence";
 import Link from "@/components/app-link";
 
 import { ClientForm } from "./client-form";
 import { requirePermission } from "@/lib/auth/permissions";
 
 export default async function NewClientPage() {
-  await requirePermission(
+  const {organization}=await requirePermission(
     "clients.create",
   );
+  const customConfig=await readDefinitions(organization.id,"client");
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-8">
@@ -26,7 +29,7 @@ export default async function NewClientPage() {
         </p>
       </div>
 
-      <ClientForm />
+      <ClientForm><CustomFieldInputs fields={customConfig.fields} revision={customConfig.revision}/></ClientForm>
     </div>
   );
 }

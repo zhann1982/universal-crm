@@ -1,4 +1,5 @@
 "use server";
+import { creationValues } from "@/modules/custom-fields/persistence";
 
 import { redirectWithNotice } from "@/modules/notifications/redirect";
 
@@ -233,10 +234,22 @@ export async function createCompany(
     }
   }
 
+  let customData;
+  try {
+    customData = await creationValues(organization.id, "company", formData);
+  } catch (error) {
+    const known = error instanceof Error && !("code" in error) &&
+      /^(Заполните поле|Поле «|Настройка полей|Неизвестное поле|Некорректные значения)/.test(error.message);
+    return {
+      values,
+      message: known ? error.message : "Не удалось проверить пользовательские поля.",
+    };
+  }
   try {
     await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
       .insert(companies)
       .values({
+      ...customData,
         organizationId:
           organization.id,
 

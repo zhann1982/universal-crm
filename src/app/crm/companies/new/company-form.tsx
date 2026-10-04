@@ -16,7 +16,7 @@ type MemberOption = {
 
 const initialState: CreateCompanyState = {};
 
-export function CompanyForm({ members }: { members: MemberOption[] }) {
+export function CompanyForm({ members, children }: { members: MemberOption[]; children?:React.ReactNode }) {
   const [state, formAction, pending] = useToastActionState(
     createCompany,
     initialState,
@@ -180,6 +180,7 @@ export function CompanyForm({ members }: { members: MemberOption[] }) {
         <FieldErrors errors={state.errors?.notes} />
       </section>
 
+      {children}
       <div className="flex justify-end">
         <button
           type="submit"

@@ -927,3 +927,39 @@ Optional Resend HTTP transport uses canonical BETTER_AUTH_URL, API key/from conf
 are provisioned. Creation is committed before external delivery; failures retain a valid manual
 link. Provider acceptance never claims inbox delivery. Better Auth verification uses the same
 transport when configured; production missing delivery remains an explicit error.
+
+## D062 — Custom fields share the tenant, lifecycle and atomic record boundary
+
+Date: 2026-10-04
+
+The user selected deployment completion plus custom fields, then explicitly chose isolated
+migration verification because no backup/write pause was prepared. Working Neon migrations
+remain unapplied; generating files is not applying them. The new read-only journal command
+checks local hashes/timestamps and reports pending migrations without exposing connection data.
+
+Client/Company/Deal definitions belong to Organization + entity. Existing settings.manage
+authorizes configuration; existing parent read/update permissions authorize values. No new
+permission grants or field-specific visibility policy. Stable UUID definitions have versioned
+name/required/position/archive/restore; entity/type/options are immutable, with 50-active and
+150-total limits. Archive retains values; hard deletion is rejected. Required does not invalidate
+legacy records or block unrelated core edits, but is enforced on creation and explicit value saves.
+
+Parent JSONB stores allowlisted UUID keys and normalized string values. This keeps creation and
+custom values in one awaited actor-scoped INSERT. A focused Neon transaction locks Organization
+configuration then parent, checks custom version, active actor/Organization and lifecycle, updates
+values and records a fixed safe Activity label in the same transaction. Deal custom writes advance
+the main Deal version so stale full edits/transitions cannot adopt newer state silently. Archived
+field values cannot be changed or removed. Numeric decimal precision is 12 integer / 6 fraction
+digits; calendar dates stay YYYY-MM-DD; boolean false counts as a supplied required value.
+
+Migration 0019 increments Organization schema revision on configuration changes and validates
+rendered revision/type/tenant/required/limits in PostgreSQL. Old forms fail safely rather than
+adopting new configuration. Controlled inputs retain failed drafts; only a successful own save
+advances the draft custom version. Existing 0016 Activity behavior remains unchanged; a separate
+AFTER trigger writes only the fixed label, never custom field names or values. No backfill.
+
+Isolated PostgreSQL tests execute production SQL, direct invalid writes, stale/foreign/revoked
+access, all types, limits, archive/restore and fault-injected history rollback. Policy/SSR tests
+cover parent permission combinations and escaped controls. Real browser/multi-session Neon
+verification and delivery of real emails remain rollout validation. Filtering/saved-view support
+for custom fields, changing select options and imports are follow-ups, not implemented here.

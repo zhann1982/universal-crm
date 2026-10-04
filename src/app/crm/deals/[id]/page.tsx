@@ -1,3 +1,4 @@
+import { CustomFieldsSection } from "@/modules/custom-fields/section";
 import { EntityTimeline } from "@/modules/activity/entity-timeline";
 import { OrganizationForm } from "@/modules/access/organization-context";
 import { and, asc, eq } from "drizzle-orm";
@@ -328,6 +329,7 @@ export default async function DealPage({
           </p>
         )}
       </section>
+      <CustomFieldsSection entity="deal" id={deal.id} values={deal.customFields} version={deal.customFieldsVersion} archived={deal.isArchived}/>
       <EntityTimeline
         entityType="deal"
         entityId={deal.id}

@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D061`
+`D062`
 
 ---
 
@@ -704,6 +704,23 @@ Serialize it with a transaction advisory lock in a separate statement before the
 creation statement. Replay must never restore revoked Membership, Organization access or Owner roles.
 Shared Permission/Role/Stage defaults also serve the development seed; do not duplicate them.
 Migration `0012_long_cammi.sql` is required. Never run the development seed for production onboarding.
+
+## Custom fields
+
+D062: Client/Company/Deal fields are Organization-scoped configuration, managed with
+`settings.manage` at `/crm/settings/custom-fields`. Values inherit the parent entity's
+read/update permissions; settings access alone never grants business-record access.
+Use `src/modules/custom-fields/persistence.ts`; definitions have immutable ID/entity/type/options,
+versioned rename/required/order/archive/restore and limits of 50 active / 150 total per entity.
+Values live in the parent JSONB column, so record creation and custom values are one INSERT.
+Required fields apply to new records and explicit custom-value saves, not unrelated edits of
+legacy records. Archived definitions/values are retained and immutable; no hard deletion.
+Schema revision is rendered with the form and rechecked under an Organization lock. Custom
+value version protects drafts; Deal custom writes also advance the main Deal version.
+Migration 0019 validates the allowlist/types/calendar dates and records a safe fixed Activity
+label atomically. Do not write an independent history event or copy custom labels/values into it.
+Do not run working-database migrations when the user selected isolated verification only.
+`db:check-migrations` is read-only; pending files intentionally produce exit code 1.
 
 ## Mutation notifications
 

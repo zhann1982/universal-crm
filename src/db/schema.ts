@@ -55,6 +55,7 @@ export const organizations = pgTable(
       .defaultRandom()
       .primaryKey(),
 
+    customFieldRevision: integer("custom_field_revision").notNull().default(0),
     name: varchar("name", {
       length: 160,
     }).notNull(),
@@ -665,6 +666,9 @@ export const clients =
         .defaultRandom()
         .primaryKey(),
 
+      customFields: jsonb("custom_fields").$type<Record<string, string>>().notNull().default({}),
+      customFieldsVersion: integer("custom_fields_version").notNull().default(1),
+      customFieldSchema: integer("custom_field_schema").notNull().default(0),
       organizationId: uuid(
         "organization_id",
       )
@@ -842,6 +846,9 @@ export const companies =
         .defaultRandom()
         .primaryKey(),
 
+      customFields: jsonb("custom_fields").$type<Record<string, string>>().notNull().default({}),
+      customFieldsVersion: integer("custom_fields_version").notNull().default(1),
+      customFieldSchema: integer("custom_field_schema").notNull().default(0),
       organizationId: uuid(
         "organization_id",
       )
@@ -1354,6 +1361,9 @@ export const deals =
         .defaultRandom()
         .primaryKey(),
 
+      customFields: jsonb("custom_fields").$type<Record<string, string>>().notNull().default({}),
+      customFieldsVersion: integer("custom_fields_version").notNull().default(1),
+      customFieldSchema: integer("custom_field_schema").notNull().default(0),
       organizationId: uuid(
         "organization_id",
       )

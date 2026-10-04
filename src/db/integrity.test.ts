@@ -23,7 +23,7 @@ test("Drizzle migration journal installs the complete schema and safely replays"
   assert.deepEqual((await pg.query("SELECT * FROM member_roles")).rows, before);
   assert.equal(
     (await pg.query("SELECT * FROM drizzle.__drizzle_migrations")).rows.length,
-    19,
+    20,
   );
 });
 

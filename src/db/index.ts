@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { getActivityActor } from "@/modules/activity/mutation-context";
 
+import * as customFieldsSchema from "./custom-fields-schema";
 import * as crmSchema from "./schema";
 import * as authSchema from "./auth-schema";
 import * as taskSchedulingSchema from "./task-scheduling-schema";
@@ -29,6 +30,7 @@ export const sql =
 
 const schema = {
   ...crmSchema,
+  ...customFieldsSchema,
   ...authSchema,
   ...taskSchedulingSchema,
   ...activitySchema,

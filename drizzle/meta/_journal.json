@@ -134,6 +134,13 @@
       "when": 1791097190599,
       "tag": "0018_bounded_read_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791101452388,
+      "tag": "0019_custom_fields",
+      "breakpoints": true
     }
   ]
 }

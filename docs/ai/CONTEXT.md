@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-04
 
+Custom fields (D062) configure Client/Company/Deal data within each Organization. Types are
+text, decimal number, date-only, boolean and fixed-option select. Configuration requires
+settings.manage; record permissions govern values. Values are entered at creation or edited
+from the detail card. Definitions can be renamed, ordered, made required, archived/restored;
+type and options stay immutable. Legacy records are not automatically backfilled.
+
 Saved views (D055) are personal Membership-scoped preferences within an Organization.
 Client/Company views persist search, status and active/archive filters. Deal views persist
 an active Pipeline, title search, all/mine/unassigned owner, Stage state and close-date filter.

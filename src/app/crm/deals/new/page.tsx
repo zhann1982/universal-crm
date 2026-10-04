@@ -1,3 +1,5 @@
+import { CustomFieldInputs } from "@/modules/custom-fields/inputs";
+import { readDefinitions } from "@/modules/custom-fields/persistence";
 import { and, asc, sql, desc, eq, isNull } from "drizzle-orm";
 import Link from "@/components/app-link";
 import { redirect } from "next/navigation";
@@ -162,6 +164,7 @@ export default async function NewDealPage({
     ];
   }
 
+  const customConfig=await readDefinitions(organization.id,"deal");
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
@@ -187,7 +190,7 @@ export default async function NewDealPage({
         defaultPipelineId={defaultPipeline.id}
         defaultStageId={defaultStage?.id ?? ""}
         defaultOwnerMemberId={member.id}
-      />
+      ><CustomFieldInputs fields={customConfig.fields} revision={customConfig.revision}/></DealForm>
     </div>
   );
 }

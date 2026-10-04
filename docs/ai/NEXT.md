@@ -2,6 +2,17 @@
 
 Last updated: 2026-10-04
 
+## Latest custom-field package — 2026-10-04
+
+D062 implements Client/Company/Deal custom fields. Do not rebuild this module. Read
+CUSTOM_FIELDS.md for scope and RELEASE_CHECKLIST.md for rollout. User explicitly selected
+isolated verification; connected Neon still has 17/20 migrations, pending 0017/0018/0019.
+No backup/write pause or mail provider is configured. Apply the package only after preparing
+those deployment conditions, then perform multi-role/browser and invitation delivery checks.
+Next product extensions: permission-safe typed custom-field filters/saved views, then CSV
+import with preview, validation and deliberate duplicate handling. Select-option evolution and
+full core/custom combined editing require explicit semantics. Analytics/automation/AI remain later.
+
 ## Latest stabilization update — 2026-10-04
 
 Five-point implementation exists (D058–D061); do not recreate these modules. Roll out 0017/0018

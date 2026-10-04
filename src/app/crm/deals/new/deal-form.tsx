@@ -38,6 +38,7 @@ type MemberOption = {
 };
 
 export function DealForm({
+  children,
   pipelines,
   stages,
   companies,
@@ -46,6 +47,7 @@ export function DealForm({
   defaultStageId,
   defaultOwnerMemberId,
 }: {
+  children?:React.ReactNode;
   pipelines: PipelineOption[];
 
   stages: StageOption[];
@@ -301,6 +303,7 @@ export function DealForm({
         <FieldErrors errors={state.errors?.notes} />
       </section>
 
+      {children}
       <div className="flex justify-end gap-3">
         <Link
           href={`/crm/deals?pipeline=${selectedPipelineId}`}

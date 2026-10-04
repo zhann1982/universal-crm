@@ -55,3 +55,17 @@ Use the same backup, paused-writes and normal Drizzle transaction/journal proced
 referenced UNIQUE constraints intentionally precede FKs in 0017. Existing parent history prevents
 hard deletion; archive/restore is unchanged. 0018 replaces history indexes with UUID tie breakers
 and adds active-board/archived-Deal partial indexes. Index creation takes locks; plan maintenance.
+
+## Custom-field rollout (D062)
+
+0019_custom_fields.sql follows 0017/0018. It adds tenant definitions, parent JSONB values/custom
+versions, Organization revision and configuration/value/history triggers. Existing records get
+empty values; no required definitions are added automatically. Types/tenant/required/archived
+values are validated when custom values change or a record is created. Legacy unrelated edits
+remain possible. Config limit checks serialize under the Organization row lock.
+
+On 2026-10-04 the read-only journal checker confirmed 17/20 matching applied hashes/timestamps
+with 0017/0018/0019 pending. User selected isolated verification only: no migration was applied.
+Follow RELEASE_CHECKLIST.md; old working schema cannot serve the updated custom-field pages.
+The existing 23-counter audit covers 0017 prerequisites, not completeness of required values in
+legacy records (missing newly required fields is intentionally allowed until an explicit save).

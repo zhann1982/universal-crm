@@ -1,3 +1,4 @@
+import { CustomFieldsSection } from "@/modules/custom-fields/section";
 import { EntityTimeline } from "@/modules/activity/entity-timeline";
 import Link from "@/components/app-link";
 import { notFound } from "next/navigation";
@@ -304,6 +305,7 @@ export default async function ClientPage({
           </p>
         )}
       </section>
+      <CustomFieldsSection entity="client" id={client.id} values={client.customFields} version={client.customFieldsVersion} archived={client.isArchived}/>
       <EntityTimeline entityType="client" entityId={client.id} entityArchived={client.isArchived} />
     </div>
   );

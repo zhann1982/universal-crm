@@ -1,3 +1,4 @@
+import { CustomFieldsSection } from "@/modules/custom-fields/section";
 import { EntityTimeline } from "@/modules/activity/entity-timeline";
 import {
   and,
@@ -367,6 +368,7 @@ export default async function CompanyPage({
           </p>
         )}
       </section>
+      <CustomFieldsSection entity="company" id={company.id} values={company.customFields} version={company.customFieldsVersion} archived={company.isArchived}/>
       <EntityTimeline entityType="company" entityId={company.id} entityArchived={company.isArchived} />
     </div>
   );
