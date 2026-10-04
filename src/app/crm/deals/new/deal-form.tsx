@@ -1,11 +1,12 @@
 "use client";
 
+import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
+
 import { OrganizationForm } from "@/modules/access/organization-context";
 
 
 import Link from "@/components/app-link";
 import {
-  useActionState,
   useState,
 } from "react";
 
@@ -108,7 +109,7 @@ export function DealForm({
     state,
     formAction,
     pending,
-  ] = useActionState(
+  ] = useToastActionState(
     createDeal,
     initialState,
   );

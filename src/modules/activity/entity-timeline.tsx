@@ -1,4 +1,4 @@
-import { OrganizationForm } from "@/modules/access/organization-context";
+import { CommentLifecycleForm } from "@/app/crm/comments/comment-lifecycle-form";
 import {
   getCurrentAccessContext,
 } from "@/lib/auth/permissions";
@@ -338,41 +338,5 @@ export async function EntityTimeline({
         </div>
       ) : null}
     </section>
-  );
-}
-
-function CommentLifecycleForm({
-  action,
-  commentId,
-  version,
-  label,
-}: {
-  action: (
-    formData: FormData,
-  ) => Promise<void>;
-  commentId: string;
-  version: number;
-  label: string;
-}) {
-  return (
-    <OrganizationForm action={action}>
-      <input
-        type="hidden"
-        name="commentId"
-        value={commentId}
-      />
-      <input
-        type="hidden"
-        name="version"
-        value={version}
-      />
-
-      <button
-        type="submit"
-        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-      >
-        {label}
-      </button>
-    </OrganizationForm>
   );
 }

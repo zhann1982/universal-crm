@@ -1,3 +1,4 @@
+import { ToastProvider } from "@/modules/notifications/toast-provider";
 import { OrganizationProvider } from "@/modules/access/organization-context";
 import Link from "@/components/app-link";
 
@@ -22,6 +23,7 @@ export default async function CrmLayout({
 
   return (
     <OrganizationProvider key={organization.id} organizationId={organization.id}>
+    <ToastProvider>
     <div className="crm-shell min-h-screen bg-slate-100 text-slate-950">
       <div className="flex min-h-screen">
         <aside className="w-64 shrink-0 border-r border-slate-200 bg-white">
@@ -137,6 +139,7 @@ export default async function CrmLayout({
         </div>
       </div>
     </div>
+    </ToastProvider>
     </OrganizationProvider>
   );
 }

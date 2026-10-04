@@ -463,7 +463,7 @@ async function changeCommentArchiveState({
     });
 
   if (!parsed.success) {
-    return;
+    return { message: "Комментарий изменился или недоступен. Обновите страницу и повторите действие." };
   }
 
   const comment =
@@ -473,7 +473,7 @@ async function changeCommentArchiveState({
     );
 
   if (!comment) {
-    return;
+    return { message: "Комментарий изменился или недоступен. Обновите страницу и повторите действие." };
   }
 
   const entityTypeResult =
@@ -482,7 +482,7 @@ async function changeCommentArchiveState({
     );
 
   if (!entityTypeResult.success) {
-    return;
+    return { message: "Комментарий изменился или недоступен. Обновите страницу и повторите действие." };
   }
 
   const entityType =
@@ -498,7 +498,7 @@ async function changeCommentArchiveState({
       member.id &&
     !canManage
   ) {
-    return;
+    return { message: "Комментарий изменился или недоступен. Обновите страницу и повторите действие." };
   }
 
   if (
@@ -508,7 +508,7 @@ async function changeCommentArchiveState({
       ),
     )
   ) {
-    return;
+    return { message: "Комментарий изменился или недоступен. Обновите страницу и повторите действие." };
   }
 
   const target =
@@ -521,14 +521,14 @@ async function changeCommentArchiveState({
     });
 
   if (!target || target.isArchived) {
-    return;
+    return { message: "Комментарий изменился или недоступен. Обновите страницу и повторите действие." };
   }
 
   if (
     comment.isArchived ===
     archive
   ) {
-    return;
+    return { message: "Комментарий изменился или недоступен. Обновите страницу и повторите действие." };
   }
 
   try {
@@ -541,14 +541,14 @@ async function changeCommentArchiveState({
       expectedVersion: parsed.data.version,
       archive,
     });
-    if (!changed) return;
+    if (!changed) return { message: "Комментарий изменился или недоступен. Обновите страницу и повторите действие." };
   } catch (error) {
     console.error(
       "Failed to change comment archive state:",
       error,
     );
 
-    return;
+    return { message: "Комментарий изменился или недоступен. Обновите страницу и повторите действие." };
   }
 
   revalidatePath(
@@ -557,12 +557,13 @@ async function changeCommentArchiveState({
       comment.entityId,
     ),
   );
+  return { success: true, message: archive ? "Комментарий перемещён в архив." : "Комментарий восстановлен." };
 }
 
 export async function archiveComment(
   formData: FormData,
-): Promise<void> {
-  await changeCommentArchiveState({
+): Promise<CommentActionState> {
+  return changeCommentArchiveState({
     formData,
     archive: true,
   });
@@ -570,8 +571,8 @@ export async function archiveComment(
 
 export async function restoreComment(
   formData: FormData,
-): Promise<void> {
-  await changeCommentArchiveState({
+): Promise<CommentActionState> {
+  return changeCommentArchiveState({
     formData,
     archive: false,
   });

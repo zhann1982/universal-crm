@@ -1,5 +1,7 @@
 "use server";
 
+import { redirectWithNotice } from "@/modules/notifications/redirect";
+
 import {
   and,
   eq,
@@ -130,7 +132,7 @@ export async function createClient(
   revalidatePath("/crm");
   revalidatePath("/crm/clients");
 
-  redirect("/crm/clients");
+  redirectWithNotice("/crm/clients", "client-created");
 }
 
 export async function updateClient(
@@ -258,9 +260,7 @@ export async function updateClient(
     `/crm/clients/${idResult.data}`,
   );
 
-  redirect(
-    `/crm/clients/${idResult.data}`,
-  );
+  redirectWithNotice(`/crm/clients/${idResult.data}`, "client-updated");
 }
 
 export async function archiveClient(
@@ -279,7 +279,7 @@ export async function archiveClient(
     redirect("/crm/clients");
   }
 
-  await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
+  const changed = await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
     .update(clients)
     .set({
       isArchived: true,
@@ -306,7 +306,9 @@ export async function archiveClient(
           clients.deletedAt,
         ),
       ),
-    ));
+    ).returning({ id: clients.id }));
+
+  if (!changed.length) redirect("/crm/clients?error=lifecycle-conflict");
 
   revalidatePath("/crm");
   revalidatePath("/crm/clients");
@@ -315,7 +317,7 @@ export async function archiveClient(
     `/crm/clients/${idResult.data}`,
   );
 
-  redirect("/crm/clients");
+  redirectWithNotice("/crm/clients", "client-archived");
 }
 
 export async function restoreClient(
@@ -334,7 +336,7 @@ export async function restoreClient(
     redirect("/crm/clients?view=archive");
   }
 
-  await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
+  const changed = await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
     .update(clients)
     .set({
       isArchived: false,
@@ -361,7 +363,9 @@ export async function restoreClient(
           clients.deletedAt,
         ),
       ),
-    ));
+    ).returning({ id: clients.id }));
+
+  if (!changed.length) redirect("/crm/clients?error=lifecycle-conflict");
 
   revalidatePath("/crm");
   revalidatePath("/crm/clients");
@@ -370,7 +374,5 @@ export async function restoreClient(
     `/crm/clients/${idResult.data}`,
   );
 
-  redirect(
-    `/crm/clients/${idResult.data}`,
-  );
+  redirectWithNotice(`/crm/clients/${idResult.data}`, "client-restored");
 }

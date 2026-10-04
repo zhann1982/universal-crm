@@ -1,11 +1,8 @@
 "use client";
 
+import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
+
 import { OrganizationForm } from "@/modules/access/organization-context";
-
-
-import {
-  useActionState,
-} from "react";
 
 import {
   createTask,
@@ -47,7 +44,7 @@ export function TaskForm({
   defaultDealId = "",
 }: TaskFormProps) {
   const [state, formAction, pending] =
-    useActionState(
+    useToastActionState(
       createTask,
       initialState,
     );

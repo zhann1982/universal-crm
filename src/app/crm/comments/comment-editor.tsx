@@ -1,11 +1,8 @@
 "use client";
 
+import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
+
 import { OrganizationForm } from "@/modules/access/organization-context";
-
-
-import {
-  useActionState,
-} from "react";
 
 import {
   updateComment,
@@ -30,7 +27,7 @@ export function CommentEditor({
     state,
     formAction,
     pending,
-  ] = useActionState(
+  ] = useToastActionState(
     updateComment,
     initialState,
   );

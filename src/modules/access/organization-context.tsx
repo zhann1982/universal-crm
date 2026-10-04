@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ComponentProps, type ReactNode } from "react";
+import { useToast, runWithToast, notifyActionResult, isNavigationError } from "@/modules/notifications/toast-provider";
 
 const OrganizationContext = createContext<string | null>(null);
 
@@ -18,7 +19,16 @@ export function useOrganizationId() {
 // its freshly authorized selection; the hidden field never grants access.
 export function OrganizationForm({ children, ...props }: ComponentProps<"form">) {
   const organizationId = useOrganizationId();
-  return <form {...props}>
+  const notify = useToast();
+  const action = props.action;
+  return <form {...props} action={typeof action === "function" ? async form => {
+    try {
+      const result = await runWithToast(notify, async () => action(form));
+      notifyActionResult(notify, result);
+    } catch (error) {
+      if (isNavigationError(error)) throw error;
+    }
+  } : action}>
     {typeof props.action === "function" && <input type="hidden" name="_organizationId" value={organizationId} />}
     {children}
   </form>;

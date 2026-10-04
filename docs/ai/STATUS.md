@@ -1,5 +1,29 @@
 # Universal CRM — Current Status
 
+## CRM mutation notifications — 2026-10-04
+
+D057 adds a shared tenant-scoped toast provider without a package or schema change.
+Client/Company/Deal create, edit and lifecycle, manual Stage changes and Kanban, Task
+create/edit/state/bulk/reminders, comments, Team invitations/status/roles, Pipeline/Stage
+configuration, saved views and Organization creation have feedback. Success waits for
+server confirmation; Client/Company lifecycle now checks RETURNING to reject zero rows.
+Comment lifecycle returns an explicit success/failure state with the original authorization
+and atomic persistence preserved. Generic unexpected errors show safe connection feedback.
+Field validation stays inline; existing conflict explanations remain visible. Success expires
+after four seconds (paused on hover/focus); errors/warnings can be closed manually.
+The provider resets with Organization scope. Redirect messages use a fixed allowlist, and
+success query parameters are consumed via router.replace to prevent action refresh replay.
+
+Verification: 183/183 tests pass, including six feedback regressions. TypeScript, ESLint
+and production build pass. Browser checks used the existing Owner session: saved-view
+creation, duplicate-name and invalid-name errors, archival, manual dismissal, success
+auto-dismiss, success redirect URL cleanup and no replay after another action/reload.
+The smoke-test view “Проверка уведомлений 04.10.2026” remains archived in Development CRM.
+Redirect smoke tests injected allowlisted feedback parameters without changing business records.
+All other entity mutation paths are connected and covered by existing domain regressions;
+a full multi-role browser mutation suite is still outstanding. No real-data integration tests ran.
+
+
 ## Client / Company / Deal history — 2026-10-03
 
 Detail cards now include the shared EntityTimeline with existing Activity/Comment permissions.

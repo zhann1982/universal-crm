@@ -853,3 +853,29 @@ PGlite tests execute the production adapter and actual migration, including roll
 result mapping, tenant/access denial, lifecycle, shared Deal conflict behavior and read permissions.
 Full multi-role/multi-session browser mutations, cursor pagination, relationship events and
 permission-safe structured values remain follow-ups.
+
+## D057 — Mutation feedback is shared and scoped to the rendered Organization
+
+Date: 2026-10-04
+
+A small client toast provider lives inside the keyed OrganizationProvider. State forms
+report explicit Server Action outcomes through useToastActionState. Imperative lifecycle
+buttons use awaited transitions, and OrganizationForm catches unexpected failures safely.
+Redirect success uses an allowlisted static message code plus a unique notice ID, only
+after authorization and a confirmed mutation. Client/Company lifecycle checks RETURNING;
+Comment lifecycle reports zero-row/conflict failures instead of silently returning.
+Permissions, tenant scope, optimistic versions and atomic business history stay server-side.
+
+Success lasts four seconds and pauses on hover/focus. Errors/warnings require dismissal;
+the stack is bounded to four. Screen-reader status/alert roles, keyboard close, responsive
+placement and reduced-motion support are included. Field validation stays inline. Tokens,
+private related values and raw exception details never enter feedback messages.
+
+Successful redirect parameters are consumed via router.replace: merely changing native
+history can let a subsequent Server Action restore the original success query. Conflict
+URLs are consumed in history without removing the currently rendered explanation.
+Bulk Task feedback distinguishes complete success, partial conflicts and no selection.
+No new notification persistence, infrastructure, dependency or database migration is needed.
+
+Verification: six feedback regressions plus the existing suite, TypeScript/lint/build and
+Owner browser smoke checks. A complete multi-role mutation browser suite remains separate.

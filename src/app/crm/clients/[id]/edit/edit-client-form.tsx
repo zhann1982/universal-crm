@@ -1,10 +1,12 @@
 "use client";
 
+import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
+
 import { OrganizationForm } from "@/modules/access/organization-context";
 
 
 import Link from "@/components/app-link";
-import { useActionState } from "react";
+
 
 import { updateClient } from "../../actions";
 import type { UpdateClientState } from "@/lib/validation/client";
@@ -65,7 +67,7 @@ export function EditClientForm({
     );
 
   const [state, formAction, pending] =
-    useActionState(
+    useToastActionState(
       updateAction,
       initialState,
     );

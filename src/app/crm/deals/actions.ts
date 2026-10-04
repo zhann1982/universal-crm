@@ -1,5 +1,7 @@
 "use server";
 
+import { redirectWithNotice } from "@/modules/notifications/redirect";
+
 import {
   and,
   eq,
@@ -460,9 +462,7 @@ export async function createDeal(
     "/crm/deals",
   );
 
-  redirect(
-    `/crm/deals?pipeline=${pipeline.id}`,
-  );
+  redirectWithNotice(`/crm/deals?pipeline=${pipeline.id}`, "deal-created");
 }
 
 export async function moveDealToStage(
@@ -573,9 +573,7 @@ export async function moveDealToStage(
     `/crm/deals/${result.dealId}`,
   );
 
-  redirect(
-    `/crm/deals/${result.dealId}`,
-  );
+  redirectWithNotice(`/crm/deals/${result.dealId}`, "deal-stage");
 }
 
 export async function updateDeal(
@@ -1175,9 +1173,7 @@ export async function updateDeal(
     `/crm/deals/${existingDeal.id}`,
   );
 
-  redirect(
-    `/crm/deals/${existingDeal.id}`,
-  );
+  redirectWithNotice(`/crm/deals/${existingDeal.id}`, "deal-updated");
 }
 
 export async function archiveDeal(
@@ -1335,9 +1331,7 @@ export async function archiveDeal(
     `/crm/deals/${archived.id}`,
   );
 
-  redirect(
-    `/crm/deals?pipeline=${archived.pipelineId}`,
-  );
+  redirectWithNotice(`/crm/deals?pipeline=${archived.pipelineId}`, "deal-archived");
 }
 
 export async function restoreDeal(
@@ -1483,7 +1477,5 @@ export async function restoreDeal(
     `/crm/deals/${restored.id}`,
   );
 
-  redirect(
-    `/crm/deals/${restored.id}`,
-  );
+  redirectWithNotice(`/crm/deals/${restored.id}`, "deal-restored");
 }

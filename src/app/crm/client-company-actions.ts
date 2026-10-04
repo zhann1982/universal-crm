@@ -1,5 +1,7 @@
 "use server";
 
+import { redirectWithNotice } from "@/modules/notifications/redirect";
+
 import {
   revalidatePath,
 } from "next/cache";
@@ -116,9 +118,7 @@ export async function linkClientToCompany(
     `/crm/companies/${parsed.data.companyId}`,
   );
 
-  redirect(
-    `/crm/clients/${parsed.data.clientId}`,
-  );
+  redirectWithNotice(`/crm/clients/${parsed.data.clientId}`, "company-linked");
 }
 
 export async function unlinkClientFromCompany(
@@ -183,7 +183,5 @@ export async function unlinkClientFromCompany(
     `/crm/companies/${parsed.data.companyId}`,
   );
 
-  redirect(
-    `/crm/clients/${parsed.data.clientId}`,
-  );
+  redirectWithNotice(`/crm/clients/${parsed.data.clientId}`, "company-unlinked");
 }

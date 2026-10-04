@@ -1,12 +1,12 @@
 "use client";
 
+import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
+
 import { OrganizationForm } from "@/modules/access/organization-context";
 
 
 import Link from "@/components/app-link";
-import {
-  useActionState,
-} from "react";
+
 
 import {
   updateTask,
@@ -66,7 +66,7 @@ export function TaskEditForm({
   canEditDeals,
 }: TaskEditFormProps) {
   const [state, formAction, pending] =
-    useActionState(
+    useToastActionState(
       updateTask,
       initialState,
     );

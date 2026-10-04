@@ -3,7 +3,7 @@
 import { useOrganizationId } from "@/modules/access/organization-context";
 
 
-import { useTransition } from "react";
+import { useToastTransition } from "@/modules/notifications/use-toast-transition";
 
 import { restoreClient } from "../actions";
 
@@ -14,7 +14,7 @@ export function RestoreClientButton({
 }) {
   const organizationScope = useOrganizationId();
   const [pending, startTransition] =
-    useTransition();
+    useToastTransition();
 
   function handleRestore() {
     const confirmed =
@@ -26,8 +26,8 @@ export function RestoreClientButton({
       return;
     }
 
-    startTransition(() => {
-      void restoreClient(organizationScope, clientId);
+    startTransition(async () => {
+      await restoreClient(organizationScope, clientId);
     });
   }
 

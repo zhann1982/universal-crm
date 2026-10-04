@@ -1,13 +1,15 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
+import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
+
+import { type ReactNode } from "react";
 import { OrganizationForm } from "@/modules/access/organization-context";
 import { submitPipeline, type PipelineState } from "./actions";
 
 export function PipelineForm({ operation, pipelineId, version, stageId, children, label = "Сохранить" }: {
   operation: string; pipelineId?: string; version?: number; stageId?: string; children?: ReactNode; label?: string;
 }) {
-  const [state, action, pending] = useActionState<PipelineState, FormData>(submitPipeline, {});
+  const [state, action, pending] = useToastActionState<PipelineState, FormData>(submitPipeline, {});
   return <OrganizationForm action={action} className="space-y-3">
     <input type="hidden" name="operation" value={operation} />
     {pipelineId && <input type="hidden" name="pipelineId" value={pipelineId} />}

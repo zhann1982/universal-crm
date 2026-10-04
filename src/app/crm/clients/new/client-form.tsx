@@ -1,9 +1,8 @@
 "use client";
 
+import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
+
 import { OrganizationForm } from "@/modules/access/organization-context";
-
-
-import { useActionState } from "react";
 
 import { createClient } from "../actions";
 import type { CreateClientState } from "@/lib/validation/client";
@@ -12,7 +11,7 @@ const initialState: CreateClientState = {};
 
 export function ClientForm() {
   const [state, formAction, pending] =
-    useActionState(
+    useToastActionState(
       createClient,
       initialState,
     );

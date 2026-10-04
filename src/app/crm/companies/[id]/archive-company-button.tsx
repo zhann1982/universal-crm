@@ -3,9 +3,7 @@
 import { useOrganizationId } from "@/modules/access/organization-context";
 
 
-import {
-  useTransition,
-} from "react";
+import { useToastTransition } from "@/modules/notifications/use-toast-transition";
 
 import {
   archiveCompany,
@@ -20,7 +18,7 @@ export function ArchiveCompanyButton({
   const [
     pending,
     startTransition,
-  ] = useTransition();
+  ] = useToastTransition();
 
   function handleArchive() {
     const confirmed =
@@ -32,8 +30,8 @@ export function ArchiveCompanyButton({
       return;
     }
 
-    startTransition(() => {
-      void archiveCompany(
+    startTransition(async () => {
+      await archiveCompany(
         organizationScope,
         companyId,
       );

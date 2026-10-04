@@ -1,5 +1,7 @@
 "use server";
 
+import { redirectWithNotice } from "@/modules/notifications/redirect";
+
 import {
   and,
   eq,
@@ -290,9 +292,7 @@ export async function createCompany(
     "/crm/companies",
   );
 
-  redirect(
-    "/crm/companies",
-  );
+  redirectWithNotice("/crm/companies", "company-created");
 }
 
 export async function updateCompany(
@@ -629,9 +629,7 @@ export async function updateCompany(
     `/crm/companies/${existingCompany.id}`,
   );
 
-  redirect(
-    `/crm/companies/${existingCompany.id}`,
-  );
+  redirectWithNotice(`/crm/companies/${existingCompany.id}`, "company-updated");
 }
 
 export async function archiveCompany(
@@ -654,7 +652,7 @@ export async function archiveCompany(
     );
   }
 
-  await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
+  const changed = await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
     .update(companies)
     .set({
       isArchived: true,
@@ -683,7 +681,9 @@ export async function archiveCompany(
           companies.deletedAt,
         ),
       ),
-    ));
+    ).returning({ id: companies.id }));
+
+  if (!changed.length) redirect("/crm/companies?error=lifecycle-conflict");
 
   revalidatePath("/crm");
 
@@ -695,9 +695,7 @@ export async function archiveCompany(
     `/crm/companies/${idResult.data}`,
   );
 
-  redirect(
-    "/crm/companies",
-  );
+  redirectWithNotice("/crm/companies", "company-archived");
 }
 
 export async function restoreCompany(
@@ -723,7 +721,7 @@ export async function restoreCompany(
     );
   }
 
-  await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
+  const changed = await recordMutation({ organizationId: organization.id, memberId: member.id }, () => db
     .update(companies)
     .set({
       isArchived: false,
@@ -752,7 +750,9 @@ export async function restoreCompany(
           companies.deletedAt,
         ),
       ),
-    ));
+    ).returning({ id: companies.id }));
+
+  if (!changed.length) redirect("/crm/companies?error=lifecycle-conflict");
 
   revalidatePath(
     "/crm",
@@ -769,12 +769,8 @@ export async function restoreCompany(
   if (
     destination === "list"
   ) {
-    redirect(
-      "/crm/companies",
-    );
+    redirectWithNotice("/crm/companies", "company-restored");
   }
 
-  redirect(
-    `/crm/companies/${idResult.data}`,
-  );
+  redirectWithNotice(`/crm/companies/${idResult.data}`, "company-restored");
 }

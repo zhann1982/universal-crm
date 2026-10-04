@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D056`
+`D057`
 
 ---
 
@@ -704,3 +704,13 @@ Serialize it with a transaction advisory lock in a separate statement before the
 creation statement. Replay must never restore revoked Membership, Organization access or Owner roles.
 Shared Permission/Role/Stage defaults also serve the development seed; do not duplicate them.
 Migration `0012_long_cammi.sql` is required. Never run the development seed for production onboarding.
+
+## Mutation notifications
+
+D057: use the shared ToastProvider inside the keyed OrganizationProvider. CRM state forms
+use useToastActionState; imperative buttons use useToastTransition and await their Server Action.
+Redirect success uses redirectWithNotice only after a confirmed write, never before validation
+or for zero affected rows. Keep field validation and important conflict explanations inline.
+Notification text must not contain raw errors, invitation tokens or hidden related data.
+Success notices are transient; consume their URL parameters through the Next router so Server
+Action refreshes cannot restore them. Toasts are presentation feedback, never authorization proof.

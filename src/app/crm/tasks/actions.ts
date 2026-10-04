@@ -1,5 +1,7 @@
 "use server";
 
+import { redirectWithNotice } from "@/modules/notifications/redirect";
+
 import { randomUUID } from "node:crypto";
 import { changeTaskState, dismissReminder, type TaskStateAction } from "@/modules/tasks/change-task-state";
 import { saveTask, completeTaskRecord } from "@/modules/tasks/save-task";
@@ -478,9 +480,7 @@ export async function createTask(
     "/crm/tasks",
   );
 
-  redirect(
-    "/crm/tasks",
-  );
+  redirectWithNotice("/crm/tasks", "task-created");
 }
 
 export async function updateTask(
@@ -895,9 +895,7 @@ export async function updateTask(
     existingTask.id,
   );
 
-  redirect(
-    `/crm/tasks/${existingTask.id}`,
-  );
+  redirectWithNotice(`/crm/tasks/${existingTask.id}`, "task-updated");
 }
 
 export async function completeTask(
@@ -945,10 +943,8 @@ export async function completeTask(
     updated.id,
   );
 
-  redirect(
-    returnTo ??
-      `/crm/tasks/${updated.id}`,
-  );
+  redirectWithNotice(returnTo ??
+      `/crm/tasks/${updated.id}`, "task-completed");
 }
 
 export async function reopenTask(
@@ -992,10 +988,8 @@ export async function reopenTask(
     updated.id,
   );
 
-  redirect(
-    returnTo ??
-      `/crm/tasks/${updated.id}`,
-  );
+  redirectWithNotice(returnTo ??
+      `/crm/tasks/${updated.id}`, "task-reopened");
 }
 
 export async function archiveTask(
@@ -1039,10 +1033,8 @@ export async function archiveTask(
     archived.id,
   );
 
-  redirect(
-    returnTo ??
-      "/crm/tasks",
-  );
+  redirectWithNotice(returnTo ??
+      "/crm/tasks", "task-archived");
 }
 
 export async function restoreTask(
@@ -1088,10 +1080,8 @@ export async function restoreTask(
     restored.id,
   );
 
-  redirect(
-    returnTo ??
-      `/crm/tasks/${restored.id}`,
-  );
+  redirectWithNotice(returnTo ??
+      `/crm/tasks/${restored.id}`, "task-restored");
 }
 
 export async function bulkTaskAction(
@@ -1282,7 +1272,7 @@ export async function dismissTaskReminder(
     updated.taskId,
   );
 
-  redirect(returnTo);
+  redirectWithNotice(returnTo, "reminder-dismissed");
 }
 
 function getTaskReturnTo(
@@ -1362,7 +1352,7 @@ function withTaskError(
   error: string,
 ) {
   if (returnTo === "/crm") {
-    return "/crm";
+    return `/crm?error=${encodeURIComponent(error)}`;
   }
 
   if (

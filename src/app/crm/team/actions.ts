@@ -1,5 +1,7 @@
 "use server";
 
+import { redirectWithNotice } from "@/modules/notifications/redirect";
+
 import {
   revalidatePath,
 } from "next/cache";
@@ -225,9 +227,7 @@ export async function updateMemberStatus(
     "/crm/team",
   );
 
-  redirect(
-    `/crm/team?statusUpdated=${status}`,
-  );
+  redirectWithNotice(`/crm/team?statusUpdated=${status}`, "member-status");
 }
 
 export async function updateMemberRoles(
@@ -309,7 +309,5 @@ export async function updateMemberRoles(
     "/crm/team",
   );
 
-  redirect(
-    "/crm/team?saved=1",
-  );
+  redirectWithNotice("/crm/team?saved=1", "member-roles");
 }

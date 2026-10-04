@@ -3,9 +3,7 @@
 import { useOrganizationId } from "@/modules/access/organization-context";
 
 
-import {
-  useTransition,
-} from "react";
+import { useToastTransition } from "@/modules/notifications/use-toast-transition";
 
 import {
   restoreDeal,
@@ -20,7 +18,7 @@ export function RestoreDealButton({
   const [
     pending,
     startTransition,
-  ] = useTransition();
+  ] = useToastTransition();
 
   function handleRestore() {
     const confirmed =
@@ -32,8 +30,8 @@ export function RestoreDealButton({
       return;
     }
 
-    startTransition(() => {
-      void restoreDeal(
+    startTransition(async () => {
+      await restoreDeal(
         organizationScope,
         dealId,
       );

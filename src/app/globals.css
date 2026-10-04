@@ -25,6 +25,20 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.crm-toasts { position: fixed; z-index: 200; bottom: max(24px, env(safe-area-inset-bottom)); right: 24px; width: min(390px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 10px; pointer-events: none; font: 14px/1.5 Arial, sans-serif; }
+.crm-toast { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border: 1px solid #d9e2e7; border-radius: 12px; background: #fff; color: #334155; box-shadow: 0 8px 30px #0f172a24; pointer-events: auto; animation: crm-toast-in .18s ease-out; }
+.crm-toast p { flex: 1; margin: 0; overflow-wrap: anywhere; }
+.crm-toast-icon { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; font-weight: bold; }
+.crm-toast-success .crm-toast-icon { color: #047857; background: #d1fae5; }
+.crm-toast-error .crm-toast-icon { color: #b91c1c; background: #fee2e2; }
+.crm-toast-warning .crm-toast-icon { color: #a16207; background: #fef3c7; }
+.crm-toast button { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 5px; color: #64748b; background: transparent; cursor: pointer; font-size: 22px; }
+.crm-toast button:hover { background: #f1f5f9; color: #0f172a; }
+.crm-toast button:focus-visible { outline: 2px solid #2785a5; outline-offset: 2px; }
+@keyframes crm-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 640px) { .crm-toasts { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); } }
+@media (prefers-reduced-motion: reduce) { .crm-toast { animation: none; } }
+
 .crm-navigation-progress {
   position: fixed;
   top: 0;

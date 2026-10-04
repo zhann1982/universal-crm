@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirectWithNotice } from "@/modules/notifications/redirect";
 import { revalidatePath } from "next/cache";
 import { requireVerifiedSession } from "@/lib/auth/verified-session";
 import { ORGANIZATION_COOKIE } from "@/modules/access/organization-selection";
@@ -27,5 +27,5 @@ export async function submitOrganization(_state: CreationState, formData: FormDa
     sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30,
   });
   revalidatePath("/crm", "layout");
-  redirect("/crm");
+  redirectWithNotice("/crm", "organization-created");
 }

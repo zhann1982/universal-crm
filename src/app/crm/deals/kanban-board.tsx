@@ -3,13 +3,16 @@
 import { useOrganizationId } from "@/modules/access/organization-context";
 
 
+import { useToast } from "@/modules/notifications/toast-provider";
+import { useToastTransition } from "@/modules/notifications/use-toast-transition";
+
 import Link from "@/components/app-link";
 import {
   useRouter,
 } from "next/navigation";
 import {
   useState,
-  useTransition,
+
 } from "react";
 
 import {
@@ -88,13 +91,14 @@ export function KanbanBoard({
     boolean;
 }) {
   const organizationScope = useOrganizationId();
+  const notify = useToast();
   const router =
     useRouter();
 
   const [
     pending,
     startTransition,
-  ] = useTransition();
+  ] = useToastTransition();
 
   const [
     draggingDealId,
@@ -181,9 +185,8 @@ export function KanbanBoard({
         if (
           !result.success
         ) {
-          setError(
-            result.message,
-          );
+          setError(result.message);
+          notify({ kind: "error", message: result.message });
 
           /*
            * Серверное состояние
@@ -200,6 +203,7 @@ export function KanbanBoard({
           return;
         }
 
+        notify({ kind: "success", message: "Этап сделки сохранён." });
         router.refresh();
       },
     );

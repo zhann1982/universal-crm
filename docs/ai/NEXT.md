@@ -1,8 +1,15 @@
 # Universal CRM — Next Development Steps
 
-Last updated: 2026-10-03
+Last updated: 2026-10-04
 
-## Current update — 2026-10-03
+## Current update — 2026-10-04
+
+CRM mutation toast feedback is implemented (D057). Reuse the shared notification hooks
+and redirectWithNotice for new actions; never infer success from an unconfirmed/zero-row
+mutation. Owner saved-view/browser feedback smoke checks pass; extend multi-role/browser
+verification to existing Client/Company/Deal/Task/Comment/Team/configuration operations.
+
+## Previous update — 2026-10-03
 
 Client/Company/Deal Activity rollout is implemented (D056 / migration 0016).
 Do not recreate the timeline or event persistence. Next: verify real multi-session/browser
