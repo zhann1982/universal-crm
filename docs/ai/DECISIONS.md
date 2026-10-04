@@ -879,3 +879,51 @@ No new notification persistence, infrastructure, dependency or database migratio
 
 Verification: six feedback regressions plus the existing suite, TypeScript/lint/build and
 Owner browser smoke checks. A complete multi-role mutation browser suite remains separate.
+
+## D058 — Deal reads and stale mutations preserve permission and draft boundaries
+
+Date: 2026-10-04
+
+Team member visibility alone does not query Role bindings/configuration. roles.read allows role
+labels; members.manage allows the narrow ID/name assignment references. Descriptions are not queried.
+Deal detail lookup queries related names only with their read permissions, preserving self display
+from authorized context. Full edit captures the initial version at mount because refreshed props
+can change while draft fields remain unchanged. Lifecycle operations share change-deal-lifecycle.ts
+with rendered expected version, conditional lifecycle/tenant/deleted predicates and atomic Activity.
+A stale draft or zero changed rows is a conflict, never implicit adoption of current version.
+
+## D059 — Polymorphic history references use generated tenant foreign keys
+
+Date: 2026-10-04
+
+Migration 0017 adds Task relationship and Schedule tenant FKs and four generated UUID target
+columns on Comment/Activity. Ordinary composite FKs enforce each parent type without duplicating
+application authorization. Entity type is allowlisted; Activity Comment FK includes Organization,
+entity type and target ID. Retain nullable Member SET NULL and inactive-owner semantics.
+Parents with history/comments require archive, not hard deletion. Audit now checks 23 invariants.
+No historical repair or automatic tenant reassignment; invalid data aborts migration.
+
+## D060 — Boards, history and references use bounded database reads
+
+Date: 2026-10-04
+
+Board columns fetch 20 plus one lookahead; full SQL Stage/currency aggregates preserve totals.
+History pages fetch 50 events or 100 standalone comments and only visible event comment bodies.
+Keysets include time and UUID, preserving PostgreSQL microseconds as UTC strings. Archive uses
+50-row pages with deterministic ordering. References use 50-option permission/scoped search,
+retaining current selections outside the initial page. Migration 0018 extends supporting indexes.
+Representative PGlite traversal proves pagination/bounds, not production concurrency/throughput.
+
+## D061 — Invitation administration rotates links; email acceptance is explicit
+
+Date: 2026-10-04
+
+Pending/expired invitations support revoke/reissue behind members.manage and rendered scope.
+Mutations take the canonical-email lock in a preceding statement and compare the rendered
+expiration; they do not revive accepted/revoked invitations. Reissue rotates token hash and
+advances expiry. Raw tokens are returned only immediately to the authorized administrator.
+Optional Resend HTTP transport uses canonical BETTER_AUTH_URL, API key/from configuration,
+10-second timeout and a hashed idempotency key. No queues, new service account or paid resources
+are provisioned. Creation is committed before external delivery; failures retain a valid manual
+link. Provider acceptance never claims inbox delivery. Better Auth verification uses the same
+transport when configured; production missing delivery remains an explicit error.

@@ -1,5 +1,38 @@
 # Universal CRM — Current Status
 
+## Five-point stabilization implementation — 2026-10-04
+
+D058–D061 implement permission-safe Deal details; rendered-version lifecycle mutations;
+Task/Schedule/Comment/Activity tenant constraints (0017); bounded board/archive/history and
+searchable references with indexes (0018); invitation administration and optional email transport.
+Full-edit drafts capture their initial version even if refreshed props change. Existing owners and
+selected relationships remain usable outside the first 50 reference options. Board counts/sums
+cover the complete filtered set and keep currencies separate. History cursors retain microseconds;
+comment bodies are fetched only with comments.read and for visible event references.
+
+Verification: 206/206 local tests passed, including actual PostgreSQL constraint/direct-write,
+Deal lifecycle conflict/history rollback, related-name/Team Role query permission combinations, 4000 Deal
+keyset traversal, 700 history events with timestamp ties, bounded reference search, invitation
+token rotation/stale/revoked/accepted checks and mocked email transport. Tests are serial to avoid
+PGlite worker memory exhaustion. TypeScript, ESLint and the final production build passed. Drizzle generation reports no schema
+differences after migration snapshot/index verification.
+
+Connected read-only audit: all 23 counters zero. Migrations 0017/0018 are NOT applied to the
+connected Neon database; schedule coordinated rollout with writes paused. Real email is NOT
+configured or verified. Resend API acceptance is reported separately from recipient delivery.
+Browser Owner checks passed: create Deal, manual Stage transition versus a stale full-edit draft
+(conflict with draft preserved), switch Development CRM ↔ Secondary Corp, stale reference search
+(no foreign record access) and stale form submission (explicit scope-change rejection). These are
+normal UI operations, not the unsafe working-database integration scripts. Invitation sending remains mocked.
+Synthetic fixture: Deal 1226473b-6368-4b2d-83b5-d94b5b3fed8c, «Проверка стабилизации 04.10.2026»,
+in Development CRM. Its native archive confirmation is pending in the handoff browser tab:
+the browser API could not accept, dismiss or close the tab (focus-emulation timeout). No browser
+archive success is claimed. SQL lifecycle/rollback tests passed. Original Organization selection was restored.
+
+This does not certify production throughput or every role/session race. Existing test:integration
+scripts require a dedicated non-production PostgreSQL environment and were not run against working data.
+
+
 ## CRM mutation notifications — 2026-10-04
 
 D057 adds a shared tenant-scoped toast provider without a package or schema change.

@@ -120,6 +120,20 @@
       "when": 1791028297875,
       "tag": "0016_entity_activity",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791095671545,
+      "tag": "0017_task_activity_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791097190599,
+      "tag": "0018_bounded_read_indexes",
+      "breakpoints": true
     }
   ]
 }

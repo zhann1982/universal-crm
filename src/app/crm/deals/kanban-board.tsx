@@ -1,29 +1,19 @@
 "use client";
+import { loadBoardColumn } from "./board-read-actions";
+import type { BoardFilters } from "@/modules/deals/read-board";
 
 import { useOrganizationId } from "@/modules/access/organization-context";
-
 
 import { useToast } from "@/modules/notifications/toast-provider";
 import { useToastTransition } from "@/modules/notifications/use-toast-transition";
 
 import Link from "@/components/app-link";
-import {
-  useRouter,
-} from "next/navigation";
-import {
-  useState,
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-} from "react";
+import { formatMoney, formatNumber, groupMoneyByCurrency } from "@/lib/money";
 
-import {
-  formatMoney,
-  formatNumber,
-  groupMoneyByCurrency,
-} from "@/lib/money";
-
-import {
-  moveDealOnBoard,
-} from "./board-actions";
+import { moveDealOnBoard } from "./board-actions";
 
 type StageItem = {
   id: string;
@@ -32,9 +22,7 @@ type StageItem = {
   position: number;
   probability: number;
 
-  color:
-    | string
-    | null;
+  color: string | null;
 };
 
 type DealItem = {
@@ -42,203 +30,149 @@ type DealItem = {
   version: number;
   title: string;
 
-  amount:
-    | string
-    | null;
+  amount: string | null;
 
-  currency:
-    | string
-    | null;
+  currency: string | null;
 
   stageId: string;
 
-  expectedCloseAt:
-    | string
-    | null;
+  expectedCloseAt: string | null;
 
-  companyId:
-    | string
-    | null;
+  companyId: string | null;
 
-  companyName:
-    | string
-    | null;
+  companyName: string | null;
 
-  ownerDisplayName:
-    | string
-    | null;
+  ownerDisplayName: string | null;
 };
 
-const stageTypeLabels:
-  Record<string, string> = {
-    open: "Открыта",
-    won: "Выиграна",
-    lost: "Проиграна",
-  };
+const stageTypeLabels: Record<string, string> = {
+  open: "Открыта",
+  won: "Выиграна",
+  lost: "Проиграна",
+};
 
 export function KanbanBoard({
   stages,
   deals,
   canUpdate,
+  filters,
+  cursors,
+  summary,
 }: {
-  stages:
-    StageItem[];
+  filters: BoardFilters;
+  cursors: Record<string, { id: string; at: string } | null>;
+  summary: {
+    stageId: string;
+    currency: string | null;
+    count: number;
+    amount: string | null;
+  }[];
+  stages: StageItem[];
 
-  deals:
-    DealItem[];
+  deals: DealItem[];
 
-  canUpdate:
-    boolean;
+  canUpdate: boolean;
 }) {
+  const [extra, setExtra] = useState<DealItem[]>([]);
+  const [next, setNext] = useState(cursors);
+  const [loading, setLoading] = useState<string | null>(null);
   const organizationScope = useOrganizationId();
   const notify = useToast();
-  const router =
-    useRouter();
+  const router = useRouter();
 
-  const [
-    pending,
-    startTransition,
-  ] = useToastTransition();
+  const [pending, startTransition] = useToastTransition();
 
-  const [
-    draggingDealId,
-    setDraggingDealId,
-  ] = useState<
-    string | null
-  >(null);
+  const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
 
-  const [
-    overStageId,
-    setOverStageId,
-  ] = useState<
-    string | null
-  >(null);
+  const [overStageId, setOverStageId] = useState<string | null>(null);
 
-  const [
-    error,
-    setError,
-  ] = useState<
-    string | null
-  >(null);
+  const [error, setError] = useState<string | null>(null);
 
   function clearDragState() {
-    setDraggingDealId(
-      null,
-    );
+    setDraggingDealId(null);
 
-    setOverStageId(
-      null,
-    );
+    setOverStageId(null);
   }
 
-  function handleDrop(
-    targetStageId: string,
-  ) {
-    if (
-      !canUpdate ||
-      !draggingDealId ||
-      pending
-    ) {
+  function handleDrop(targetStageId: string) {
+    if (!canUpdate || !draggingDealId || pending) {
       clearDragState();
       return;
     }
 
-    const deal =
-      deals.find(
-        (item) =>
-          item.id ===
-          draggingDealId,
-      );
+    const deal = [...deals, ...extra].find(
+      (item) => item.id === draggingDealId,
+    );
 
     if (!deal) {
       clearDragState();
       return;
     }
 
-    if (
-      deal.stageId ===
-      targetStageId
-    ) {
+    if (deal.stageId === targetStageId) {
       clearDragState();
       return;
     }
 
-    const dealId =
-      deal.id;
+    const dealId = deal.id;
 
     clearDragState();
 
-    setError(
-      null,
-    );
+    setError(null);
 
-    startTransition(
-      async () => {
-        const result =
-          await moveDealOnBoard(
+    startTransition(async () => {
+      const result = await moveDealOnBoard(
         organizationScope,
-            dealId,
-            targetStageId,
-            deal.version,
-          );
+        dealId,
+        targetStageId,
+        deal.version,
+      );
 
-        if (
-          !result.success
-        ) {
-          setError(result.message);
-          notify({ kind: "error", message: result.message });
+      if (!result.success) {
+        setError(result.message);
+        notify({ kind: "error", message: result.message });
 
-          /*
-           * Серверное состояние
-           * сделки могло измениться
-           * другим пользователем
-           * или другим действием.
-           *
-           * Перечитываем Server
-           * Component и получаем
-           * актуальные Stage/Deal.
-           */
-          router.refresh();
-
-          return;
-        }
-
-        notify({ kind: "success", message: "Этап сделки сохранён." });
+        /*
+         * Серверное состояние
+         * сделки могло измениться
+         * другим пользователем
+         * или другим действием.
+         *
+         * Перечитываем Server
+         * Component и получаем
+         * актуальные Stage/Deal.
+         */
         router.refresh();
-      },
-    );
+
+        return;
+      }
+
+      notify({ kind: "success", message: "Этап сделки сохранён." });
+      router.refresh();
+    });
   }
 
   return (
     <div>
       {canUpdate && (
         <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          Карточки можно
-          перетаскивать между
-          этапами воронки.
+          Карточки можно перетаскивать между этапами воронки.
         </div>
       )}
 
       {pending && (
         <div className="mb-4 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
-          Сохраняем новый
-          этап сделки...
+          Сохраняем новый этап сделки...
         </div>
       )}
 
       {error && (
         <div className="mb-4 flex items-start justify-between gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <span>
-            {error}
-          </span>
+          <span>{error}</span>
 
           <button
             type="button"
-            onClick={() =>
-              setError(
-                null,
-              )
-            }
+            onClick={() => setError(null)}
             className="font-medium hover:underline"
           >
             Закрыть
@@ -248,367 +182,283 @@ export function KanbanBoard({
 
       <div className="overflow-x-auto pb-6">
         <div className="flex min-w-max items-start gap-4">
-          {stages.map(
-            (stage) => {
-              const stageDeals =
-                deals.filter(
-                  (deal) =>
-                    deal.stageId ===
-                    stage.id,
-                );
+          {stages.map((stage) => {
+            const stageDeals = [...deals, ...extra].filter(
+              (deal) => deal.stageId === stage.id,
+            );
 
-              const stageTotals =
-                groupMoneyByCurrency(
-                  stageDeals,
-                );
+            const stageTotals = groupMoneyByCurrency(
+              summary.filter((row) => row.stageId === stage.id),
+            );
 
-              const isOver =
-                overStageId ===
-                stage.id;
+            const isOver = overStageId === stage.id;
 
-              return (
-                <section
-                  key={
-                    stage.id
+            return (
+              <section
+                key={stage.id}
+                onDragOver={(event) => {
+                  if (!canUpdate || pending) {
+                    return;
                   }
-                  onDragOver={(
-                    event,
-                  ) => {
-                    if (
-                      !canUpdate ||
-                      pending
-                    ) {
-                      return;
-                    }
 
-                    event.preventDefault();
+                  event.preventDefault();
 
-                    event.dataTransfer.dropEffect =
-                      "move";
+                  event.dataTransfer.dropEffect = "move";
 
-                    setOverStageId(
-                      stage.id,
-                    );
-                  }}
-                  onDragEnter={(
-                    event,
-                  ) => {
-                    if (
-                      !canUpdate ||
-                      pending
-                    ) {
-                      return;
-                    }
+                  setOverStageId(stage.id);
+                }}
+                onDragEnter={(event) => {
+                  if (!canUpdate || pending) {
+                    return;
+                  }
 
-                    event.preventDefault();
+                  event.preventDefault();
 
-                    setOverStageId(
-                      stage.id,
-                    );
-                  }}
-                  onDragLeave={(
-                    event,
-                  ) => {
-                    const related =
-                      event.relatedTarget;
+                  setOverStageId(stage.id);
+                }}
+                onDragLeave={(event) => {
+                  const related = event.relatedTarget;
 
-                    if (
-                      related instanceof
-                        Node &&
-                      event.currentTarget.contains(
-                        related,
-                      )
-                    ) {
-                      return;
-                    }
+                  if (
+                    related instanceof Node &&
+                    event.currentTarget.contains(related)
+                  ) {
+                    return;
+                  }
 
-                    if (
-                      overStageId ===
-                      stage.id
-                    ) {
-                      setOverStageId(
-                        null,
-                      );
-                    }
-                  }}
-                  onDrop={(
-                    event,
-                  ) => {
-                    event.preventDefault();
+                  if (overStageId === stage.id) {
+                    setOverStageId(null);
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
 
-                    handleDrop(
-                      stage.id,
-                    );
-                  }}
+                  handleDrop(stage.id);
+                }}
+                className={[
+                  "w-80 shrink-0 overflow-hidden rounded-xl border bg-slate-50 shadow-sm transition",
+                  isOver
+                    ? "border-blue-400 ring-2 ring-blue-100"
+                    : "border-slate-200",
+                ].join(" ")}
+              >
+                <div
                   className={[
-                    "w-80 shrink-0 overflow-hidden rounded-xl border bg-slate-50 shadow-sm transition",
+                    "border-b p-4 transition",
                     isOver
-                      ? "border-blue-400 ring-2 ring-blue-100"
-                      : "border-slate-200",
-                  ].join(
-                    " ",
-                  )}
+                      ? "border-blue-200 bg-blue-50"
+                      : "border-slate-200 bg-white",
+                  ].join(" ")}
                 >
-                  <div
-                    className={[
-                      "border-b p-4 transition",
-                      isOver
-                        ? "border-blue-200 bg-blue-50"
-                        : "border-slate-200 bg-white",
-                    ].join(
-                      " ",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="font-semibold">
-                          {
-                            stage.name
-                          }
-                        </h2>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="font-semibold">{stage.name}</h2>
 
-                        <div className="mt-1 text-xs text-slate-500">
-                          {stageTypeLabels[
-                            stage.type
-                          ] ??
-                            stage.type}
-                          {" · "}
-                          {
-                            stage.probability
-                          }
-                          %
-                        </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {stageTypeLabels[stage.type] ?? stage.type}
+                        {" · "}
+                        {stage.probability}%
                       </div>
-
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium">
-                        {
-                          stageDeals.length
-                        }
-                      </span>
                     </div>
 
-                    {stageTotals.length >
-                      0 && (
-                      <div className="mt-3 space-y-1 border-t border-slate-100 pt-3">
-                        {stageTotals.map(
-                          (
-                            total,
-                          ) => (
-                            <div
-                              key={
-                                total.currency
-                              }
-                              className="flex items-center justify-between gap-3 text-sm"
-                            >
-                              <span className="font-medium text-slate-700">
-                                {formatNumber(
-                                  total.amount,
-                                )}
-                              </span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium">
+                      {summary
+                        .filter((row) => row.stageId === stage.id)
+                        .reduce((n, row) => n + row.count, 0)}
+                    </span>
+                  </div>
 
-                              <span className="text-xs font-semibold text-slate-500">
-                                {
-                                  total.currency
-                                }
+                  {stageTotals.length > 0 && (
+                    <div className="mt-3 space-y-1 border-t border-slate-100 pt-3">
+                      {stageTotals.map((total) => (
+                        <div
+                          key={total.currency}
+                          className="flex items-center justify-between gap-3 text-sm"
+                        >
+                          <span className="font-medium text-slate-700">
+                            {formatNumber(total.amount)}
+                          </span>
+
+                          <span className="text-xs font-semibold text-slate-500">
+                            {total.currency}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {isOver && draggingDealId && (
+                    <div className="mt-3 rounded-lg border border-dashed border-blue-300 bg-white px-3 py-2 text-center text-xs font-medium text-blue-700">
+                      Отпустите карточку здесь
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-h-32 space-y-3 p-3">
+                  {stageDeals.length === 0 ? (
+                    <div
+                      className={[
+                        "rounded-lg border border-dashed p-6 text-center text-sm transition",
+                        isOver
+                          ? "border-blue-300 bg-blue-50 text-blue-600"
+                          : "border-slate-300 bg-white text-slate-400",
+                      ].join(" ")}
+                    >
+                      {isOver ? "Переместить сюда" : "Сделок нет"}
+                    </div>
+                  ) : (
+                    stageDeals.map((deal) => {
+                      const isDragging = draggingDealId === deal.id;
+
+                      return (
+                        <article
+                          key={deal.id}
+                          draggable={canUpdate && !pending}
+                          onDragStart={(event) => {
+                            if (!canUpdate || pending) {
+                              event.preventDefault();
+                              return;
+                            }
+
+                            event.dataTransfer.effectAllowed = "move";
+
+                            event.dataTransfer.setData("text/plain", deal.id);
+
+                            setDraggingDealId(deal.id);
+
+                            setError(null);
+                          }}
+                          onDragEnd={() => {
+                            clearDragState();
+                          }}
+                          className={[
+                            "rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition",
+                            canUpdate
+                              ? "cursor-grab active:cursor-grabbing"
+                              : "",
+                            isDragging
+                              ? "opacity-40"
+                              : "hover:border-slate-300 hover:shadow-md",
+                          ].join(" ")}
+                        >
+                          {canUpdate && (
+                            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2">
+                              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                                ⋮⋮ Перетащить
                               </span>
                             </div>
-                          ),
-                        )}
-                      </div>
-                    )}
+                          )}
 
-                    {isOver &&
-                      draggingDealId && (
-                        <div className="mt-3 rounded-lg border border-dashed border-blue-300 bg-white px-3 py-2 text-center text-xs font-medium text-blue-700">
-                          Отпустите
-                          карточку здесь
-                        </div>
-                      )}
-                  </div>
-
-                  <div className="min-h-32 space-y-3 p-3">
-                    {stageDeals.length ===
-                    0 ? (
-                      <div
-                        className={[
-                          "rounded-lg border border-dashed p-6 text-center text-sm transition",
-                          isOver
-                            ? "border-blue-300 bg-blue-50 text-blue-600"
-                            : "border-slate-300 bg-white text-slate-400",
-                        ].join(
-                          " ",
-                        )}
-                      >
-                        {isOver
-                          ? "Переместить сюда"
-                          : "Сделок нет"}
-                      </div>
-                    ) : (
-                      stageDeals.map(
-                        (
-                          deal,
-                        ) => {
-                          const isDragging =
-                            draggingDealId ===
-                            deal.id;
-
-                          return (
-                            <article
-                              key={
-                                deal.id
-                              }
-                              draggable={
-                                canUpdate &&
-                                !pending
-                              }
-                              onDragStart={(
-                                event,
-                              ) => {
-                                if (
-                                  !canUpdate ||
-                                  pending
-                                ) {
-                                  event.preventDefault();
-                                  return;
-                                }
-
-                                event.dataTransfer.effectAllowed =
-                                  "move";
-
-                                event.dataTransfer.setData(
-                                  "text/plain",
-                                  deal.id,
-                                );
-
-                                setDraggingDealId(
-                                  deal.id,
-                                );
-
-                                setError(
-                                  null,
-                                );
-                              }}
-                              onDragEnd={() => {
-                                clearDragState();
-                              }}
-                              className={[
-                                "rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition",
-                                canUpdate
-                                  ? "cursor-grab active:cursor-grabbing"
-                                  : "",
-                                isDragging
-                                  ? "opacity-40"
-                                  : "hover:border-slate-300 hover:shadow-md",
-                              ].join(
-                                " ",
-                              )}
+                          <div className="font-medium leading-5">
+                            <Link
+                              href={`/crm/deals/${deal.id}`}
+                              draggable={false}
+                              className="transition hover:text-blue-600 hover:underline"
                             >
-                              {canUpdate && (
-                                <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2">
-                                  <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                                    ⋮⋮
-                                    Перетащить
-                                  </span>
-                                </div>
-                              )}
+                              {deal.title}
+                            </Link>
+                          </div>
 
-                              <div className="font-medium leading-5">
+                          <div className="mt-3 text-lg font-semibold">
+                            {deal.amount
+                              ? formatMoney(deal.amount, deal.currency)
+                              : "Сумма не указана"}
+                          </div>
+
+                          {deal.companyName && (
+                            <div className="mt-3">
+                              {deal.companyId ? (
                                 <Link
-                                  href={`/crm/deals/${deal.id}`}
-                                  draggable={
-                                    false
-                                  }
-                                  className="transition hover:text-blue-600 hover:underline"
+                                  href={`/crm/companies/${deal.companyId}`}
+                                  draggable={false}
+                                  className="text-sm text-slate-600 transition hover:text-blue-600 hover:underline"
                                 >
-                                  {
-                                    deal.title
-                                  }
+                                  {deal.companyName}
                                 </Link>
-                              </div>
-
-                              <div className="mt-3 text-lg font-semibold">
-                                {deal.amount
-                                  ? formatMoney(
-                                      deal.amount,
-                                      deal.currency,
-                                    )
-                                  : "Сумма не указана"}
-                              </div>
-
-                              {deal.companyName && (
-                                <div className="mt-3">
-                                  {deal.companyId ? (
-                                    <Link
-                                      href={`/crm/companies/${deal.companyId}`}
-                                      draggable={
-                                        false
-                                      }
-                                      className="text-sm text-slate-600 transition hover:text-blue-600 hover:underline"
-                                    >
-                                      {
-                                        deal.companyName
-                                      }
-                                    </Link>
-                                  ) : (
-                                    <span className="text-sm text-slate-600">
-                                      {
-                                        deal.companyName
-                                      }
-                                    </span>
-                                  )}
-                                </div>
+                              ) : (
+                                <span className="text-sm text-slate-600">
+                                  {deal.companyName}
+                                </span>
                               )}
+                            </div>
+                          )}
 
-                              <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                                <div>
-                                  Ответственный:{" "}
-                                  <span className="text-slate-700">
-                                    {deal.ownerDisplayName ||
-                                      "Не назначен"}
-                                  </span>
-                                </div>
+                          <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                            <div>
+                              Ответственный:{" "}
+                              <span className="text-slate-700">
+                                {deal.ownerDisplayName || "Не назначен"}
+                              </span>
+                            </div>
 
-                                <div>
-                                  Закрытие:{" "}
-                                  <span className="text-slate-700">
-                                    {deal.expectedCloseAt
-                                      ? formatDateOnly(
-                                          deal.expectedCloseAt,
-                                        )
-                                      : "Не указано"}
-                                  </span>
-                                </div>
-                              </div>
-                            </article>
-                          );
-                        },
-                      )
-                    )}
-                  </div>
-                </section>
-              );
-            },
-          )}
+                            <div>
+                              Закрытие:{" "}
+                              <span className="text-slate-700">
+                                {deal.expectedCloseAt
+                                  ? formatDateOnly(deal.expectedCloseAt)
+                                  : "Не указано"}
+                              </span>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+                {next[stage.id] && (
+                  <button
+                    disabled={loading !== null || pending}
+                    className="m-3 rounded border px-4 py-2 text-sm disabled:opacity-50"
+                    onClick={async () => {
+                      setLoading(stage.id);
+                      try {
+                        const result = await loadBoardColumn({
+                          organizationId: organizationScope,
+                          filters,
+                          stageId: stage.id,
+                          cursor: next[stage.id],
+                        });
+                        if (!result) {
+                          notify({
+                            kind: "error",
+                            message: "Доска недоступна. Обновите страницу.",
+                          });
+                          return;
+                        }
+                        setExtra((old) => [
+                          ...old,
+                          ...result.rows.filter(
+                            (row) =>
+                              ![...deals, ...old].some((d) => d.id === row.id),
+                          ),
+                        ]);
+                        setNext((old) => ({ ...old, [stage.id]: result.next }));
+                      } catch {
+                        notify({
+                          kind: "error",
+                          message: "Не удалось загрузить сделки.",
+                        });
+                      } finally {
+                        setLoading(null);
+                      }
+                    }}
+                  >
+                    {loading === stage.id ? "Загрузка…" : "Ещё сделки"}
+                  </button>
+                )}
+              </section>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-function formatDateOnly(
-  value: string,
-) {
-  const [
-    year,
-    month,
-    day,
-  ] = value.split("-");
+function formatDateOnly(value: string) {
+  const [year, month, day] = value.split("-");
 
-  if (
-    !year ||
-    !month ||
-    !day
-  ) {
+  if (!year || !month || !day) {
     return value;
   }
 

@@ -1,0 +1,30 @@
+ALTER TABLE "deals" ADD CONSTRAINT "deals_org_id_unique" UNIQUE("organization_id","id");--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_org_id_unique" UNIQUE("organization_id","id");--> statement-breakpoint
+ALTER TABLE "comments" ADD CONSTRAINT "comments_org_entity_id_unique" UNIQUE("organization_id","entity_type","entity_id","id");--> statement-breakpoint
+ALTER TABLE "activity_events" ADD COLUMN "client_target_id" uuid GENERATED ALWAYS AS (CASE WHEN entity_type = 'client' THEN entity_id END) STORED;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD COLUMN "company_target_id" uuid GENERATED ALWAYS AS (CASE WHEN entity_type = 'company' THEN entity_id END) STORED;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD COLUMN "deal_target_id" uuid GENERATED ALWAYS AS (CASE WHEN entity_type = 'deal' THEN entity_id END) STORED;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD COLUMN "task_target_id" uuid GENERATED ALWAYS AS (CASE WHEN entity_type = 'task' THEN entity_id END) STORED;--> statement-breakpoint
+ALTER TABLE "comments" ADD COLUMN "client_target_id" uuid GENERATED ALWAYS AS (CASE WHEN entity_type = 'client' THEN entity_id END) STORED;--> statement-breakpoint
+ALTER TABLE "comments" ADD COLUMN "company_target_id" uuid GENERATED ALWAYS AS (CASE WHEN entity_type = 'company' THEN entity_id END) STORED;--> statement-breakpoint
+ALTER TABLE "comments" ADD COLUMN "deal_target_id" uuid GENERATED ALWAYS AS (CASE WHEN entity_type = 'deal' THEN entity_id END) STORED;--> statement-breakpoint
+ALTER TABLE "comments" ADD COLUMN "task_target_id" uuid GENERATED ALWAYS AS (CASE WHEN entity_type = 'task' THEN entity_id END) STORED;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_org_owner_fk" FOREIGN KEY ("organization_id","owner_member_id") REFERENCES "public"."organization_members"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_org_creator_fk" FOREIGN KEY ("organization_id","created_by_member_id") REFERENCES "public"."organization_members"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_org_client_fk" FOREIGN KEY ("organization_id","client_id") REFERENCES "public"."clients"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_org_company_fk" FOREIGN KEY ("organization_id","company_id") REFERENCES "public"."companies"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_org_deal_fk" FOREIGN KEY ("organization_id","deal_id") REFERENCES "public"."deals"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_schedules" ADD CONSTRAINT "task_schedules_org_task_fk" FOREIGN KEY ("organization_id","task_id") REFERENCES "public"."tasks"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD CONSTRAINT "activity_events_org_client_fk" FOREIGN KEY ("organization_id","client_target_id") REFERENCES "public"."clients"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD CONSTRAINT "activity_events_org_company_fk" FOREIGN KEY ("organization_id","company_target_id") REFERENCES "public"."companies"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD CONSTRAINT "activity_events_org_deal_fk" FOREIGN KEY ("organization_id","deal_target_id") REFERENCES "public"."deals"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD CONSTRAINT "activity_events_org_task_fk" FOREIGN KEY ("organization_id","task_target_id") REFERENCES "public"."tasks"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD CONSTRAINT "activity_events_org_member_fk" FOREIGN KEY ("organization_id","actor_member_id") REFERENCES "public"."organization_members"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD CONSTRAINT "activity_events_org_comment_target_fk" FOREIGN KEY ("organization_id","entity_type","entity_id","comment_id") REFERENCES "public"."comments"("organization_id","entity_type","entity_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "comments" ADD CONSTRAINT "comments_org_client_fk" FOREIGN KEY ("organization_id","client_target_id") REFERENCES "public"."clients"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "comments" ADD CONSTRAINT "comments_org_company_fk" FOREIGN KEY ("organization_id","company_target_id") REFERENCES "public"."companies"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "comments" ADD CONSTRAINT "comments_org_deal_fk" FOREIGN KEY ("organization_id","deal_target_id") REFERENCES "public"."deals"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "comments" ADD CONSTRAINT "comments_org_task_fk" FOREIGN KEY ("organization_id","task_target_id") REFERENCES "public"."tasks"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "comments" ADD CONSTRAINT "comments_org_member_fk" FOREIGN KEY ("organization_id","author_member_id") REFERENCES "public"."organization_members"("organization_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_events" ADD CONSTRAINT "activity_events_entity_type_check" CHECK ("activity_events"."entity_type" IN ('client','company','deal','task'));--> statement-breakpoint
+ALTER TABLE "comments" ADD CONSTRAINT "comments_entity_type_check" CHECK ("comments"."entity_type" IN ('client','company','deal','task'));

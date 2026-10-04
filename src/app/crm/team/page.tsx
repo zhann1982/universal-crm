@@ -1,23 +1,14 @@
+import { readTeamRows, readTeamRoleOptions } from "@/modules/members/read-team";
+import { InvitationControls } from "./invitation-controls";
 import { OrganizationForm } from "@/modules/access/organization-context";
-import {
-  and,
-  asc,
-  eq,
-} from "drizzle-orm";
+import { desc, sql, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import {
-  memberRoles,
-  organizationMembers,
-  roles,
-} from "@/db/schema";
+import { organizationInvitations } from "@/db/schema";
 import { requirePermission } from "@/lib/auth/permissions";
 
 import { AddMemberForm } from "./add-member-form";
-import {
-  updateMemberRoles,
-  updateMemberStatus,
-} from "./actions";
+import { updateMemberRoles, updateMemberStatus } from "./actions";
 
 type SearchParams = {
   saved?: string;
@@ -31,159 +22,67 @@ export default async function TeamPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params =
-    await searchParams;
+  const params = await searchParams;
 
   const {
     organization,
     member: currentMember,
     permissions: currentPermissions,
-  } = await requirePermission(
-    "members.read",
-  );
+  } = await requirePermission("members.read");
 
-  const rows = await db
-    .select({
-      memberId:
-        organizationMembers.id,
+  const [rows, roleList] = await Promise.all([
+    readTeamRows(organization.id, currentPermissions),
+    readTeamRoleOptions(organization.id, currentPermissions),
+  ]);
+  const canReadRoles =
+    currentPermissions.has("roles.read") ||
+    currentPermissions.has("members.manage");
 
-      userId:
-        organizationMembers.userId,
+  const memberMap = new Map<
+    string,
+    {
+      id: string;
+      userId: string;
 
-      displayName:
-        organizationMembers.displayName,
+      displayName: string | null;
 
-      email:
-        organizationMembers.email,
+      email: string | null;
 
-      status:
-        organizationMembers.status,
+      status: string;
 
-      joinedAt:
-        organizationMembers.joinedAt,
+      joinedAt: Date;
 
-      roleId:
-        roles.id,
-
-      roleName:
-        roles.name,
-    })
-    .from(organizationMembers)
-    .leftJoin(
-      memberRoles,
-      eq(
-        memberRoles.memberId,
-        organizationMembers.id,
-      ),
-    )
-    .leftJoin(
-      roles,
-      and(
-        eq(
-          roles.id,
-          memberRoles.roleId,
-        ),
-
-        eq(
-          roles.organizationId,
-          organization.id,
-        ),
-      ),
-    )
-    .where(
-      eq(
-        organizationMembers.organizationId,
-        organization.id,
-      ),
-    )
-    .orderBy(
-      asc(
-        organizationMembers.displayName,
-      ),
-    );
-
-  const roleList = await db
-    .select({
-      id: roles.id,
-      name: roles.name,
-      description:
-        roles.description,
-    })
-    .from(roles)
-    .where(
-      eq(
-        roles.organizationId,
-        organization.id,
-      ),
-    )
-    .orderBy(
-      asc(roles.name),
-    );
-
-  const memberMap =
-    new Map<
-      string,
-      {
+      roles: Array<{
         id: string;
-        userId: string;
-
-        displayName:
-          | string
-          | null;
-
-        email:
-          | string
-          | null;
-
-        status: string;
-
-        joinedAt: Date;
-
-        roles: Array<{
-          id: string;
-          name: string;
-        }>;
-      }
-    >();
+        name: string;
+      }>;
+    }
+  >();
 
   for (const row of rows) {
-    let member =
-      memberMap.get(
-        row.memberId,
-      );
+    let member = memberMap.get(row.memberId);
 
     if (!member) {
       member = {
         id: row.memberId,
 
-        userId:
-          row.userId,
+        userId: row.userId,
 
-        displayName:
-          row.displayName,
+        displayName: row.displayName,
 
-        email:
-          row.email,
+        email: row.email,
 
-        status:
-          row.status,
+        status: row.status,
 
-        joinedAt:
-          row.joinedAt,
+        joinedAt: row.joinedAt,
 
         roles: [],
       };
 
-      memberMap.set(
-        row.memberId,
-        member,
-      );
+      memberMap.set(row.memberId, member);
     }
 
-    if (
-      row.roleId &&
-      row.roleName
-    ) {
+    if (row.roleId && row.roleName) {
       member.roles.push({
         id: row.roleId,
         name: row.roleName,
@@ -191,298 +90,255 @@ export default async function TeamPage({
     }
   }
 
-  const members = [
-    ...memberMap.values(),
-  ];
+  const members = [...memberMap.values()];
 
-  const canManage =
-    currentPermissions.has(
-      "members.manage",
-    );
+  const canManage = currentPermissions.has("members.manage");
+
+  const invitations = canManage
+    ? await db
+        .select({
+          id: organizationInvitations.id,
+          email: organizationInvitations.emailNormalized,
+          expiresAt: organizationInvitations.expiresAt,
+          acceptedAt: organizationInvitations.acceptedAt,
+          revokedAt: organizationInvitations.revokedAt,
+          expired: sql<boolean>`${organizationInvitations.expiresAt} <= CURRENT_TIMESTAMP`,
+        })
+        .from(organizationInvitations)
+        .where(eq(organizationInvitations.organizationId, organization.id))
+        .orderBy(
+          desc(organizationInvitations.createdAt),
+          desc(organizationInvitations.id),
+        )
+        .limit(50)
+    : [];
 
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">
-          Команда
-        </h1>
+        <h1 className="text-3xl font-bold">Команда</h1>
 
         <p className="mt-2 text-slate-500">
-          Сотрудники, роли и доступ
-          к организации.
+          Сотрудники, роли и доступ к организации.
         </p>
       </div>
 
       {params.saved === "1" && (
-        <SuccessMessage>
-          Роли сотрудника обновлены.
-        </SuccessMessage>
+        <SuccessMessage>Роли сотрудника обновлены.</SuccessMessage>
       )}
 
       {params.added === "1" && (
-        <SuccessMessage>
-          Сотрудник добавлен в организацию.
-        </SuccessMessage>
+        <SuccessMessage>Сотрудник добавлен в организацию.</SuccessMessage>
       )}
 
-      {params.statusUpdated ===
-        "inactive" && (
-        <SuccessMessage>
-          Сотрудник деактивирован.
-        </SuccessMessage>
+      {params.statusUpdated === "inactive" && (
+        <SuccessMessage>Сотрудник деактивирован.</SuccessMessage>
       )}
 
-      {params.statusUpdated ===
-        "active" && (
-        <SuccessMessage>
-          Сотрудник снова активирован.
-        </SuccessMessage>
+      {params.statusUpdated === "active" && (
+        <SuccessMessage>Сотрудник снова активирован.</SuccessMessage>
       )}
 
       {params.error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {getErrorMessage(
-            params.error,
-          )}
+          {getErrorMessage(params.error)}
         </div>
       )}
 
+      {canManage && <AddMemberForm roles={roleList} />}
+
       {canManage && (
-        <AddMemberForm
-          roles={roleList}
-        />
+        <section className="mb-6 rounded-xl border bg-white p-6">
+          <h2 className="text-lg font-semibold">Приглашения</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Последние 50 приглашений. Перевыпуск аннулирует старую ссылку.
+          </p>
+          <div className="mt-4 grid gap-4">
+            {invitations.map((invitation) => (
+              <div key={invitation.id} className="rounded-lg border p-4">
+                <div className="font-medium">{invitation.email}</div>
+                <p className="text-sm text-slate-500">
+                  {invitation.acceptedAt
+                    ? "Принято"
+                    : invitation.revokedAt
+                      ? "Отозвано"
+                      : invitation.expired
+                        ? "Истекло"
+                        : "Ожидает принятия"}{" "}
+                  · до {invitation.expiresAt.toLocaleString("ru-RU")}
+                </p>
+                {!invitation.acceptedAt && !invitation.revokedAt && (
+                  <InvitationControls
+                    id={invitation.id}
+                    expiresAt={invitation.expiresAt.toISOString()}
+                  />
+                )}
+              </div>
+            ))}
+            {invitations.length === 0 && (
+              <p className="text-sm text-slate-500">Приглашений пока нет.</p>
+            )}
+          </div>
+        </section>
       )}
 
       <div className="grid gap-5">
-        {members.map(
-          (member) => {
-            const isCurrent =
-              member.id ===
-              currentMember.id;
+        {members.map((member) => {
+          const isCurrent = member.id === currentMember.id;
 
-            const isActive =
-              member.status ===
-              "active";
+          const isActive = member.status === "active";
 
-            const selectedRoleIds =
-              new Set(
-                member.roles.map(
-                  (role) =>
-                    role.id,
-                ),
-              );
+          const selectedRoleIds = new Set(member.roles.map((role) => role.id));
 
-            return (
-              <section
-                key={member.id}
-                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-5">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-lg font-semibold">
-                        {member.displayName ||
-                          member.userId}
-                      </h2>
+          return (
+            <section
+              key={member.id}
+              className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-5">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 className="text-lg font-semibold">
+                      {member.displayName || member.userId}
+                    </h2>
 
-                      {isCurrent && (
-                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
-                          Вы
-                        </span>
-                      )}
-
-                      <span
-                        className={
-                          isActive
-                            ? "rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700"
-                            : "rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600"
-                        }
-                      >
-                        {isActive
-                          ? "Активен"
-                          : "Неактивен"}
+                    {isCurrent && (
+                      <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                        Вы
                       </span>
-                    </div>
+                    )}
 
-                    <div className="mt-2 text-sm text-slate-500">
-                      {member.email ||
-                        "Email не указан"}
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-400">
-                      userId:{" "}
-                      {member.userId}
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {member.roles.length >
-                      0 ? (
-                        member.roles.map(
-                          (role) => (
-                            <span
-                              key={
-                                role.id
-                              }
-                              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium"
-                            >
-                              {
-                                role.name
-                              }
-                            </span>
-                          ),
-                        )
-                      ) : (
-                        <span className="text-sm text-slate-400">
-                          Роли не назначены
-                        </span>
-                      )}
-                    </div>
+                    <span
+                      className={
+                        isActive
+                          ? "rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700"
+                          : "rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600"
+                      }
+                    >
+                      {isActive ? "Активен" : "Неактивен"}
+                    </span>
                   </div>
 
-                  <div className="text-sm text-slate-400">
-                    В команде с{" "}
-                    {member.joinedAt.toLocaleDateString(
-                      "ru-RU",
+                  <div className="mt-2 text-sm text-slate-500">
+                    {member.email || "Email не указан"}
+                  </div>
+
+                  <div className="mt-1 text-xs text-slate-400">
+                    userId: {member.userId}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {member.roles.length > 0 ? (
+                      member.roles.map((role) => (
+                        <span
+                          key={role.id}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium"
+                        >
+                          {role.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm text-slate-400">
+                        {canReadRoles ? "Роли не назначены" : "Роли скрыты"}
+                      </span>
                     )}
                   </div>
                 </div>
 
-                {canManage &&
-                  !isCurrent && (
-                    <>
-                      <OrganizationForm
-                        action={
-                          updateMemberRoles
-                        }
-                        className="mt-6 border-t border-slate-200 pt-5"
-                      >
-                        <input
-                          type="hidden"
-                          name="memberId"
-                          value={
-                            member.id
-                          }
-                        />
+                <div className="text-sm text-slate-400">
+                  В команде с {member.joinedAt.toLocaleDateString("ru-RU")}
+                </div>
+              </div>
 
-                        <div className="text-sm font-medium">
-                          Роли сотрудника
-                        </div>
+              {canManage && !isCurrent && (
+                <>
+                  <OrganizationForm
+                    action={updateMemberRoles}
+                    className="mt-6 border-t border-slate-200 pt-5"
+                  >
+                    <input type="hidden" name="memberId" value={member.id} />
 
-                        <div className="mt-3 flex flex-wrap gap-3">
-                          {roleList.map(
-                            (role) => (
-                              <label
-                                key={
-                                  role.id
-                                }
-                                className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                              >
-                                <input
-                                  type="checkbox"
-                                  name="roleIds"
-                                  value={
-                                    role.id
-                                  }
-                                  defaultChecked={selectedRoleIds.has(
-                                    role.id,
-                                  )}
-                                />
+                    <div className="text-sm font-medium">Роли сотрудника</div>
 
-                                <span>
-                                  {
-                                    role.name
-                                  }
-                                </span>
-                              </label>
-                            ),
-                          )}
-                        </div>
-
-                        <button
-                          type="submit"
-                          className="mt-4 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {roleList.map((role) => (
+                        <label
+                          key={role.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"
                         >
-                          Сохранить роли
-                        </button>
-                      </OrganizationForm>
+                          <input
+                            type="checkbox"
+                            name="roleIds"
+                            value={role.id}
+                            defaultChecked={selectedRoleIds.has(role.id)}
+                          />
 
-                      <OrganizationForm
-                        action={
-                          updateMemberStatus
-                        }
-                        className="mt-5 border-t border-slate-200 pt-5"
-                      >
-                        <input
-                          type="hidden"
-                          name="memberId"
-                          value={
-                            member.id
-                          }
-                        />
-
-                        <input
-                          type="hidden"
-                          name="status"
-                          value={
-                            isActive
-                              ? "inactive"
-                              : "active"
-                          }
-                        />
-
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                          <div>
-                            <div className="text-sm font-medium">
-                              Доступ к CRM
-                            </div>
-
-                            <div className="mt-1 text-sm text-slate-500">
-                              {isActive
-                                ? "Деактивация запретит сотруднику доступ к этой организации."
-                                : "Активация снова разрешит сотруднику доступ к этой организации."}
-                            </div>
-                          </div>
-
-                          <button
-                            type="submit"
-                            className={
-                              isActive
-                                ? "rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
-                                : "rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
-                            }
-                          >
-                            {isActive
-                              ? "Деактивировать"
-                              : "Активировать"}
-                          </button>
-                        </div>
-                      </OrganizationForm>
-                    </>
-                  )}
-
-                {canManage &&
-                  isCurrent && (
-                    <div className="mt-6 border-t border-slate-200 pt-5 text-sm text-slate-500">
-                      Изменение собственных
-                      ролей и деактивация
-                      собственной учётной
-                      записи запрещены.
+                          <span>{role.name}</span>
+                        </label>
+                      ))}
                     </div>
-                  )}
-              </section>
-            );
-          },
-        )}
+
+                    <button
+                      type="submit"
+                      className="mt-4 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                    >
+                      Сохранить роли
+                    </button>
+                  </OrganizationForm>
+
+                  <OrganizationForm
+                    action={updateMemberStatus}
+                    className="mt-5 border-t border-slate-200 pt-5"
+                  >
+                    <input type="hidden" name="memberId" value={member.id} />
+
+                    <input
+                      type="hidden"
+                      name="status"
+                      value={isActive ? "inactive" : "active"}
+                    />
+
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-medium">Доступ к CRM</div>
+
+                        <div className="mt-1 text-sm text-slate-500">
+                          {isActive
+                            ? "Деактивация запретит сотруднику доступ к этой организации."
+                            : "Активация снова разрешит сотруднику доступ к этой организации."}
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className={
+                          isActive
+                            ? "rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
+                            : "rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
+                        }
+                      >
+                        {isActive ? "Деактивировать" : "Активировать"}
+                      </button>
+                    </div>
+                  </OrganizationForm>
+                </>
+              )}
+
+              {canManage && isCurrent && (
+                <div className="mt-6 border-t border-slate-200 pt-5 text-sm text-slate-500">
+                  Изменение собственных ролей и деактивация собственной учётной
+                  записи запрещены.
+                </div>
+              )}
+            </section>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function SuccessMessage({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function SuccessMessage({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
       {children}
@@ -490,9 +346,7 @@ function SuccessMessage({
   );
 }
 
-function getErrorMessage(
-  error: string,
-) {
+function getErrorMessage(error: string) {
   switch (error) {
     case "self":
       return "Нельзя изменять собственные роли.";
@@ -525,7 +379,7 @@ function getErrorMessage(
       return "Пользователь зарегистрирован, но ещё не подтвердил свой email.";
 
     case "user-ambiguous":
-      return "Найдено несколько учётных записей с одинаковым email после нормализации. Добавление сотрудника остановлено.";  
+      return "Найдено несколько учётных записей с одинаковым email после нормализации. Добавление сотрудника остановлено.";
 
     case "member-exists":
       return "Этот пользователь уже состоит в организации.";

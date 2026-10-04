@@ -1,12 +1,16 @@
 # Universal CRM — Project Context
 
-Last updated: 2026-10-03
+Last updated: 2026-10-04
 
 Saved views (D055) are personal Membership-scoped preferences within an Organization.
 Client/Company views persist search, status and active/archive filters. Deal views persist
 an active Pipeline, title search, all/mine/unassigned owner, Stage state and close-date filter.
 They store validated filter objects, never result snapshots or arbitrary URLs. Existing entity
 read permissions apply; there is no shared-view permission or sharing workflow yet.
+
+Invitation administration can revoke or reissue pending/expired invitations without creating
+Memberships. Email transport is optional until configured; manual invitation links remain available.
+Boards and history use bounded pages; reference selectors support scoped server search.
 
 ## Goal
 

@@ -1,16 +1,6 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  isNull,
-  or,
-} from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
 import Link from "@/components/app-link";
-import {
-  notFound,
-  redirect,
-} from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { db } from "@/db";
 import {
@@ -19,19 +9,11 @@ import {
   pipelineStages,
   pipelines,
 } from "@/db/schema";
-import {
-  requirePermission,
-} from "@/lib/auth/permissions";
-import {
-  getDealById,
-} from "@/lib/deals/get-deal";
-import {
-  dealIdSchema,
-} from "@/lib/validation/deal";
+import { requirePermission } from "@/lib/auth/permissions";
+import { getDealById } from "@/lib/deals/get-deal";
+import { dealIdSchema } from "@/lib/validation/deal";
 
-import {
-  EditDealForm,
-} from "./edit-deal-form";
+import { EditDealForm } from "./edit-deal-form";
 
 export default async function EditDealPage({
   params,
@@ -40,45 +22,24 @@ export default async function EditDealPage({
     id: string;
   }>;
 }) {
-  const {
-    organization,
-    member,
-    permissions,
-  } = await requirePermission(
-    "deals.update",
-  );
+  const { organization, member, permissions } =
+    await requirePermission("deals.update");
 
-  if (
-    !permissions.has(
-      "pipelines.read",
-    )
-  ) {
-    redirect(
-      "/crm/forbidden",
-    );
+  if (!permissions.has("pipelines.read")) {
+    redirect("/crm/forbidden");
   }
 
-  const { id } =
-    await params;
+  const { id } = await params;
 
-  const idResult =
-    dealIdSchema.safeParse(
-      id,
-    );
+  const idResult = dealIdSchema.safeParse(id);
 
   if (!idResult.success) {
     notFound();
   }
 
-  const deal =
-    await getDealById(
-      idResult.data,
-    );
+  const deal = await getDealById(idResult.data);
 
-  if (
-    !deal ||
-    deal.isArchived
-  ) {
+  if (!deal || deal.isArchived) {
     notFound();
   }
 
@@ -89,87 +50,47 @@ export default async function EditDealPage({
    * доступной даже если позже
    * была архивирована.
    */
-  const pipelineList =
-    await db
-      .select({
-        id:
-          pipelines.id,
+  const pipelineList = await db
+    .select({
+      id: pipelines.id,
 
-        name:
-          pipelines.name,
+      name: pipelines.name,
 
-        isDefault:
-          pipelines.isDefault,
-      })
-      .from(pipelines)
-      .where(
-        and(
-          eq(
-            pipelines.organizationId,
-            organization.id,
-          ),
+      isDefault: pipelines.isDefault,
+    })
+    .from(pipelines)
+    .where(
+      and(
+        eq(pipelines.organizationId, organization.id),
 
-          or(
-            eq(
-              pipelines.isArchived,
-              false,
-            ),
+        or(
+          eq(pipelines.isArchived, false),
 
-            eq(
-              pipelines.id,
-              deal.pipelineId,
-            ),
-          ),
+          eq(pipelines.id, deal.pipelineId),
         ),
-      )
-      .orderBy(
-        desc(
-          pipelines.isDefault,
-        ),
-        asc(
-          pipelines.name,
-        ),
-      );
+      ),
+    )
+    .orderBy(desc(pipelines.isDefault), asc(pipelines.name));
 
-  const pipelineIds =
-    pipelineList.map(
-      (pipeline) =>
-        pipeline.id,
-    );
+  const pipelineIds = pipelineList.map((pipeline) => pipeline.id);
 
   const stages =
     pipelineIds.length > 0
       ? await db
           .select({
-            id:
-              pipelineStages.id,
+            id: pipelineStages.id,
 
-            pipelineId:
-              pipelineStages.pipelineId,
+            pipelineId: pipelineStages.pipelineId,
 
-            name:
-              pipelineStages.name,
+            name: pipelineStages.name,
 
-            type:
-              pipelineStages.type,
+            type: pipelineStages.type,
 
-            position:
-              pipelineStages.position,
+            position: pipelineStages.position,
           })
-          .from(
-            pipelineStages,
-          )
-          .where(
-            eq(
-              pipelineStages.organizationId,
-              organization.id,
-            ),
-          )
-          .orderBy(
-            asc(
-              pipelineStages.position,
-            ),
-          )
+          .from(pipelineStages)
+          .where(eq(pipelineStages.organizationId, organization.id))
+          .orderBy(asc(pipelineStages.position))
       : [];
 
   /*
@@ -189,79 +110,50 @@ export default async function EditDealPage({
 
     name: string;
 
-    taxId:
-      | string
-      | null;
+    taxId: string | null;
   }> = [];
 
-  if (
-    permissions.has(
-      "companies.read",
-    )
-  ) {
-    companyList =
-      await db
-        .select({
-          id:
-            companies.id,
+  if (permissions.has("companies.read")) {
+    companyList = await db
+      .select({
+        id: companies.id,
 
-          name:
-            companies.name,
+        name: companies.name,
 
-          taxId:
-            companies.taxId,
-        })
-        .from(companies)
-        .where(
-          and(
-            eq(
-              companies.organizationId,
-              organization.id,
-            ),
+        taxId: companies.taxId,
+      })
+      .from(companies)
+      .where(
+        and(
+          eq(companies.organizationId, organization.id),
 
-            isNull(
-              companies.deletedAt,
-            ),
+          isNull(companies.deletedAt),
 
-            deal.companyId
-              ? or(
-                  eq(
-                    companies.isArchived,
-                    false,
-                  ),
+          deal.companyId
+            ? or(
+                eq(companies.isArchived, false),
 
-                  eq(
-                    companies.id,
-                    deal.companyId,
-                  ),
-                )
-              : eq(
-                  companies.isArchived,
-                  false,
-                ),
-          ),
-        )
-        .orderBy(
-          asc(
-            companies.name,
-          ),
-        );
-    } else if (
-      deal.companyId
-    ) {
-      companyList = [
-        {
-          id:
-            deal.companyId,
+                eq(companies.id, deal.companyId),
+              )
+            : eq(companies.isArchived, false),
+        ),
+      )
+      .orderBy(
+        sql`CASE WHEN ${companies.id}=${deal.companyId}::uuid THEN 0 ELSE 1 END`,
+        asc(companies.name),
+      )
+      .limit(50);
+  } else if (deal.companyId) {
+    companyList = [
+      {
+        id: deal.companyId,
 
-          name:
-            "Текущая компания",
+        name: "Текущая компания",
 
-          taxId:
-            null,
-        },
-      ];
-    }
+        taxId: null,
+      },
+    ];
+  }
 
   /*
    * F05 — owner picker.
@@ -279,69 +171,44 @@ export default async function EditDealPage({
   let memberList: Array<{
     id: string;
 
-    displayName:
-      | string
-      | null;
+    displayName: string | null;
   }> = [];
 
-  if (
-    permissions.has(
-      "members.read",
-    )
-  ) {
-    memberList =
-      await db
-        .select({
-          id:
-            organizationMembers.id,
+  if (permissions.has("members.read")) {
+    memberList = await db
+      .select({
+        id: organizationMembers.id,
 
-          displayName:
-            organizationMembers.displayName,
-        })
-        .from(
-          organizationMembers,
-        )
-        .where(
-          and(
-            eq(
-              organizationMembers.organizationId,
-              organization.id,
-            ),
+        displayName: organizationMembers.displayName,
+      })
+      .from(organizationMembers)
+      .where(
+        and(
+          eq(organizationMembers.organizationId, organization.id),
 
-            deal.ownerMemberId
-              ? or(
-                  eq(
-                    organizationMembers.status,
-                    "active",
-                  ),
+          deal.ownerMemberId
+            ? or(
+                eq(organizationMembers.status, "active"),
 
-                  eq(
-                    organizationMembers.id,
-                    deal.ownerMemberId,
-                  ),
-                )
-              : eq(
-                  organizationMembers.status,
-                  "active",
-                ),
-          ),
-        )
-        .orderBy(
-          asc(
-            organizationMembers.displayName,
-          ),
-        );
+                eq(organizationMembers.id, deal.ownerMemberId),
+              )
+            : eq(organizationMembers.status, "active"),
+        ),
+      )
+      .orderBy(
+        sql`CASE WHEN ${organizationMembers.id}=${deal.ownerMemberId}::uuid THEN 0 ELSE 1 END`,
+        asc(organizationMembers.displayName),
+      )
+      .limit(50);
   } else {
     /*
      * Без members.read пользователь
      * может назначить себя.
      */
     memberList.push({
-      id:
-        member.id,
+      id: member.id,
 
-      displayName:
-        member.displayName,
+      displayName: member.displayName,
     });
 
     /*
@@ -353,17 +220,11 @@ export default async function EditDealPage({
      * существующего owner, но
      * не раскрывает каталог Team.
      */
-    if (
-      deal.ownerMemberId &&
-      deal.ownerMemberId !==
-        member.id
-    ) {
+    if (deal.ownerMemberId && deal.ownerMemberId !== member.id) {
       memberList.push({
-        id:
-          deal.ownerMemberId,
+        id: deal.ownerMemberId,
 
-        displayName:
-          "Сотрудник",
+        displayName: "Сотрудник",
       });
     }
   }
@@ -378,67 +239,36 @@ export default async function EditDealPage({
           ← Назад к сделке
         </Link>
 
-        <h1 className="mt-4 text-3xl font-bold">
-          Редактирование сделки
-        </h1>
+        <h1 className="mt-4 text-3xl font-bold">Редактирование сделки</h1>
 
-        <p className="mt-2 text-slate-500">
-          {deal.title}
-        </p>
+        <p className="mt-2 text-slate-500">{deal.title}</p>
       </div>
 
       <EditDealForm
-        dealId={
-          deal.id
-        }
-        initialVersion={
-          deal.version
-        }
-        pipelines={
-          pipelineList
-        }
-        stages={
-          stages
-        }
-        companies={
-          companyList
-        }
-        members={
-          memberList
-        }
+        dealId={deal.id}
+        initialVersion={deal.version}
+        pipelines={pipelineList}
+        stages={stages}
+        companies={companyList}
+        members={memberList}
         initialValues={{
-          title:
-            deal.title,
+          title: deal.title,
 
-          pipelineId:
-            deal.pipelineId,
+          pipelineId: deal.pipelineId,
 
-          stageId:
-            deal.stageId,
+          stageId: deal.stageId,
 
-          amount:
-            deal.amount ??
-            "",
+          amount: deal.amount ?? "",
 
-          currency:
-            deal.currency ??
-            "",
+          currency: deal.currency ?? "",
 
-          companyId:
-            deal.companyId ??
-            "",
+          companyId: deal.companyId ?? "",
 
-          ownerMemberId:
-            deal.ownerMemberId ??
-            "",
+          ownerMemberId: deal.ownerMemberId ?? "",
 
-          expectedCloseAt:
-            deal.expectedCloseAt ??
-            "",
+          expectedCloseAt: deal.expectedCloseAt ?? "",
 
-          notes:
-            deal.notes ??
-            "",
+          notes: deal.notes ?? "",
         }}
       />
     </div>

@@ -1,5 +1,6 @@
 import {
   index,
+  foreignKey,
   integer,
   pgTable,
   timestamp,
@@ -8,10 +9,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import {
-  organizations,
-  tasks,
-} from "./schema";
+import { organizations, tasks } from "./schema";
 
 /*
 |--------------------------------------------------------------------------
@@ -33,110 +31,69 @@ export const taskSchedules = pgTable(
         onDelete: "cascade",
       }),
 
-    organizationId: uuid(
-      "organization_id",
-    )
+    organizationId: uuid("organization_id")
       .notNull()
-      .references(
-        () => organizations.id,
-        {
-          onDelete: "cascade",
-        },
-      ),
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }),
 
-    reminderAt: timestamp(
-      "reminder_at",
-      {
-        withTimezone: true,
-      },
-    ),
+    reminderAt: timestamp("reminder_at", {
+      withTimezone: true,
+    }),
 
-    reminderDismissedAt: timestamp(
-      "reminder_dismissed_at",
-      {
-        withTimezone: true,
-      },
-    ),
+    reminderDismissedAt: timestamp("reminder_dismissed_at", {
+      withTimezone: true,
+    }),
 
-    recurrenceFrequency: varchar(
-      "recurrence_frequency",
-      {
-        length: 32,
-      },
-    )
+    recurrenceFrequency: varchar("recurrence_frequency", {
+      length: 32,
+    })
       .default("none")
       .notNull(),
 
-    recurrenceInterval: integer(
-      "recurrence_interval",
-    )
-      .default(1)
-      .notNull(),
+    recurrenceInterval: integer("recurrence_interval").default(1).notNull(),
 
-    recurrenceEndAt: timestamp(
-      "recurrence_end_at",
-      {
-        withTimezone: true,
-      },
-    ),
+    recurrenceEndAt: timestamp("recurrence_end_at", {
+      withTimezone: true,
+    }),
 
-    recurrenceSeriesId: uuid(
-      "recurrence_series_id",
-    ),
+    recurrenceSeriesId: uuid("recurrence_series_id"),
 
-    recurrenceSequence: integer(
-      "recurrence_sequence",
-    )
-      .default(1)
-      .notNull(),
+    recurrenceSequence: integer("recurrence_sequence").default(1).notNull(),
 
-    version: integer("version")
-      .default(1)
-      .notNull(),
+    version: integer("version").default(1).notNull(),
 
-    createdAt: timestamp(
-      "created_at",
-      {
-        withTimezone: true,
-      },
-    )
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
       .defaultNow()
       .notNull(),
 
-    updatedAt: timestamp(
-      "updated_at",
-      {
-        withTimezone: true,
-      },
-    )
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
       .defaultNow()
       .notNull(),
   },
   (table) => [
-    index(
-      "task_schedules_org_reminder_idx",
-    ).on(
+    foreignKey({
+      name: "task_schedules_org_task_fk",
+      columns: [table.organizationId, table.taskId],
+      foreignColumns: [tasks.organizationId, tasks.id],
+    }).onDelete("cascade"),
+    index("task_schedules_org_reminder_idx").on(
       table.organizationId,
       table.reminderAt,
     ),
 
-    index(
-      "task_schedules_org_task_idx",
-    ).on(
-      table.organizationId,
-      table.taskId,
-    ),
+    index("task_schedules_org_task_idx").on(table.organizationId, table.taskId),
 
-    index(
-      "task_schedules_org_series_idx",
-    ).on(
+    index("task_schedules_org_series_idx").on(
       table.organizationId,
       table.recurrenceSeriesId,
     ),
 
-    uniqueIndex(
-      "task_schedules_org_series_sequence_unique",
-    ).on(
+    uniqueIndex("task_schedules_org_series_sequence_unique").on(
       table.organizationId,
       table.recurrenceSeriesId,
       table.recurrenceSequence,

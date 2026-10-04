@@ -1,38 +1,19 @@
-import {
-  and,
-  asc,
-  eq,
-  or,
-} from "drizzle-orm";
+import { and, asc, eq, or } from "drizzle-orm";
 import Link from "@/components/app-link";
-import {
-  notFound,
-} from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { db } from "@/db";
-import {
-  organizationMembers,
-} from "@/db/schema";
-import {
-  requirePermission,
-} from "@/lib/auth/permissions";
-import {
-  getCompanyById,
-} from "@/lib/companies/get-company";
-import {
-  companyIdSchema,
-} from "@/lib/validation/company";
+import { organizationMembers } from "@/db/schema";
+import { requirePermission } from "@/lib/auth/permissions";
+import { getCompanyById } from "@/lib/companies/get-company";
+import { companyIdSchema } from "@/lib/validation/company";
 
-import {
-  EditCompanyForm,
-} from "./edit-company-form";
+import { EditCompanyForm } from "./edit-company-form";
 
 type MemberOption = {
   id: string;
 
-  displayName:
-    | string
-    | null;
+  displayName: string | null;
 
   status: string;
 };
@@ -44,40 +25,24 @@ export default async function EditCompanyPage({
     id: string;
   }>;
 }) {
-  const {
-    organization,
-    member,
-    permissions,
-  } = await requirePermission(
-    "companies.update",
-  );
+  const { organization, member, permissions } =
+    await requirePermission("companies.update");
 
-  const { id } =
-    await params;
+  const { id } = await params;
 
-  const idResult =
-    companyIdSchema.safeParse(
-      id,
-    );
+  const idResult = companyIdSchema.safeParse(id);
 
   if (!idResult.success) {
     notFound();
   }
 
-  const company =
-    await getCompanyById(
-      idResult.data,
-    );
+  const company = await getCompanyById(idResult.data);
 
-  if (
-    !company ||
-    company.isArchived
-  ) {
+  if (!company || company.isArchived) {
     notFound();
   }
 
-  let members:
-    MemberOption[] = [];
+  let members: MemberOption[] = [];
 
   /*
    * F05.
@@ -92,73 +57,44 @@ export default async function EditCompanyPage({
    * Email для owner-picker
    * не загружается.
    */
-  if (
-    permissions.has(
-      "members.read",
-    )
-  ) {
-    const memberStatusCondition =
-      company.ownerMemberId
-        ? or(
-            eq(
-              organizationMembers.status,
-              "active",
-            ),
+  if (permissions.has("members.read")) {
+    const memberStatusCondition = company.ownerMemberId
+      ? or(
+          eq(organizationMembers.status, "active"),
 
-            eq(
-              organizationMembers.id,
-              company.ownerMemberId,
-            ),
-          )
-        : eq(
-            organizationMembers.status,
-            "active",
-          );
-
-    members =
-      await db
-        .select({
-          id:
-            organizationMembers.id,
-
-          displayName:
-            organizationMembers.displayName,
-
-          status:
-            organizationMembers.status,
-        })
-        .from(
-          organizationMembers,
+          eq(organizationMembers.id, company.ownerMemberId),
         )
-        .where(
-          and(
-            eq(
-              organizationMembers.organizationId,
-              organization.id,
-            ),
+      : eq(organizationMembers.status, "active");
 
-            memberStatusCondition,
-          ),
-        )
-        .orderBy(
-          asc(
-            organizationMembers.displayName,
-          ),
-        );
+    members = await db
+      .select({
+        id: organizationMembers.id,
+
+        displayName: organizationMembers.displayName,
+
+        status: organizationMembers.status,
+      })
+      .from(organizationMembers)
+      .where(
+        and(
+          eq(organizationMembers.organizationId, organization.id),
+
+          memberStatusCondition,
+        ),
+      )
+      .orderBy(asc(organizationMembers.displayName))
+      .limit(50);
   } else {
     /*
      * Без members.read пользователь
      * может назначить себя.
      */
     members.push({
-      id:
-        member.id,
+      id: member.id,
 
-      displayName:
-        member.displayName,
+      displayName: member.displayName,
 
-      status:
-        member.status,
+      status: member.status,
     });
 
     /*
@@ -171,37 +107,22 @@ export default async function EditCompanyPage({
      * существующего owner без
      * изменения и сохраняет F08.
      */
-    if (
-      company.ownerMemberId &&
-      company.ownerMemberId !==
-        member.id
-    ) {
-      const [currentOwner] =
-        await db
-          .select({
-            id:
-              organizationMembers.id,
+    if (company.ownerMemberId && company.ownerMemberId !== member.id) {
+      const [currentOwner] = await db
+        .select({
+          id: organizationMembers.id,
 
-            status:
-              organizationMembers.status,
-          })
-          .from(
-            organizationMembers,
-          )
-          .where(
-            and(
-              eq(
-                organizationMembers.id,
-                company.ownerMemberId,
-              ),
+          status: organizationMembers.status,
+        })
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.id, company.ownerMemberId),
 
-              eq(
-                organizationMembers.organizationId,
-                organization.id,
-              ),
-            ),
-          )
-          .limit(1);
+            eq(organizationMembers.organizationId, organization.id),
+          ),
+        )
+        .limit(1);
 
       if (currentOwner) {
         members.push({
@@ -222,20 +143,12 @@ export default async function EditCompanyPage({
           ← Назад к компании
         </Link>
 
-        <h1 className="mt-4 text-3xl font-bold">
-          Редактирование компании
-        </h1>
+        <h1 className="mt-4 text-3xl font-bold">Редактирование компании</h1>
 
-        <p className="mt-2 text-slate-500">
-          Измените данные
-          компании.
-        </p>
+        <p className="mt-2 text-slate-500">Измените данные компании.</p>
       </div>
 
-      <EditCompanyForm
-        company={company}
-        members={members}
-      />
+      <EditCompanyForm company={company} members={members} />
     </div>
   );
 }

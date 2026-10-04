@@ -6,7 +6,7 @@ Migration: `drizzle/0013_tenant_integrity.sql`. Application and migration must s
 
 Run `npm run db:audit-integrity` against the intended database using its local environment configuration.
 This reads counts in one snapshot; it never mutates rows/schema or prints personal records.
-Exit 0 means all 12 checked invariants passed. Exit 1 means violations or an audit error.
+Exit 0 means all 23 checked invariants passed. Exit 1 means violations or an audit error.
 If there are violations, inspect affected records securely and decide repairs explicitly. Do not run the
 development seed or automatically reassign records to another Organization.
 
@@ -45,3 +45,13 @@ missing migrations 0012 and 0013 through drizzle-kit after Organization creation
 absent `organization_creations` table. All 14 journal hashes matched local migrations, required
 schema was verified and the post-migration audit passed. Browser creation still requires a retry;
 other deployment environments have not been verified by this recovery.
+
+## Task and history rollout (D059/D060)
+
+0017_task_activity_integrity.sql and 0018_bounded_read_indexes.sql are tested in isolated
+PostgreSQL but not applied to the connected database. The 23-counter read-only audit was clean
+on 2026-10-04. Recheck immediately before rollout; generated constraints do not repair data.
+Use the same backup, paused-writes and normal Drizzle transaction/journal procedure. Composite
+referenced UNIQUE constraints intentionally precede FKs in 0017. Existing parent history prevents
+hard deletion; archive/restore is unchanged. 0018 replaces history indexes with UUID tie breakers
+and adds active-board/archived-Deal partial indexes. Index creation takes locks; plan maintenance.

@@ -2,7 +2,17 @@
 
 Last updated: 2026-10-04
 
-## Current update — 2026-10-04
+## Latest stabilization update — 2026-10-04
+
+Five-point implementation exists (D058–D061); do not recreate these modules. Roll out 0017/0018
+with a backup/branch and paused writes after the 23-invariant audit. Configure mail and verify
+a controlled invitation + email verification delivery before calling onboarding production-ready.
+See EMAIL_DELIVERY.md. Isolated tests cover permission queries, PostgreSQL references/conflicts
+and bounded 4000-Deal/700-event reads. Broader multi-role browser/session coverage and measured
+Neon throughput remain deployment validation; dedicated non-production PostgreSQL CI remains open.
+Do not point existing integration suites at the connected working database.
+
+## Previous notifications update — 2026-10-04
 
 CRM mutation toast feedback is implemented (D057). Reuse the shared notification hooks
 and redirectWithNotice for new actions; never infer success from an unconfirmed/zero-row

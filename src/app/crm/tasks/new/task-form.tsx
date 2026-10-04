@@ -1,21 +1,15 @@
 "use client";
+import { ReferenceSearchSelect } from "@/modules/references/search-select";
 
 import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
 
 import { OrganizationForm } from "@/modules/access/organization-context";
 
-import {
-  createTask,
-} from "../actions";
-import type {
-  CreateTaskState,
-} from "@/lib/validation/task";
-import {
-  TaskScheduleFields,
-} from "../task-schedule-fields";
+import { createTask } from "../actions";
+import type { CreateTaskState } from "@/lib/validation/task";
+import { TaskScheduleFields } from "../task-schedule-fields";
 
-const initialState:
-  CreateTaskState = {};
+const initialState: CreateTaskState = {};
 
 type Option = {
   id: string;
@@ -43,17 +37,13 @@ export function TaskForm({
   defaultCompanyId = "",
   defaultDealId = "",
 }: TaskFormProps) {
-  const [state, formAction, pending] =
-    useToastActionState(
-      createTask,
-      initialState,
-    );
+  const [state, formAction, pending] = useToastActionState(
+    createTask,
+    initialState,
+  );
 
   return (
-    <OrganizationForm
-      action={formAction}
-      className="space-y-8"
-    >
+    <OrganizationForm action={formAction} className="space-y-8">
       {state.message && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {state.message}
@@ -61,9 +51,7 @@ export function TaskForm({
       )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Основная информация
-        </h2>
+        <h2 className="text-lg font-semibold">Основная информация</h2>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <div className="md:col-span-2">
@@ -72,25 +60,16 @@ export function TaskForm({
               name="title"
               required
               placeholder="Например: Позвонить клиенту"
-              defaultValue={
-                state.values?.title
-              }
-              errors={
-                state.errors?.title
-              }
+              defaultValue={state.values?.title}
+              errors={state.errors?.title}
             />
           </div>
 
           <SelectField
             label="Статус"
             name="status"
-            defaultValue={
-              state.values?.status ??
-              "todo"
-            }
-            errors={
-              state.errors?.status
-            }
+            defaultValue={state.values?.status ?? "todo"}
+            errors={state.errors?.status}
             options={[
               {
                 value: "todo",
@@ -114,13 +93,8 @@ export function TaskForm({
           <SelectField
             label="Приоритет"
             name="priority"
-            defaultValue={
-              state.values?.priority ??
-              "normal"
-            }
-            errors={
-              state.errors?.priority
-            }
+            defaultValue={state.values?.priority ?? "normal"}
+            errors={state.errors?.priority}
             options={[
               {
                 value: "low",
@@ -149,38 +123,22 @@ export function TaskForm({
               Ответственный
             </label>
 
-            <select
+            <ReferenceSearchSelect
               id="ownerMemberId"
               name="ownerMemberId"
-              defaultValue={
-                state.values
-                  ?.ownerMemberId ??
-                defaultOwnerMemberId
-              }
+              defaultValue={state.values?.ownerMemberId ?? defaultOwnerMemberId}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
             >
-              <option value="">
-                Без ответственного
-              </option>
+              <option value="">Без ответственного</option>
 
-              {members.map(
-                (member) => (
-                  <option
-                    key={member.id}
-                    value={member.id}
-                  >
-                    {member.label}
-                  </option>
-                ),
-              )}
-            </select>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.label}
+                </option>
+              ))}
+            </ReferenceSearchSelect>
 
-            <FieldErrors
-              errors={
-                state.errors
-                  ?.ownerMemberId
-              }
-            />
+            <FieldErrors errors={state.errors?.ownerMemberId} />
           </div>
         </div>
 
@@ -196,19 +154,12 @@ export function TaskForm({
             id="description"
             name="description"
             rows={6}
-            defaultValue={
-              state.values
-                ?.description ?? ""
-            }
+            defaultValue={state.values?.description ?? ""}
             placeholder="Что нужно сделать?"
             className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-slate-500"
           />
 
-          <FieldErrors
-            errors={
-              state.errors?.description
-            }
-          />
+          <FieldErrors errors={state.errors?.description} />
         </div>
       </section>
 
@@ -235,13 +186,9 @@ export function TaskForm({
       />
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Связи CRM
-        </h2>
+        <h2 className="text-lg font-semibold">Связи CRM</h2>
 
-        <p className="mt-1 text-sm text-slate-500">
-          Все связи необязательны.
-        </p>
+        <p className="mt-1 text-sm text-slate-500">Все связи необязательны.</p>
 
         <div className="mt-6 grid gap-6 md:grid-cols-3">
           <ReferenceSelect
@@ -249,13 +196,8 @@ export function TaskForm({
             name="clientId"
             emptyLabel="Без клиента"
             options={clients}
-            defaultValue={
-              state.values?.clientId ??
-              defaultClientId
-            }
-            errors={
-              state.errors?.clientId
-            }
+            defaultValue={state.values?.clientId ?? defaultClientId}
+            errors={state.errors?.clientId}
           />
 
           <ReferenceSelect
@@ -263,13 +205,8 @@ export function TaskForm({
             name="companyId"
             emptyLabel="Без компании"
             options={companies}
-            defaultValue={
-              state.values?.companyId ??
-              defaultCompanyId
-            }
-            errors={
-              state.errors?.companyId
-            }
+            defaultValue={state.values?.companyId ?? defaultCompanyId}
+            errors={state.errors?.companyId}
           />
 
           <ReferenceSelect
@@ -277,13 +214,8 @@ export function TaskForm({
             name="dealId"
             emptyLabel="Без сделки"
             options={deals}
-            defaultValue={
-              state.values?.dealId ??
-              defaultDealId
-            }
-            errors={
-              state.errors?.dealId
-            }
+            defaultValue={state.values?.dealId ?? defaultDealId}
+            errors={state.errors?.dealId}
           />
         </div>
       </section>
@@ -294,9 +226,7 @@ export function TaskForm({
           disabled={pending}
           className="rounded-lg bg-slate-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending
-            ? "Сохранение..."
-            : "Создать задачу"}
+          {pending ? "Сохранение..." : "Создать задачу"}
         </button>
       </div>
     </OrganizationForm>
@@ -322,17 +252,10 @@ function Field({
 }: FieldProps) {
   return (
     <div>
-      <label
-        htmlFor={name}
-        className="mb-2 block text-sm font-medium"
-      >
+      <label htmlFor={name} className="mb-2 block text-sm font-medium">
         {label}
 
-        {required && (
-          <span className="ml-1 text-red-500">
-            *
-          </span>
-        )}
+        {required && <span className="ml-1 text-red-500">*</span>}
       </label>
 
       <input
@@ -340,9 +263,7 @@ function Field({
         name={name}
         required={required}
         placeholder={placeholder}
-        defaultValue={
-          defaultValue ?? ""
-        }
+        defaultValue={defaultValue ?? ""}
         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-slate-500"
       />
 
@@ -371,30 +292,22 @@ function SelectField({
 }) {
   return (
     <div>
-      <label
-        htmlFor={name}
-        className="mb-2 block text-sm font-medium"
-      >
+      <label htmlFor={name} className="mb-2 block text-sm font-medium">
         {label}
       </label>
 
-      <select
+      <ReferenceSearchSelect
         id={name}
         name={name}
         defaultValue={defaultValue}
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
       >
-        {options.map(
-          (option) => (
-            <option
-              key={option.value}
-              value={option.value}
-            >
-              {option.label}
-            </option>
-          ),
-        )}
-      </select>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </ReferenceSearchSelect>
 
       <FieldErrors errors={errors} />
     </div>
@@ -418,47 +331,31 @@ function ReferenceSelect({
 }) {
   return (
     <div>
-      <label
-        htmlFor={name}
-        className="mb-2 block text-sm font-medium"
-      >
+      <label htmlFor={name} className="mb-2 block text-sm font-medium">
         {label}
       </label>
 
-      <select
+      <ReferenceSearchSelect
         id={name}
         name={name}
-        defaultValue={
-          defaultValue ?? ""
-        }
+        defaultValue={defaultValue ?? ""}
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
       >
-        <option value="">
-          {emptyLabel}
-        </option>
+        <option value="">{emptyLabel}</option>
 
-        {options.map(
-          (option) => (
-            <option
-              key={option.id}
-              value={option.id}
-            >
-              {option.label}
-            </option>
-          ),
-        )}
-      </select>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </ReferenceSearchSelect>
 
       <FieldErrors errors={errors} />
     </div>
   );
 }
 
-function FieldErrors({
-  errors,
-}: {
-  errors?: string[];
-}) {
+function FieldErrors({ errors }: { errors?: string[] }) {
   if (!errors?.length) {
     return null;
   }
@@ -466,10 +363,7 @@ function FieldErrors({
   return (
     <div className="mt-2 space-y-1">
       {errors.map((error) => (
-        <p
-          key={error}
-          className="text-sm text-red-600"
-        >
+        <p key={error} className="text-sm text-red-600">
           {error}
         </p>
       ))}

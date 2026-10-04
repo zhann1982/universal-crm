@@ -1,283 +1,166 @@
-import {
-  and,
-  asc,
-  eq,
-  isNull,
-} from "drizzle-orm";
+import { and, asc, sql, eq, isNull } from "drizzle-orm";
 import Link from "@/components/app-link";
 
 import { db } from "@/db";
-import {
-  clients,
-  companies,
-  deals,
-  organizationMembers,
-} from "@/db/schema";
-import {
-  requirePermission,
-} from "@/lib/auth/permissions";
+import { clients, companies, deals, organizationMembers } from "@/db/schema";
+import { requirePermission } from "@/lib/auth/permissions";
 
-import {
-  TaskForm,
-} from "./task-form";
+import { TaskForm } from "./task-form";
 
 type SearchParams = {
-  [key: string]:
-    | string
-    | string[]
-    | undefined;
+  [key: string]: string | string[] | undefined;
 };
 
-function getSingleValue(
-  value:
-    | string
-    | string[]
-    | undefined,
-) {
-  return Array.isArray(value)
-    ? value[0]
-    : value;
+function getSingleValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 export default async function NewTaskPage({
   searchParams,
 }: {
-  searchParams:
-    Promise<SearchParams>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const {
-    organization,
-    member,
-    permissions,
-  } = await requirePermission(
-    "tasks.create",
-  );
+  const { organization, member, permissions } =
+    await requirePermission("tasks.create");
 
-  const rawSearchParams =
-    await searchParams;
+  const rawSearchParams = await searchParams;
 
   let memberList: Array<{
     id: string;
     label: string;
   }>;
 
-  if (
-    permissions.has(
-      "members.read",
-    )
-  ) {
-    const members =
-      await db
-        .select({
-          id:
-            organizationMembers.id,
+  if (permissions.has("members.read")) {
+    const members = await db
+      .select({
+        id: organizationMembers.id,
 
-          displayName:
-            organizationMembers.displayName,
-        })
-        .from(
-          organizationMembers,
-        )
-        .where(
-          and(
-            eq(
-              organizationMembers.organizationId,
-              organization.id,
-            ),
+        displayName: organizationMembers.displayName,
+      })
+      .from(organizationMembers)
+      .where(
+        and(
+          eq(organizationMembers.organizationId, organization.id),
 
-            eq(
-              organizationMembers.status,
-              "active",
-            ),
-          ),
-        )
-        .orderBy(
-          asc(
-            organizationMembers.displayName,
-          ),
-        );
+          eq(organizationMembers.status, "active"),
+        ),
+      )
+      .orderBy(
+        sql`CASE WHEN ${organizationMembers.id}=${member.id}::uuid THEN 0 ELSE 1 END`,
+        asc(organizationMembers.displayName),
+      )
+      .limit(50);
 
-    memberList = members.map(
-      (item) => ({
-        id: item.id,
-        label:
-          item.displayName ||
-          "Сотрудник",
-      }),
-    );
+    memberList = members.map((item) => ({
+      id: item.id,
+      label: item.displayName || "Сотрудник",
+    }));
   } else {
     memberList = [
       {
         id: member.id,
-        label:
-          member.displayName ||
-          "Я",
+        label: member.displayName || "Я",
       },
     ];
   }
 
-  const clientList =
-    permissions.has(
-      "clients.read",
-    )
-      ? await db
-          .select({
-            id:
-              clients.id,
+  const clientList = permissions.has("clients.read")
+    ? await db
+        .select({
+          id: clients.id,
 
-            firstName:
-              clients.firstName,
+          firstName: clients.firstName,
 
-            lastName:
-              clients.lastName,
+          lastName: clients.lastName,
 
-            phone:
-              clients.phone,
-          })
-          .from(clients)
-          .where(
-            and(
-              eq(
-                clients.organizationId,
-                organization.id,
-              ),
+          phone: clients.phone,
+        })
+        .from(clients)
+        .where(
+          and(
+            eq(clients.organizationId, organization.id),
 
-              eq(
-                clients.isArchived,
-                false,
-              ),
+            eq(clients.isArchived, false),
 
-              isNull(
-                clients.deletedAt,
-              ),
-            ),
-          )
-          .orderBy(
-            asc(
-              clients.lastName,
-            ),
-            asc(
-              clients.firstName,
-            ),
-          )
-      : [];
+            isNull(clients.deletedAt),
+          ),
+        )
+        .orderBy(
+          sql`CASE WHEN ${clients.id}::text=${getSingleValue(rawSearchParams.clientId) ?? ""} THEN 0 ELSE 1 END`,
+          asc(clients.lastName),
+          asc(clients.firstName),
+        )
+        .limit(50)
+    : [];
 
-  const companyList =
-    permissions.has(
-      "companies.read",
-    )
-      ? await db
-          .select({
-            id:
-              companies.id,
+  const companyList = permissions.has("companies.read")
+    ? await db
+        .select({
+          id: companies.id,
 
-            name:
-              companies.name,
-          })
-          .from(companies)
-          .where(
-            and(
-              eq(
-                companies.organizationId,
-                organization.id,
-              ),
+          name: companies.name,
+        })
+        .from(companies)
+        .where(
+          and(
+            eq(companies.organizationId, organization.id),
 
-              eq(
-                companies.isArchived,
-                false,
-              ),
+            eq(companies.isArchived, false),
 
-              isNull(
-                companies.deletedAt,
-              ),
-            ),
-          )
-          .orderBy(
-            asc(
-              companies.name,
-            ),
-          )
-      : [];
+            isNull(companies.deletedAt),
+          ),
+        )
+        .orderBy(
+          sql`CASE WHEN ${companies.id}::text=${getSingleValue(rawSearchParams.companyId) ?? ""} THEN 0 ELSE 1 END`,
+          asc(companies.name),
+        )
+        .limit(50)
+    : [];
 
-  const dealList =
-    permissions.has(
-      "deals.read",
-    )
-      ? await db
-          .select({
-            id:
-              deals.id,
+  const dealList = permissions.has("deals.read")
+    ? await db
+        .select({
+          id: deals.id,
 
-            title:
-              deals.title,
-          })
-          .from(deals)
-          .where(
-            and(
-              eq(
-                deals.organizationId,
-                organization.id,
-              ),
+          title: deals.title,
+        })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.organizationId, organization.id),
 
-              eq(
-                deals.isArchived,
-                false,
-              ),
+            eq(deals.isArchived, false),
 
-              isNull(
-                deals.deletedAt,
-              ),
-            ),
-          )
-          .orderBy(
-            asc(
-              deals.title,
-            ),
-          )
-      : [];
+            isNull(deals.deletedAt),
+          ),
+        )
+        .orderBy(
+          sql`CASE WHEN ${deals.id}::text=${getSingleValue(rawSearchParams.dealId) ?? ""} THEN 0 ELSE 1 END`,
+          asc(deals.title),
+        )
+        .limit(50)
+    : [];
 
-  const requestedClientId =
-    getSingleValue(
-      rawSearchParams.clientId,
-    );
+  const requestedClientId = getSingleValue(rawSearchParams.clientId);
 
-  const requestedCompanyId =
-    getSingleValue(
-      rawSearchParams.companyId,
-    );
+  const requestedCompanyId = getSingleValue(rawSearchParams.companyId);
 
-  const requestedDealId =
-    getSingleValue(
-      rawSearchParams.dealId,
-    );
+  const requestedDealId = getSingleValue(rawSearchParams.dealId);
 
   const defaultClientId =
     requestedClientId &&
-    clientList.some(
-      (client) =>
-        client.id ===
-        requestedClientId,
-    )
+    clientList.some((client) => client.id === requestedClientId)
       ? requestedClientId
       : "";
 
   const defaultCompanyId =
     requestedCompanyId &&
-    companyList.some(
-      (company) =>
-        company.id ===
-        requestedCompanyId,
-    )
+    companyList.some((company) => company.id === requestedCompanyId)
       ? requestedCompanyId
       : "";
 
   const defaultDealId =
-    requestedDealId &&
-    dealList.some(
-      (deal) =>
-        deal.id ===
-        requestedDealId,
-    )
+    requestedDealId && dealList.some((deal) => deal.id === requestedDealId)
       ? requestedDealId
       : "";
 
@@ -291,75 +174,38 @@ export default async function NewTaskPage({
           ← Назад к задачам
         </Link>
 
-        <h1 className="mt-4 text-3xl font-bold">
-          Новая задача
-        </h1>
+        <h1 className="mt-4 text-3xl font-bold">Новая задача</h1>
 
         <p className="mt-2 text-slate-500">
-          Создайте рабочую задачу,
-          назначьте ответственного и
-          при необходимости свяжите её
-          с клиентом, компанией или
-          сделкой.
+          Создайте рабочую задачу, назначьте ответственного и при необходимости
+          свяжите её с клиентом, компанией или сделкой.
         </p>
       </div>
 
       <TaskForm
-        members={
-          memberList
-        }
-        clients={
-          clientList.map(
-            (client) => ({
-              id:
-                client.id,
+        members={memberList}
+        clients={clientList.map((client) => ({
+          id: client.id,
 
-              label:
-                [
-                  client.lastName,
-                  client.firstName,
-                ]
-                  .filter(Boolean)
-                  .join(" ") ||
-                client.phone ||
-                "Клиент",
-            }),
-          )
-        }
-        companies={
-          companyList.map(
-            (company) => ({
-              id:
-                company.id,
+          label:
+            [client.lastName, client.firstName].filter(Boolean).join(" ") ||
+            client.phone ||
+            "Клиент",
+        }))}
+        companies={companyList.map((company) => ({
+          id: company.id,
 
-              label:
-                company.name,
-            }),
-          )
-        }
-        deals={
-          dealList.map(
-            (deal) => ({
-              id:
-                deal.id,
+          label: company.name,
+        }))}
+        deals={dealList.map((deal) => ({
+          id: deal.id,
 
-              label:
-                deal.title,
-            }),
-          )
-        }
-        defaultOwnerMemberId={
-          member.id
-        }
-        defaultClientId={
-          defaultClientId
-        }
-        defaultCompanyId={
-          defaultCompanyId
-        }
-        defaultDealId={
-          defaultDealId
-        }
+          label: deal.title,
+        }))}
+        defaultOwnerMemberId={member.id}
+        defaultClientId={defaultClientId}
+        defaultCompanyId={defaultCompanyId}
+        defaultDealId={defaultDealId}
       />
     </div>
   );

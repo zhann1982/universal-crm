@@ -43,4 +43,36 @@ SELECT 'stage_probability', count(*)::integer FROM pipeline_stages WHERE probabi
 UNION ALL
 SELECT 'deal_amount_currency', count(*)::integer FROM deals
 WHERE (amount IS NOT NULL AND (amount < 0 OR amount = 'NaN'::numeric OR currency IS NULL))
-   OR (currency IS NOT NULL AND currency !~ '^[A-Z]{3}$');
+   OR (currency IS NOT NULL AND currency !~ '^[A-Z]{3}$')
+UNION ALL
+SELECT 'task_owner_tenant', count(*)::integer FROM tasks t LEFT JOIN organization_members p ON p.id=t.owner_member_id
+WHERE t.owner_member_id IS NOT NULL AND t.organization_id IS DISTINCT FROM p.organization_id
+UNION ALL
+SELECT 'task_creator_tenant', count(*)::integer FROM tasks t LEFT JOIN organization_members p ON p.id=t.created_by_member_id
+WHERE t.created_by_member_id IS NOT NULL AND t.organization_id IS DISTINCT FROM p.organization_id
+UNION ALL
+SELECT 'task_client_tenant', count(*)::integer FROM tasks t LEFT JOIN clients p ON p.id=t.client_id
+WHERE t.client_id IS NOT NULL AND t.organization_id IS DISTINCT FROM p.organization_id
+UNION ALL
+SELECT 'task_company_tenant', count(*)::integer FROM tasks t LEFT JOIN companies p ON p.id=t.company_id
+WHERE t.company_id IS NOT NULL AND t.organization_id IS DISTINCT FROM p.organization_id
+UNION ALL
+SELECT 'task_deal_tenant', count(*)::integer FROM tasks t LEFT JOIN deals p ON p.id=t.deal_id
+WHERE t.deal_id IS NOT NULL AND t.organization_id IS DISTINCT FROM p.organization_id
+UNION ALL
+SELECT 'schedule_task_tenant', count(*)::integer FROM task_schedules s LEFT JOIN tasks t ON t.id=s.task_id WHERE s.organization_id IS DISTINCT FROM t.organization_id
+UNION ALL
+SELECT 'comments_member_tenant', count(*)::integer FROM comments e LEFT JOIN organization_members m ON m.id=e.author_member_id WHERE e.author_member_id IS NOT NULL AND e.organization_id IS DISTINCT FROM m.organization_id
+UNION ALL
+SELECT 'comments_parent_tenant', count(*)::integer FROM comments e LEFT JOIN (
+SELECT 'client' AS type,id,organization_id FROM clients UNION ALL SELECT 'company',id,organization_id FROM companies UNION ALL SELECT 'deal',id,organization_id FROM deals UNION ALL SELECT 'task',id,organization_id FROM tasks
+) p ON p.type=e.entity_type AND p.id=e.entity_id WHERE e.organization_id IS DISTINCT FROM p.organization_id
+UNION ALL
+SELECT 'activity_events_member_tenant', count(*)::integer FROM activity_events e LEFT JOIN organization_members m ON m.id=e.actor_member_id WHERE e.actor_member_id IS NOT NULL AND e.organization_id IS DISTINCT FROM m.organization_id
+UNION ALL
+SELECT 'activity_events_parent_tenant', count(*)::integer FROM activity_events e LEFT JOIN (
+SELECT 'client' AS type,id,organization_id FROM clients UNION ALL SELECT 'company',id,organization_id FROM companies UNION ALL SELECT 'deal',id,organization_id FROM deals UNION ALL SELECT 'task',id,organization_id FROM tasks
+) p ON p.type=e.entity_type AND p.id=e.entity_id WHERE e.organization_id IS DISTINCT FROM p.organization_id
+UNION ALL
+SELECT 'activity_comment_target', count(*)::integer FROM activity_events e LEFT JOIN comments c ON c.id=e.comment_id
+WHERE e.comment_id IS NOT NULL AND (e.organization_id IS DISTINCT FROM c.organization_id OR e.entity_type IS DISTINCT FROM c.entity_type OR e.entity_id IS DISTINCT FROM c.entity_id);

@@ -1,21 +1,15 @@
 "use client";
+import { ReferenceSearchSelect } from "@/modules/references/search-select";
 
 import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
 
 import { OrganizationForm } from "@/modules/access/organization-context";
 
-
 import Link from "@/components/app-link";
-import {
-  useState,
-} from "react";
+import { useState } from "react";
 
-import {
-  updateDeal,
-} from "../../actions";
-import type {
-  UpdateDealState,
-} from "@/lib/validation/deal";
+import { updateDeal } from "../../actions";
+import type { UpdateDealState } from "@/lib/validation/deal";
 
 type PipelineOption = {
   id: string;
@@ -35,17 +29,13 @@ type CompanyOption = {
   id: string;
   name: string;
 
-  taxId:
-    | string
-    | null;
+  taxId: string | null;
 };
 
 type MemberOption = {
   id: string;
 
-  displayName:
-    | string
-    | null;
+  displayName: string | null;
 };
 
 type InitialValues = {
@@ -81,87 +71,49 @@ export function EditDealForm({
 
   initialVersion: number;
 
-  pipelines:
-    PipelineOption[];
+  pipelines: PipelineOption[];
 
-  stages:
-    StageOption[];
+  stages: StageOption[];
 
-  companies:
-    CompanyOption[];
+  companies: CompanyOption[];
 
-  members:
-    MemberOption[];
+  members: MemberOption[];
 
-  initialValues:
-    InitialValues;
+  initialValues: InitialValues;
 }) {
-  const initialState:
-    UpdateDealState = {
-      values:
-        initialValues,
-    };
+  // A refresh may update props while draft fields remain unchanged.
+  // Keep the version of the draft, rather than silently adopting newer data.
+  const [draftVersion] = useState(initialVersion);
+  const initialState: UpdateDealState = {
+    values: initialValues,
+  };
 
-  const updateAction =
-    updateDeal.bind(
-      null,
-      dealId,
-    );
+  const updateAction = updateDeal.bind(null, dealId);
 
-  const [
-    state,
-    formAction,
-    pending,
-  ] = useToastActionState(
+  const [state, formAction, pending] = useToastActionState(
     updateAction,
     initialState,
   );
 
-  const [
-    selectedPipelineId,
-    setSelectedPipelineId,
-  ] = useState(
-    state.values
-      ?.pipelineId ??
-      initialValues.pipelineId,
+  const [selectedPipelineId, setSelectedPipelineId] = useState(
+    state.values?.pipelineId ?? initialValues.pipelineId,
   );
 
-  const currentStages =
-    stages.filter(
-      (stage) =>
-        stage.pipelineId ===
-        selectedPipelineId,
-    );
+  const currentStages = stages.filter(
+    (stage) => stage.pipelineId === selectedPipelineId,
+  );
 
-  const savedStageId =
-    state.values?.stageId ??
-    initialValues.stageId;
+  const savedStageId = state.values?.stageId ?? initialValues.stageId;
 
-  const stageExists =
-    currentStages.some(
-      (stage) =>
-        stage.id ===
-        savedStageId,
-    );
+  const stageExists = currentStages.some((stage) => stage.id === savedStageId);
 
-  const stageDefaultValue =
-    stageExists
-      ? savedStageId
-      : currentStages[0]?.id ??
-        "";
+  const stageDefaultValue = stageExists
+    ? savedStageId
+    : (currentStages[0]?.id ?? "");
 
   return (
-    <OrganizationForm
-      action={formAction}
-      className="space-y-8"
-    >
-      <input
-        type="hidden"
-        name="version"
-        value={
-          initialVersion
-        }
-      />
+    <OrganizationForm action={formAction} className="space-y-8">
+      <input type="hidden" name="version" value={draftVersion} />
 
       {state.message && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -170,23 +122,15 @@ export function EditDealForm({
       )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Основная информация
-        </h2>
+        <h2 className="text-lg font-semibold">Основная информация</h2>
 
         <div className="mt-6">
           <Field
             label="Название сделки"
             name="title"
             required
-            defaultValue={
-              state.values
-                ?.title ??
-              initialValues.title
-            }
-            errors={
-              state.errors?.title
-            }
+            defaultValue={state.values?.title ?? initialValues.title}
+            errors={state.errors?.title}
           />
         </div>
 
@@ -197,118 +141,64 @@ export function EditDealForm({
               className="mb-2 block text-sm font-medium"
             >
               Воронка
-              <span className="ml-1 text-red-500">
-                *
-              </span>
+              <span className="ml-1 text-red-500">*</span>
             </label>
 
             <select
               id="pipelineId"
               name="pipelineId"
-              value={
-                selectedPipelineId
-              }
-              onChange={(
-                event,
-              ) => {
-                setSelectedPipelineId(
-                  event.target.value,
-                );
+              value={selectedPipelineId}
+              onChange={(event) => {
+                setSelectedPipelineId(event.target.value);
               }}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
             >
-              {pipelines.map(
-                (pipeline) => (
-                  <option
-                    key={
-                      pipeline.id
-                    }
-                    value={
-                      pipeline.id
-                    }
-                  >
-                    {
-                      pipeline.name
-                    }
+              {pipelines.map((pipeline) => (
+                <option key={pipeline.id} value={pipeline.id}>
+                  {pipeline.name}
 
-                    {pipeline.isDefault
-                      ? " — основная"
-                      : ""}
-                  </option>
-                ),
-              )}
+                  {pipeline.isDefault ? " — основная" : ""}
+                </option>
+              ))}
             </select>
 
-            <FieldErrors
-              errors={
-                state.errors
-                  ?.pipelineId
-              }
-            />
+            <FieldErrors errors={state.errors?.pipelineId} />
           </div>
 
           <div>
-            <label
-              htmlFor="stageId"
-              className="mb-2 block text-sm font-medium"
-            >
+            <label htmlFor="stageId" className="mb-2 block text-sm font-medium">
               Этап
-              <span className="ml-1 text-red-500">
-                *
-              </span>
+              <span className="ml-1 text-red-500">*</span>
             </label>
 
             <select
-              key={
-                selectedPipelineId
-              }
+              key={selectedPipelineId}
               id="stageId"
               name="stageId"
               required
-              defaultValue={
-                stageDefaultValue
-              }
+              defaultValue={stageDefaultValue}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
             >
-              {currentStages.map(
-                (stage) => (
-                  <option
-                    key={
-                      stage.id
-                    }
-                    value={
-                      stage.id
-                    }
-                  >
-                    {
-                      stage.name
-                    }
-                  </option>
-                ),
-              )}
+              {currentStages.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.name}
+                </option>
+              ))}
             </select>
 
-            {currentStages.length ===
-              0 && (
+            {currentStages.length === 0 && (
               <p className="mt-2 text-sm text-red-600">
                 У этой воронки нет этапов.
               </p>
             )}
 
-            <FieldErrors
-              errors={
-                state.errors
-                  ?.stageId
-              }
-            />
+            <FieldErrors errors={state.errors?.stageId} />
           </div>
         </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Стоимость
-        </h2>
+        <h2 className="text-lg font-semibold">Стоимость</h2>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <Field
@@ -316,15 +206,8 @@ export function EditDealForm({
             name="amount"
             inputMode="decimal"
             placeholder="1500000"
-            defaultValue={
-              state.values
-                ?.amount ??
-              initialValues.amount
-            }
-            errors={
-              state.errors
-                ?.amount
-            }
+            defaultValue={state.values?.amount ?? initialValues.amount}
+            errors={state.errors?.amount}
           />
 
           <Field
@@ -332,23 +215,14 @@ export function EditDealForm({
             name="currency"
             maxLength={3}
             placeholder="KZT"
-            defaultValue={
-              state.values
-                ?.currency ??
-              initialValues.currency
-            }
-            errors={
-              state.errors
-                ?.currency
-            }
+            defaultValue={state.values?.currency ?? initialValues.currency}
+            errors={state.errors?.currency}
           />
         </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Связи и ответственный
-        </h2>
+        <h2 className="text-lg font-semibold">Связи и ответственный</h2>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <div>
@@ -359,48 +233,24 @@ export function EditDealForm({
               Компания
             </label>
 
-            <select
+            <ReferenceSearchSelect
               id="companyId"
               name="companyId"
-              defaultValue={
-                state.values
-                  ?.companyId ??
-                initialValues.companyId
-              }
+              defaultValue={state.values?.companyId ?? initialValues.companyId}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
             >
-              <option value="">
-                Не выбрана
-              </option>
+              <option value="">Не выбрана</option>
 
-              {companies.map(
-                (company) => (
-                  <option
-                    key={
-                      company.id
-                    }
-                    value={
-                      company.id
-                    }
-                  >
-                    {
-                      company.name
-                    }
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
 
-                    {company.taxId
-                      ? ` — ${company.taxId}`
-                      : ""}
-                  </option>
-                ),
-              )}
-            </select>
+                  {company.taxId ? ` — ${company.taxId}` : ""}
+                </option>
+              ))}
+            </ReferenceSearchSelect>
 
-            <FieldErrors
-              errors={
-                state.errors
-                  ?.companyId
-              }
-            />
+            <FieldErrors errors={state.errors?.companyId} />
           </div>
 
           <div>
@@ -411,51 +261,30 @@ export function EditDealForm({
               Ответственный
             </label>
 
-            <select
+            <ReferenceSearchSelect
               id="ownerMemberId"
               name="ownerMemberId"
               defaultValue={
-                state.values
-                  ?.ownerMemberId ??
-                initialValues.ownerMemberId
+                state.values?.ownerMemberId ?? initialValues.ownerMemberId
               }
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
             >
-              <option value="">
-                Не назначен
-              </option>
+              <option value="">Не назначен</option>
 
-              {members.map(
-                (member) => (
-                  <option
-                    key={
-                      member.id
-                    }
-                    value={
-                      member.id
-                    }
-                  >
-                    {member.displayName ||
-                      "Сотрудник"}
-                  </option>
-                ),
-              )}
-            </select>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.displayName || "Сотрудник"}
+                </option>
+              ))}
+            </ReferenceSearchSelect>
 
-            <FieldErrors
-              errors={
-                state.errors
-                  ?.ownerMemberId
-              }
-            />
+            <FieldErrors errors={state.errors?.ownerMemberId} />
           </div>
         </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Планирование
-        </h2>
+        <h2 className="text-lg font-semibold">Планирование</h2>
 
         <div className="mt-6 max-w-md">
           <Field
@@ -463,40 +292,25 @@ export function EditDealForm({
             name="expectedCloseAt"
             type="date"
             defaultValue={
-              state.values
-                ?.expectedCloseAt ??
-              initialValues.expectedCloseAt
+              state.values?.expectedCloseAt ?? initialValues.expectedCloseAt
             }
-            errors={
-              state.errors
-                ?.expectedCloseAt
-            }
+            errors={state.errors?.expectedCloseAt}
           />
         </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Заметки
-        </h2>
+        <h2 className="text-lg font-semibold">Заметки</h2>
 
         <textarea
           id="notes"
           name="notes"
           rows={6}
-          defaultValue={
-            state.values
-              ?.notes ??
-            initialValues.notes
-          }
+          defaultValue={state.values?.notes ?? initialValues.notes}
           className="mt-6 w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-slate-500"
         />
 
-        <FieldErrors
-          errors={
-            state.errors?.notes
-          }
-        />
+        <FieldErrors errors={state.errors?.notes} />
       </section>
 
       <div className="flex justify-end gap-3">
@@ -509,16 +323,10 @@ export function EditDealForm({
 
         <button
           type="submit"
-          disabled={
-            pending ||
-            currentStages.length ===
-              0
-          }
+          disabled={pending || currentStages.length === 0}
           className="rounded-lg bg-slate-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending
-            ? "Сохранение..."
-            : "Сохранить"}
+          {pending ? "Сохранение..." : "Сохранить"}
         </button>
       </div>
     </OrganizationForm>
@@ -538,10 +346,7 @@ type FieldProps = {
 
   placeholder?: string;
 
-  inputMode?:
-    | "text"
-    | "decimal"
-    | "numeric";
+  inputMode?: "text" | "decimal" | "numeric";
 
   maxLength?: number;
 
@@ -561,17 +366,10 @@ function Field({
 }: FieldProps) {
   return (
     <div>
-      <label
-        htmlFor={name}
-        className="mb-2 block text-sm font-medium"
-      >
+      <label htmlFor={name} className="mb-2 block text-sm font-medium">
         {label}
 
-        {required && (
-          <span className="ml-1 text-red-500">
-            *
-          </span>
-        )}
+        {required && <span className="ml-1 text-red-500">*</span>}
       </label>
 
       <input
@@ -579,49 +377,30 @@ function Field({
         name={name}
         type={type}
         required={required}
-        defaultValue={
-          defaultValue ?? ""
-        }
-        placeholder={
-          placeholder
-        }
-        inputMode={
-          inputMode
-        }
-        maxLength={
-          maxLength
-        }
+        defaultValue={defaultValue ?? ""}
+        placeholder={placeholder}
+        inputMode={inputMode}
+        maxLength={maxLength}
         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-slate-500"
       />
 
-      <FieldErrors
-        errors={errors}
-      />
+      <FieldErrors errors={errors} />
     </div>
   );
 }
 
-function FieldErrors({
-  errors,
-}: {
-  errors?: string[];
-}) {
+function FieldErrors({ errors }: { errors?: string[] }) {
   if (!errors?.length) {
     return null;
   }
 
   return (
     <div className="mt-2 space-y-1">
-      {errors.map(
-        (error) => (
-          <p
-            key={error}
-            className="text-sm text-red-600"
-          >
-            {error}
-          </p>
-        ),
-      )}
+      {errors.map((error) => (
+        <p key={error} className="text-sm text-red-600">
+          {error}
+        </p>
+      ))}
     </div>
   );
 }

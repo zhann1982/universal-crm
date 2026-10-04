@@ -1,131 +1,99 @@
-import {
-  drizzleAdapter,
-} from "@better-auth/drizzle-adapter";
-import {
-  betterAuth,
-} from "better-auth";
-import {
-  nextCookies,
-} from "better-auth/next-js";
+import { sendEmail } from "@/lib/email/delivery";
+import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { betterAuth } from "better-auth";
+import { nextCookies } from "better-auth/next-js";
 
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 
-export const auth =
-  betterAuth({
-    database:
-      drizzleAdapter(
-        db,
-        {
-          provider: "pg",
-          schema:
-            authSchema,
-        },
-      ),
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: authSchema,
+  }),
 
-    emailVerification: {
-      sendVerificationEmail:
-        async ({
-          user,
-          url,
-        }) => {
-          /*
-           * Локальная разработка.
-           *
-           * Пока реальный email-provider
-           * не подключён, verification URL
-           * выводится только в серверный
-           * терминал.
-           *
-           * НИКОГДА не использовать такой
-           * режим в production.
-           */
-          if (
-            process.env
-              .NODE_ENV !==
-            "production"
-          ) {
-            console.log(
-              "",
-            );
-
-            console.log(
-              "========================================",
-            );
-
-            console.log(
-              "DEV EMAIL VERIFICATION",
-            );
-
-            console.log(
-              "Email:",
-              user.email,
-            );
-
-            console.log(
-              "Verification URL:",
-            );
-
-            console.log(
-              url,
-            );
-
-            console.log(
-              "========================================",
-            );
-
-            console.log(
-              "",
-            );
-
-            return;
-          }
-
-          /*
-           * До подключения production
-           * email provider не делаем вид,
-           * что письмо было отправлено.
-           */
-          console.error(
-            "Email verification requested, but production email delivery is not configured.",
-          );
-
-          throw new Error(
-            "EMAIL_DELIVERY_NOT_CONFIGURED",
-          );
-        },
-
-      sendOnSignUp:
-        true,
-
-      expiresIn:
-        60 * 60,
-    },
-
-    emailAndPassword: {
-      enabled: true,
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      if (process.env.RESEND_API_KEY && process.env.EMAIL_FROM) {
+        const delivery = await sendEmail({
+          to: user.email,
+          subject: "Подтвердите email для Universal CRM",
+          text: `Подтвердите адрес email: ${url}`,
+          key: `verification:${url}`,
+        });
+        if (delivery !== "accepted") throw new Error("EMAIL_DELIVERY_FAILED");
+        return;
+      }
 
       /*
-       * Пока НЕ блокируем сам вход
-       * через Better Auth.
+       * Локальная разработка.
        *
-       * Это позволяет уже существующему
-       * development-пользователю войти
-       * и подтвердить email.
+       * Пока реальный email-provider
+       * не подключён, verification URL
+       * выводится только в серверный
+       * терминал.
        *
-       * CRM-доступ блокируется отдельно
-       * в getCurrentMember().
-       *
-       * После подключения настоящей
-       * email-доставки сможем включить:
-       *
-       * requireEmailVerification: true
+       * НИКОГДА не использовать такой
+       * режим в production.
        */
-      requireEmailVerification:
-        false,
+      if (process.env.NODE_ENV !== "production") {
+        console.log("");
+
+        console.log("========================================");
+
+        console.log("DEV EMAIL VERIFICATION");
+
+        console.log("Email:", user.email);
+
+        console.log("Verification URL:");
+
+        console.log(url);
+
+        console.log("========================================");
+
+        console.log("");
+
+        return;
+      }
+
+      /*
+       * До подключения production
+       * email provider не делаем вид,
+       * что письмо было отправлено.
+       */
+      console.error(
+        "Email verification requested, but production email delivery is not configured.",
+      );
+
+      throw new Error("EMAIL_DELIVERY_NOT_CONFIGURED");
     },
 
-    plugins: [
-      nextCookies(),
-    ],
-  });
+    sendOnSignUp: true,
+
+    expiresIn: 60 * 60,
+  },
+
+  emailAndPassword: {
+    enabled: true,
+
+    /*
+     * Пока НЕ блокируем сам вход
+     * через Better Auth.
+     *
+     * Это позволяет уже существующему
+     * development-пользователю войти
+     * и подтвердить email.
+     *
+     * CRM-доступ блокируется отдельно
+     * в getCurrentMember().
+     *
+     * После подключения настоящей
+     * email-доставки сможем включить:
+     *
+     * requireEmailVerification: true
+     */
+    requireEmailVerification: false,
+  },
+
+  plugins: [nextCookies()],
+});

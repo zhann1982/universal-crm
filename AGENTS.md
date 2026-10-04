@@ -59,7 +59,7 @@ Never renumber or reuse existing IDs.
 
 Current latest decision:
 
-`D057`
+`D061`
 
 ---
 
@@ -714,3 +714,31 @@ or for zero affected rows. Keep field validation and important conflict explanat
 Notification text must not contain raw errors, invitation tokens or hidden related data.
 Success notices are transient; consume their URL parameters through the Next router so Server
 Action refreshes cannot restore them. Toasts are presentation feedback, never authorization proof.
+
+## Stabilization follow-through
+
+D058: Team role labels require roles.read or the narrow members.manage assignment context;
+Member visibility alone must not fetch roles/configuration. Use read-team.ts, without Role descriptions.
+Deal detail queries use read-deal.ts and permission-safe related fields. No Company/Member
+name lookup without its read permission. Full-edit draft version is captured at form mount;
+refreshing props must not promote an unchanged draft to a newer version. Archive/restore must
+pass the rendered Deal version to change-deal-lifecycle.ts; zero rows mean conflict. Atomic history remains required.
+
+D059: migration 0017 adds Task/Schedule/Comment/Activity tenant references. Generated per-type
+target columns enforce polymorphic parent references and Activity Comment target equality.
+Business parents with history/comments cannot be hard deleted; archive remains the normal lifecycle.
+The read-only audit checks 23 invariants. Verify rollout separately; do not claim migration applied to Neon.
+
+D060: board columns use read-board.ts (20 rows plus lookahead), SQL aggregates by Stage/currency,
+and timestamp + UUID keyset cursors. Preserve PostgreSQL microseconds in cursors; JS Date truncates them.
+History uses read-timeline.ts (50 events / 100 comments) and fetches bodies only for visible events.
+Searchable references use read-options.ts (50 options), rendered scope comparison and independent
+entity read permissions. Preserve existing selected relationships/owners outside the initial page.
+Migration 0018 adds supporting indexes. Isolated scale tests are not production throughput certification.
+
+D061: invitation revoke/reissue use change-invitation.ts, members.manage and rendered tenant scope.
+Keep the shared canonical-email transaction lock; never revive accepted/revoked invitations.
+Reissue rotates the hash and expiration; the prior link is invalid. Expiration snapshot rejects stale administration.
+Optional Resend transport requires RESEND_API_KEY and EMAIL_FROM; BETTER_AUTH_URL supplies the canonical origin.
+No real mail is sent without configuration. Distinguish invitation creation, provider acceptance and delivery.
+Tokens appear only in immediate authorized result/link; never log or persist raw tokens or provider errors.

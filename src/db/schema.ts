@@ -1510,6 +1510,9 @@ export const deals =
       ),
     },
     (table) => [
+      unique("deals_org_id_unique").on(table.organizationId, table.id),
+      index("deals_board_page_idx").on(table.organizationId,table.pipelineId,table.stageId,table.createdAt,table.id).where(sql`NOT ${table.isArchived} AND ${table.deletedAt} IS NULL`),
+      index("deals_archive_page_idx").on(table.organizationId,table.updatedAt,table.id).where(sql`${table.isArchived} AND ${table.deletedAt} IS NULL`),
       foreignKey({
         name: "deals_org_pipeline_fk",
         columns: [table.organizationId, table.pipelineId],
@@ -1772,6 +1775,12 @@ export const tasks =
       ),
     },
     (table) => [
+      unique("tasks_org_id_unique").on(table.organizationId, table.id),
+      foreignKey({ name: "tasks_org_owner_fk", columns: [table.organizationId, table.ownerMemberId], foreignColumns: [organizationMembers.organizationId, organizationMembers.id] }),
+      foreignKey({ name: "tasks_org_creator_fk", columns: [table.organizationId, table.createdByMemberId], foreignColumns: [organizationMembers.organizationId, organizationMembers.id] }),
+      foreignKey({ name: "tasks_org_client_fk", columns: [table.organizationId, table.clientId], foreignColumns: [clients.organizationId, clients.id] }),
+      foreignKey({ name: "tasks_org_company_fk", columns: [table.organizationId, table.companyId], foreignColumns: [companies.organizationId, companies.id] }),
+      foreignKey({ name: "tasks_org_deal_fk", columns: [table.organizationId, table.dealId], foreignColumns: [deals.organizationId, deals.id] }),
       index(
         "tasks_organization_idx",
       ).on(

@@ -1,54 +1,28 @@
 import { EntityTimeline } from "@/modules/activity/entity-timeline";
 import { OrganizationForm } from "@/modules/access/organization-context";
-import {
-  and,
-  asc,
-  eq,
-} from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import Link from "@/components/app-link";
-import {
-  notFound,
-} from "next/navigation";
+import { notFound } from "next/navigation";
 
-import {
-  RelatedTasksSection,
-} from "@/app/crm/tasks/related-tasks-section";
+import { RelatedTasksSection } from "@/app/crm/tasks/related-tasks-section";
 import { db } from "@/db";
-import {
-  pipelineStages,
-} from "@/db/schema";
-import {
-  requirePermission,
-} from "@/lib/auth/permissions";
-import {
-  getDealById,
-} from "@/lib/deals/get-deal";
-import {
-  dealIdSchema,
-} from "@/lib/validation/deal";
+import { pipelineStages } from "@/db/schema";
+import { requirePermission } from "@/lib/auth/permissions";
+import { getDealById } from "@/lib/deals/get-deal";
+import { dealIdSchema } from "@/lib/validation/deal";
 
-import {
-  moveDealToStage,
-} from "../actions";
-import {
-  ArchiveDealButton,
-} from "./archive-deal-button";
-import {
-  RestoreDealButton,
-} from "./restore-deal-button";
+import { moveDealToStage } from "../actions";
+import { ArchiveDealButton } from "./archive-deal-button";
+import { RestoreDealButton } from "./restore-deal-button";
 
-const stageTypeLabels:
-  Record<string, string> = {
-    open: "Открытая",
-    won: "Выиграна",
-    lost: "Проиграна",
-  };
+const stageTypeLabels: Record<string, string> = {
+  open: "Открытая",
+  won: "Выиграна",
+  lost: "Проиграна",
+};
 
 type SearchParams = {
-  error?:
-    | string
-    | string[]
-    | undefined;
+  error?: string | string[] | undefined;
 };
 
 export default async function DealPage({
@@ -59,93 +33,52 @@ export default async function DealPage({
     id: string;
   }>;
 
-  searchParams:
-    Promise<SearchParams>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const {
-    organization,
-    member,
-    permissions,
-  } = await requirePermission(
-    "deals.read",
-  );
+  const { organization, member, permissions } =
+    await requirePermission("deals.read");
 
-  const { id } =
-    await params;
+  const { id } = await params;
 
-  const query =
-    await searchParams;
+  const query = await searchParams;
 
-  const error =
-    Array.isArray(
-      query.error,
-    )
-      ? query.error[0]
-      : query.error;
+  const error = Array.isArray(query.error) ? query.error[0] : query.error;
 
-  const idResult =
-    dealIdSchema.safeParse(
-      id,
-    );
+  const idResult = dealIdSchema.safeParse(id);
 
   if (!idResult.success) {
     notFound();
   }
 
-  const deal =
-    await getDealById(
-      idResult.data,
-    );
+  const deal = await getDealById(idResult.data);
 
   if (!deal) {
     notFound();
   }
 
-  const stages =
-    await db
-      .select({
-        id:
-          pipelineStages.id,
+  const stages = await db
+    .select({
+      id: pipelineStages.id,
 
-        name:
-          pipelineStages.name,
+      name: pipelineStages.name,
 
-        type:
-          pipelineStages.type,
+      type: pipelineStages.type,
 
-        probability:
-          pipelineStages.probability,
+      probability: pipelineStages.probability,
 
-        position:
-          pipelineStages.position,
-      })
-      .from(
-        pipelineStages,
-      )
-      .where(
-        and(
-          eq(
-            pipelineStages.organizationId,
-            organization.id,
-          ),
+      position: pipelineStages.position,
+    })
+    .from(pipelineStages)
+    .where(
+      and(
+        eq(pipelineStages.organizationId, organization.id),
 
-          eq(
-            pipelineStages.pipelineId,
-            deal.pipelineId,
-          ),
-        ),
-      )
-      .orderBy(
-        asc(
-          pipelineStages.position,
-        ),
-      );
+        eq(pipelineStages.pipelineId, deal.pipelineId),
+      ),
+    )
+    .orderBy(asc(pipelineStages.position));
 
-  const moveAction =
-    moveDealToStage.bind(
-      null,
-      deal.id,
-    );
+  const moveAction = moveDealToStage.bind(null, deal.id);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -158,27 +91,20 @@ export default async function DealPage({
           }
           className="text-sm text-slate-500 transition hover:text-slate-900"
         >
-          {deal.isArchived
-            ? "← Назад в архив"
-            : "← Назад к воронке"}
+          {deal.isArchived ? "← Назад в архив" : "← Назад к воронке"}
         </Link>
 
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-bold">
-                {deal.title}
-              </h1>
+              <h1 className="text-3xl font-bold">{deal.title}</h1>
 
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium">
                 {deal.stageName}
               </span>
 
               <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                {stageTypeLabels[
-                  deal.stageType
-                ] ??
-                  deal.stageType}
+                {stageTypeLabels[deal.stageType] ?? deal.stageType}
               </span>
 
               {deal.isArchived && (
@@ -189,199 +115,135 @@ export default async function DealPage({
             </div>
 
             <p className="mt-2 text-sm text-slate-500">
-              Воронка:{" "}
-              {deal.pipelineName}
+              Воронка: {deal.pipelineName}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
-            {permissions.has(
-              "deals.update",
-            ) &&
-              !deal.isArchived && (
-                <Link
-                  href={`/crm/deals/${deal.id}/edit`}
-                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
-                >
-                  Редактировать
-                </Link>
-              )}
+            {permissions.has("deals.update") && !deal.isArchived && (
+              <Link
+                href={`/crm/deals/${deal.id}/edit`}
+                className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:bg-slate-50"
+              >
+                Редактировать
+              </Link>
+            )}
 
-            {permissions.has(
-              "deals.archive",
-            ) &&
-              !deal.isArchived && (
-                <ArchiveDealButton
-                  dealId={deal.id}
-                />
-              )}
+            {permissions.has("deals.archive") && !deal.isArchived && (
+              <ArchiveDealButton dealId={deal.id} version={deal.version} />
+            )}
 
-            {permissions.has(
-              "deals.archive",
-            ) &&
-              deal.isArchived && (
-                <RestoreDealButton
-                  dealId={deal.id}
-                />
-              )}
+            {permissions.has("deals.archive") && deal.isArchived && (
+              <RestoreDealButton dealId={deal.id} version={deal.version} />
+            )}
           </div>
         </div>
       </div>
 
-      {error ===
-        "stage-conflict" && (
+      {error === "stage-conflict" && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
-          Сделка была изменена
-          другим действием до
-          завершения смены этапа.
-          Страница уже показывает
-          актуальное состояние.
-          При необходимости повторите
+          Сделка была изменена другим действием до завершения смены этапа.
+          Страница уже показывает актуальное состояние. При необходимости
+          повторите операцию.
+        </div>
+      )}
+
+      {error === "lifecycle-conflict" && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          Состояние сделки изменилось другим действием до завершения операции.
+          Архивирование или восстановление не было выполнено поверх более нового
+          состояния. Восстановление также недоступно, пока воронка находится в
+          архиве. Проверьте актуальные данные и при необходимости повторите
           операцию.
         </div>
       )}
 
-      {error ===
-        "lifecycle-conflict" && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
-          Состояние сделки изменилось
-          другим действием до завершения
-          операции. Архивирование или
-          восстановление не было выполнено
-          поверх более нового состояния.
-          Восстановление также недоступно,
-          пока воронка находится в архиве.
-          Проверьте актуальные данные
-          и при необходимости повторите
-          операцию.
-        </div>
-      )}
-
-      {error ===
-        "stage-error" && (
+      {error === "stage-error" && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
-          Не удалось изменить этап
-          сделки. Повторите попытку.
+          Не удалось изменить этап сделки. Повторите попытку.
         </div>
       )}
 
       {deal.isArchived && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
-          Эта сделка находится
-          в архиве. Редактирование
-          и изменение этапа
-          недоступны до
-          восстановления.
+          Эта сделка находится в архиве. Редактирование и изменение этапа
+          недоступны до восстановления.
         </div>
       )}
 
-      {permissions.has(
-        "deals.update",
-      ) &&
-        !deal.isArchived && (
-          <section className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">
-              Этап сделки
-            </h2>
+      {permissions.has("deals.update") && !deal.isArchived && (
+        <section className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Этап сделки</h2>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Переместите сделку
-              на другой этап
-              текущей воронки.
-            </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Переместите сделку на другой этап текущей воронки.
+          </p>
 
-            <OrganizationForm
-              action={moveAction}
-              className="mt-5 flex flex-wrap items-end gap-3"
-            >
-              <input
-                type="hidden"
-                name="version"
-                value={deal.version}
-              />
+          <OrganizationForm
+            action={moveAction}
+            className="mt-5 flex flex-wrap items-end gap-3"
+          >
+            <input type="hidden" name="version" value={deal.version} />
 
-              <div className="min-w-64 flex-1">
-                <label
-                  htmlFor="stageId"
-                  className="mb-2 block text-sm font-medium"
-                >
-                  Этап
-                </label>
-
-                <select
-                  id="stageId"
-                  name="stageId"
-                  defaultValue={
-                    deal.stageId
-                  }
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-500"
-                >
-                  {stages.map(
-                    (stage) => (
-                      <option
-                        key={stage.id}
-                        value={stage.id}
-                      >
-                        {stage.name}
-                        {" — "}
-                        {stage.probability}%
-                      </option>
-                    ),
-                  )}
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+            <div className="min-w-64 flex-1">
+              <label
+                htmlFor="stageId"
+                className="mb-2 block text-sm font-medium"
               >
-                Переместить
-              </button>
-            </OrganizationForm>
-          </section>
-        )}
+                Этап
+              </label>
+
+              <select
+                id="stageId"
+                name="stageId"
+                defaultValue={deal.stageId}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-slate-500"
+              >
+                {stages.map((stage) => (
+                  <option key={stage.id} value={stage.id}>
+                    {stage.name}
+                    {" — "}
+                    {stage.probability}%
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              Переместить
+            </button>
+          </OrganizationForm>
+        </section>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
-          <h2 className="text-lg font-semibold">
-            Сделка
-          </h2>
+          <h2 className="text-lg font-semibold">Сделка</h2>
 
           <dl className="mt-6 grid gap-6 sm:grid-cols-2">
             <InfoItem
               label="Сумма"
               value={
                 deal.amount
-                  ? formatDealAmount(
-                      deal.amount,
-                      deal.currency,
-                    )
+                  ? formatDealAmount(deal.amount, deal.currency)
                   : null
               }
             />
 
-            <InfoItem
-              label="Вероятность"
-              value={`${deal.stageProbability}%`}
-            />
+            <InfoItem label="Вероятность" value={`${deal.stageProbability}%`} />
 
-            <InfoItem
-              label="Воронка"
-              value={deal.pipelineName}
-            />
+            <InfoItem label="Воронка" value={deal.pipelineName} />
 
-            <InfoItem
-              label="Этап"
-              value={deal.stageName}
-            />
+            <InfoItem label="Этап" value={deal.stageName} />
 
             <InfoItem
               label="Ожидаемое закрытие"
               value={
                 deal.expectedCloseAt
-                  ? formatDateOnly(
-                      deal.expectedCloseAt,
-                    )
+                  ? formatDateOnly(deal.expectedCloseAt)
                   : null
               }
             />
@@ -389,33 +251,23 @@ export default async function DealPage({
             <InfoItem
               label="Фактическое закрытие"
               value={
-                deal.closedAt
-                  ? deal.closedAt.toLocaleString(
-                      "ru-RU",
-                    )
-                  : null
+                deal.closedAt ? deal.closedAt.toLocaleString("ru-RU") : null
               }
             />
           </dl>
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">
-            CRM
-          </h2>
+          <h2 className="text-lg font-semibold">CRM</h2>
 
           <dl className="mt-6 space-y-5">
             <InfoItem
               label="Ответственный"
               value={
                 deal.ownerMemberId
-                  ? permissions.has(
-                      "members.read",
-                    ) ||
-                    deal.ownerMemberId ===
-                      member.id
-                    ? deal.ownerDisplayName ||
-                      "Сотрудник"
+                  ? permissions.has("members.read") ||
+                    deal.ownerMemberId === member.id
+                    ? deal.ownerDisplayName || "Сотрудник"
                     : "Сотрудник"
                   : null
               }
@@ -423,35 +275,22 @@ export default async function DealPage({
 
             <InfoItem
               label="Создана"
-              value={
-                deal.createdAt.toLocaleString(
-                  "ru-RU",
-                )
-              }
+              value={deal.createdAt.toLocaleString("ru-RU")}
             />
 
             <InfoItem
               label="Обновлена"
-              value={
-                deal.updatedAt.toLocaleString(
-                  "ru-RU",
-                )
-              }
+              value={deal.updatedAt.toLocaleString("ru-RU")}
             />
           </dl>
         </section>
       </div>
 
-      {permissions.has(
-        "companies.read",
-      ) && (
+      {permissions.has("companies.read") && (
         <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">
-            Компания
-          </h2>
+          <h2 className="text-lg font-semibold">Компания</h2>
 
-          {deal.companyId &&
-          deal.companyName ? (
+          {deal.companyId && deal.companyName ? (
             <div className="mt-4">
               <Link
                 href={`/crm/companies/${deal.companyId}`}
@@ -461,37 +300,23 @@ export default async function DealPage({
               </Link>
             </div>
           ) : (
-            <p className="mt-4 text-sm text-slate-400">
-              Компания не указана.
-            </p>
+            <p className="mt-4 text-sm text-slate-400">Компания не указана.</p>
           )}
         </section>
       )}
 
-      {permissions.has(
-        "tasks.read",
-      ) && (
+      {permissions.has("tasks.read") && (
         <RelatedTasksSection
-          organizationId={
-            organization.id
-          }
+          organizationId={organization.id}
           relationType="deal"
           relationId={deal.id}
-          canCreateTasks={
-            permissions.has(
-              "tasks.create",
-            )
-          }
-          relationIsArchived={
-            deal.isArchived
-          }
+          canCreateTasks={permissions.has("tasks.create")}
+          relationIsArchived={deal.isArchived}
         />
       )}
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Описание / заметка
-        </h2>
+        <h2 className="text-lg font-semibold">Описание / заметка</h2>
 
         {deal.notes ? (
           <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
@@ -499,30 +324,23 @@ export default async function DealPage({
           </p>
         ) : (
           <p className="mt-4 text-sm text-slate-400">
-            Описание пока не
-            указано.
+            Описание пока не указано.
           </p>
         )}
       </section>
-      <EntityTimeline entityType="deal" entityId={deal.id} entityArchived={deal.isArchived} />
+      <EntityTimeline
+        entityType="deal"
+        entityId={deal.id}
+        entityArchived={deal.isArchived}
+      />
     </div>
   );
 }
 
-function formatDateOnly(
-  value: string,
-) {
-  const [
-    year,
-    month,
-    day,
-  ] = value.split("-");
+function formatDateOnly(value: string) {
+  const [year, month, day] = value.split("-");
 
-  if (
-    !year ||
-    !month ||
-    !day
-  ) {
+  if (!year || !month || !day) {
     return value;
   }
 
@@ -535,10 +353,7 @@ function InfoItem({
 }: {
   label: string;
 
-  value:
-    | string
-    | null
-    | undefined;
+  value: string | null | undefined;
 }) {
   return (
     <div>
@@ -553,33 +368,17 @@ function InfoItem({
   );
 }
 
-function formatDealAmount(
-  amount: string,
-  currency:
-    | string
-    | null,
-) {
-  const value =
-    Number(amount);
+function formatDealAmount(amount: string, currency: string | null) {
+  const value = Number(amount);
 
-  if (
-    !Number.isFinite(
-      value,
-    )
-  ) {
+  if (!Number.isFinite(value)) {
     return amount;
   }
 
-  const formatted =
-    new Intl.NumberFormat(
-      "ru-RU",
-      {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      },
-    ).format(value);
+  const formatted = new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
 
-  return currency
-    ? `${formatted} ${currency}`
-    : formatted;
+  return currency ? `${formatted} ${currency}` : formatted;
 }

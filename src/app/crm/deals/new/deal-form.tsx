@@ -1,21 +1,15 @@
 "use client";
+import { ReferenceSearchSelect } from "@/modules/references/search-select";
 
 import { useToastActionState } from "@/modules/notifications/use-toast-action-state";
 
 import { OrganizationForm } from "@/modules/access/organization-context";
 
-
 import Link from "@/components/app-link";
-import {
-  useState,
-} from "react";
+import { useState } from "react";
 
-import {
-  createDeal,
-} from "../actions";
-import type {
-  CreateDealState,
-} from "@/lib/validation/deal";
+import { createDeal } from "../actions";
+import type { CreateDealState } from "@/lib/validation/deal";
 
 type PipelineOption = {
   id: string;
@@ -34,17 +28,13 @@ type StageOption = {
 type CompanyOption = {
   id: string;
   name: string;
-  taxId:
-    | string
-    | null;
+  taxId: string | null;
 };
 
 type MemberOption = {
   id: string;
 
-  displayName:
-    | string
-    | null;
+  displayName: string | null;
 };
 
 export function DealForm({
@@ -56,104 +46,65 @@ export function DealForm({
   defaultStageId,
   defaultOwnerMemberId,
 }: {
-  pipelines:
-    PipelineOption[];
+  pipelines: PipelineOption[];
 
-  stages:
-    StageOption[];
+  stages: StageOption[];
 
-  companies:
-    CompanyOption[];
+  companies: CompanyOption[];
 
-  members:
-    MemberOption[];
+  members: MemberOption[];
 
-  defaultPipelineId:
-    string;
+  defaultPipelineId: string;
 
-  defaultStageId:
-    string;
+  defaultStageId: string;
 
-  defaultOwnerMemberId:
-    string;
+  defaultOwnerMemberId: string;
 }) {
-  const initialState:
-    CreateDealState = {
-      values: {
-        title: "",
+  const initialState: CreateDealState = {
+    values: {
+      title: "",
 
-        pipelineId:
-          defaultPipelineId,
+      pipelineId: defaultPipelineId,
 
-        stageId:
-          defaultStageId,
+      stageId: defaultStageId,
 
-        amount: "",
+      amount: "",
 
-        currency:
-          "KZT",
+      currency: "KZT",
 
-        companyId: "",
+      companyId: "",
 
-        ownerMemberId:
-          defaultOwnerMemberId,
+      ownerMemberId: defaultOwnerMemberId,
 
-        expectedCloseAt:
-          "",
+      expectedCloseAt: "",
 
-        notes: "",
-      },
-    };
+      notes: "",
+    },
+  };
 
-  const [
-    state,
-    formAction,
-    pending,
-  ] = useToastActionState(
+  const [state, formAction, pending] = useToastActionState(
     createDeal,
     initialState,
   );
 
-  const initialPipeline =
-    state.values
-      ?.pipelineId ||
-    defaultPipelineId;
+  const initialPipeline = state.values?.pipelineId || defaultPipelineId;
 
-  const [
-    selectedPipelineId,
-    setSelectedPipelineId,
-  ] = useState(
-    initialPipeline,
+  const [selectedPipelineId, setSelectedPipelineId] = useState(initialPipeline);
+
+  const currentStages = stages.filter(
+    (stage) => stage.pipelineId === selectedPipelineId,
   );
 
-  const currentStages =
-    stages.filter(
-      (stage) =>
-        stage.pipelineId ===
-        selectedPipelineId,
-    );
+  const savedStageId = state.values?.stageId;
 
-  const savedStageId =
-    state.values?.stageId;
+  const stageExists = currentStages.some((stage) => stage.id === savedStageId);
 
-  const stageExists =
-    currentStages.some(
-      (stage) =>
-        stage.id ===
-        savedStageId,
-    );
-
-  const stageDefaultValue =
-    stageExists
-      ? savedStageId
-      : currentStages[0]?.id ??
-        "";
+  const stageDefaultValue = stageExists
+    ? savedStageId
+    : (currentStages[0]?.id ?? "");
 
   return (
-    <OrganizationForm
-      action={formAction}
-      className="space-y-8"
-    >
+    <OrganizationForm action={formAction} className="space-y-8">
       {state.message && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {state.message}
@@ -161,22 +112,15 @@ export function DealForm({
       )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Основная информация
-        </h2>
+        <h2 className="text-lg font-semibold">Основная информация</h2>
 
         <div className="mt-6">
           <Field
             label="Название сделки"
             name="title"
             required
-            defaultValue={
-              state.values
-                ?.title
-            }
-            errors={
-              state.errors?.title
-            }
+            defaultValue={state.values?.title}
+            errors={state.errors?.title}
           />
         </div>
 
@@ -187,119 +131,63 @@ export function DealForm({
               className="mb-2 block text-sm font-medium"
             >
               Воронка
-              <span className="ml-1 text-red-500">
-                *
-              </span>
+              <span className="ml-1 text-red-500">*</span>
             </label>
 
             <select
               id="pipelineId"
               name="pipelineId"
-              value={
-                selectedPipelineId
-              }
-              onChange={(
-                event,
-              ) => {
-                setSelectedPipelineId(
-                  event.target
-                    .value,
-                );
+              value={selectedPipelineId}
+              onChange={(event) => {
+                setSelectedPipelineId(event.target.value);
               }}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
             >
-              {pipelines.map(
-                (pipeline) => (
-                  <option
-                    key={
-                      pipeline.id
-                    }
-                    value={
-                      pipeline.id
-                    }
-                  >
-                    {
-                      pipeline.name
-                    }
-                    {pipeline.isDefault
-                      ? " — основная"
-                      : ""}
-                  </option>
-                ),
-              )}
+              {pipelines.map((pipeline) => (
+                <option key={pipeline.id} value={pipeline.id}>
+                  {pipeline.name}
+                  {pipeline.isDefault ? " — основная" : ""}
+                </option>
+              ))}
             </select>
 
-            <FieldErrors
-              errors={
-                state.errors
-                  ?.pipelineId
-              }
-            />
+            <FieldErrors errors={state.errors?.pipelineId} />
           </div>
 
           <div>
-            <label
-              htmlFor="stageId"
-              className="mb-2 block text-sm font-medium"
-            >
+            <label htmlFor="stageId" className="mb-2 block text-sm font-medium">
               Этап
-              <span className="ml-1 text-red-500">
-                *
-              </span>
+              <span className="ml-1 text-red-500">*</span>
             </label>
 
             <select
-              key={
-                selectedPipelineId
-              }
+              key={selectedPipelineId}
               id="stageId"
               name="stageId"
               required
-              defaultValue={
-                stageDefaultValue
-              }
+              defaultValue={stageDefaultValue}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
             >
-              {currentStages.map(
-                (stage) => (
-                  <option
-                    key={
-                      stage.id
-                    }
-                    value={
-                      stage.id
-                    }
-                  >
-                    {
-                      stage.name
-                    }
-                  </option>
-                ),
-              )}
+              {currentStages.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.name}
+                </option>
+              ))}
             </select>
 
-            {currentStages.length ===
-              0 && (
+            {currentStages.length === 0 && (
               <p className="mt-2 text-sm text-red-600">
-                У этой воронки
-                нет этапов.
+                У этой воронки нет этапов.
               </p>
             )}
 
-            <FieldErrors
-              errors={
-                state.errors
-                  ?.stageId
-              }
-            />
+            <FieldErrors errors={state.errors?.stageId} />
           </div>
         </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Стоимость
-        </h2>
+        <h2 className="text-lg font-semibold">Стоимость</h2>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <Field
@@ -307,14 +195,8 @@ export function DealForm({
             name="amount"
             inputMode="decimal"
             placeholder="1500000"
-            defaultValue={
-              state.values
-                ?.amount
-            }
-            errors={
-              state.errors
-                ?.amount
-            }
+            defaultValue={state.values?.amount}
+            errors={state.errors?.amount}
           />
 
           <Field
@@ -322,30 +204,18 @@ export function DealForm({
             name="currency"
             maxLength={3}
             placeholder="KZT"
-            defaultValue={
-              state.values
-                ?.currency ??
-              "KZT"
-            }
-            errors={
-              state.errors
-                ?.currency
-            }
+            defaultValue={state.values?.currency ?? "KZT"}
+            errors={state.errors?.currency}
           />
         </div>
 
         <p className="mt-3 text-xs text-slate-500">
-          Используйте
-          трёхбуквенный код:
-          KZT, USD, EUR, RUB,
-          CNY и т.д.
+          Используйте трёхбуквенный код: KZT, USD, EUR, RUB, CNY и т.д.
         </p>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Связи и ответственный
-        </h2>
+        <h2 className="text-lg font-semibold">Связи и ответственный</h2>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <div>
@@ -356,47 +226,23 @@ export function DealForm({
               Компания
             </label>
 
-            <select
+            <ReferenceSearchSelect
               id="companyId"
               name="companyId"
-              defaultValue={
-                state.values
-                  ?.companyId ??
-                ""
-              }
+              defaultValue={state.values?.companyId ?? ""}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
             >
-              <option value="">
-                Не выбрана
-              </option>
+              <option value="">Не выбрана</option>
 
-              {companies.map(
-                (company) => (
-                  <option
-                    key={
-                      company.id
-                    }
-                    value={
-                      company.id
-                    }
-                  >
-                    {
-                      company.name
-                    }
-                    {company.taxId
-                      ? ` — ${company.taxId}`
-                      : ""}
-                  </option>
-                ),
-              )}
-            </select>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                  {company.taxId ? ` — ${company.taxId}` : ""}
+                </option>
+              ))}
+            </ReferenceSearchSelect>
 
-            <FieldErrors
-              errors={
-                state.errors
-                  ?.companyId
-              }
-            />
+            <FieldErrors errors={state.errors?.companyId} />
           </div>
 
           <div>
@@ -407,90 +253,52 @@ export function DealForm({
               Ответственный
             </label>
 
-            <select
+            <ReferenceSearchSelect
               id="ownerMemberId"
               name="ownerMemberId"
-              defaultValue={
-                state.values
-                  ?.ownerMemberId ??
-                defaultOwnerMemberId
-              }
+              defaultValue={state.values?.ownerMemberId ?? defaultOwnerMemberId}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-slate-500"
             >
-              <option value="">
-                Не назначен
-              </option>
+              <option value="">Не назначен</option>
 
-              {members.map(
-                (member) => (
-                  <option
-                    key={
-                      member.id
-                    }
-                    value={
-                      member.id
-                    }
-                  >
-                    {member.displayName ||
-                      "Сотрудник"}
-                  </option>
-                ),
-              )}
-            </select>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.displayName || "Сотрудник"}
+                </option>
+              ))}
+            </ReferenceSearchSelect>
 
-            <FieldErrors
-              errors={
-                state.errors
-                  ?.ownerMemberId
-              }
-            />
+            <FieldErrors errors={state.errors?.ownerMemberId} />
           </div>
         </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Планирование
-        </h2>
+        <h2 className="text-lg font-semibold">Планирование</h2>
 
         <div className="mt-6 max-w-md">
           <Field
             label="Ожидаемая дата закрытия"
             name="expectedCloseAt"
             type="date"
-            defaultValue={
-              state.values
-                ?.expectedCloseAt
-            }
-            errors={
-              state.errors
-                ?.expectedCloseAt
-            }
+            defaultValue={state.values?.expectedCloseAt}
+            errors={state.errors?.expectedCloseAt}
           />
         </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">
-          Заметки
-        </h2>
+        <h2 className="text-lg font-semibold">Заметки</h2>
 
         <textarea
           id="notes"
           name="notes"
           rows={6}
-          defaultValue={
-            state.values?.notes ??
-            ""
-          }
+          defaultValue={state.values?.notes ?? ""}
           className="mt-6 w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-slate-500"
         />
 
-        <FieldErrors
-          errors={
-            state.errors?.notes
-          }
-        />
+        <FieldErrors errors={state.errors?.notes} />
       </section>
 
       <div className="flex justify-end gap-3">
@@ -503,16 +311,10 @@ export function DealForm({
 
         <button
           type="submit"
-          disabled={
-            pending ||
-            currentStages.length ===
-              0
-          }
+          disabled={pending || currentStages.length === 0}
           className="rounded-lg bg-slate-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending
-            ? "Создание..."
-            : "Создать сделку"}
+          {pending ? "Создание..." : "Создать сделку"}
         </button>
       </div>
     </OrganizationForm>
@@ -526,10 +328,7 @@ type FieldProps = {
   required?: boolean;
   defaultValue?: string;
   placeholder?: string;
-  inputMode?:
-    | "text"
-    | "decimal"
-    | "numeric";
+  inputMode?: "text" | "decimal" | "numeric";
   maxLength?: number;
   errors?: string[];
 };
@@ -547,17 +346,10 @@ function Field({
 }: FieldProps) {
   return (
     <div>
-      <label
-        htmlFor={name}
-        className="mb-2 block text-sm font-medium"
-      >
+      <label htmlFor={name} className="mb-2 block text-sm font-medium">
         {label}
 
-        {required && (
-          <span className="ml-1 text-red-500">
-            *
-          </span>
-        )}
+        {required && <span className="ml-1 text-red-500">*</span>}
       </label>
 
       <input
@@ -565,49 +357,30 @@ function Field({
         name={name}
         type={type}
         required={required}
-        defaultValue={
-          defaultValue ?? ""
-        }
-        placeholder={
-          placeholder
-        }
-        inputMode={
-          inputMode
-        }
-        maxLength={
-          maxLength
-        }
+        defaultValue={defaultValue ?? ""}
+        placeholder={placeholder}
+        inputMode={inputMode}
+        maxLength={maxLength}
         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-slate-500"
       />
 
-      <FieldErrors
-        errors={errors}
-      />
+      <FieldErrors errors={errors} />
     </div>
   );
 }
 
-function FieldErrors({
-  errors,
-}: {
-  errors?: string[];
-}) {
+function FieldErrors({ errors }: { errors?: string[] }) {
   if (!errors?.length) {
     return null;
   }
 
   return (
     <div className="mt-2 space-y-1">
-      {errors.map(
-        (error) => (
-          <p
-            key={error}
-            className="text-sm text-red-600"
-          >
-            {error}
-          </p>
-        ),
-      )}
+      {errors.map((error) => (
+        <p key={error} className="text-sm text-red-600">
+          {error}
+        </p>
+      ))}
     </div>
   );
 }
